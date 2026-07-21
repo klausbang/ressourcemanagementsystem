@@ -56,7 +56,7 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Phase 1 - Scope Baseline and Documentation Skeleton: Done
 - Phase 2 - First Demonstrator (Static Mockup, Local): Done
 - Phase 3 - Minimal Working Local Application: Done
-- Phase 4 - Architecture and Data Design Deliverables: Not Started
+- Phase 4 - Architecture and Data Design Deliverables: Done
 - Phase 5 - Cloud Deployment Readiness and Final Stage: Not Started
 - Phase 6 - AI Collaboration and Open Questions Governance: Not Started
 
@@ -76,6 +76,11 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Task 12 (Local CRUD and order allocation flows): Done
 - Task 13 (Seed routine for reproducible demo data): Done
 
+### Phase 4 Task Status
+- Task 15 (Architecture document with local and cloud separation): Done
+- Task 16 (Detailed ER model entities and relationships): Done
+- Task 17 (Embed architecture and ER diagrams and cross-link docs): Done
+
 ## Activity Log
 - 2026-07-21: Initial plan created from prompt and saved to project.
 - 2026-07-21: Preferences confirmed for SQLite, static wireframes first, basic role checks in first working local app, PNG/SVG diagrams, and Railway in final stage.
@@ -89,6 +94,9 @@ Status legend: Not Started | In Progress | Done | Blocked
 - 2026-07-21: Phase 3 Task 11 completed by adding login/logout, session role handling, and admin/planner route guards.
 - 2026-07-21: Phase 3 Task 12 completed by implementing admin capability/resource management and planner order allocation flows with validation.
 - 2026-07-21: Phase 3 Task 13 completed by adding reproducible demo seed routines and app startup initialization for local demonstration data.
+- 2026-07-21: Phase 4 Task 15 completed by replacing docs/architecture.html with detailed architecture documentation and embedding docs/architecture-diagram.svg.
+- 2026-07-21: Phase 4 Task 16 completed by replacing docs/er-model.html with detailed entities/relationships and embedding docs/er-diagram.svg.
+- 2026-07-21: Phase 4 Task 17 completed by cross-linking architecture and ER diagrams from docs/index.html and finalizing diagram embedding in both pages.
 
 ## Open Questions Queue Policy
 - Blocker: Must be answered before current phase can continue.

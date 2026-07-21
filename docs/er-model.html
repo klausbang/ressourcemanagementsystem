@@ -7,12 +7,63 @@
 </head>
 <body>
   <header>
-    <h1>RMS ER Model (Draft)</h1>
+    <h1>RMS ER Model</h1>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
   <main>
-    <p>This page will document entities and relationships and include an embedded PNG/SVG ER diagram.</p>
+    <section>
+      <h2>1. Scope</h2>
+      <p>This ER model defines the Phase 3 and Phase 4 data structure for local RMS operation and future migration planning.</p>
+    </section>
+
+    <section>
+      <h2>2. ER Diagram</h2>
+      <img src="er-diagram.svg" alt="RMS ER diagram" width="100%">
+      <p>The diagram reflects current SQLite schema entities and keys used in the minimal working local app.</p>
+    </section>
+
+    <section>
+      <h2>3. Core Entities</h2>
+      <ul>
+        <li>users: login identity and role (admin/planner).</li>
+        <li>resources: procedures, equipment, facilities, technicians, and related resource records.</li>
+        <li>capabilities: named test capabilities.</li>
+        <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
+        <li>customer_orders: order header per customer request.</li>
+        <li>ordered_tests: one or more tests requested under each customer order.</li>
+        <li>allocations: planner assignment of a resource to an ordered test.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Relationship Rules</h2>
+      <ul>
+        <li>One customer_order has many ordered_tests.</li>
+        <li>One capability can be linked to many ordered_tests as a required capability.</li>
+        <li>resources and capabilities are linked many-to-many through resource_capabilities.</li>
+        <li>Each ordered_test can have at most one allocation in v1 (unique ordered_test_id in allocations).</li>
+        <li>Each allocation references one planner user to track who assigned the resource.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Integrity Constraints</h2>
+      <ul>
+        <li>Unique keys on username, resource code, capability name, and order code.</li>
+        <li>Foreign keys enforce referential integrity between mapping/transactional tables and master tables.</li>
+        <li>Allocation validation in application logic ensures assigned resource has required capability for the ordered test.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Migration Notes for Cloud Phase</h2>
+      <ul>
+        <li>Model is DB-engine agnostic and can be migrated from SQLite to PostgreSQL.</li>
+        <li>Preserve primary and foreign key semantics during migration.</li>
+        <li>Add migration scripts and indexes in deployment-readiness phase.</li>
+      </ul>
+    </section>
   </main>
 </body>
 </html>

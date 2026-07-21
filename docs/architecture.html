@@ -7,12 +7,59 @@
 </head>
 <body>
   <header>
-    <h1>RMS Architecture (Draft)</h1>
+    <h1>RMS Architecture</h1>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
   <main>
-    <p>This page will describe the web application architecture and include an embedded PNG/SVG diagram.</p>
+    <section>
+      <h2>1. Scope</h2>
+      <p>This architecture describes the minimal local RMS runtime in Phase 3 and defines how it evolves to Railway cloud deployment in later stages.</p>
+    </section>
+
+    <section>
+      <h2>2. Architecture Diagram</h2>
+      <img src="architecture-diagram.svg" alt="RMS web architecture diagram" width="100%">
+      <p>The diagram shows browser interaction with Flask route layers, SQLite persistence for local versions, and the future move to Railway with PostgreSQL.</p>
+    </section>
+
+    <section>
+      <h2>3. Runtime Components</h2>
+      <ul>
+        <li>Client layer: browser-based HTML pages for admin and planner workflows.</li>
+        <li>Application layer: Flask blueprints for common, admin, and planner routes.</li>
+        <li>Domain/data layer: database schema, DB connection lifecycle, and seed routines.</li>
+        <li>Data layer (local): SQLite file database.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Request Flow</h2>
+      <ol>
+        <li>User accesses route from browser.</li>
+        <li>Flask route performs role and input validation.</li>
+        <li>Route executes queries against SQLite and applies business constraints.</li>
+        <li>Route returns rendered HTML template with flash feedback.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>5. Security and Access (Basic v1)</h2>
+      <ul>
+        <li>Role checks enforce admin-only and planner-only actions.</li>
+        <li>Session holds authenticated username and role.</li>
+        <li>Input validation prevents empty required fields and invalid allocation combinations.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Environment Separation</h2>
+      <ul>
+        <li>Local: Flask + SQLite for fast iteration and demonstrator usage.</li>
+        <li>Cloud target: Railway deployment with environment variables and PostgreSQL.</li>
+        <li>Migration path: keep route/domain design stable; swap DB backend and add migration scripts in a later phase.</li>
+      </ul>
+    </section>
   </main>
 </body>
 </html>
