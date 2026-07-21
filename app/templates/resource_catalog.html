@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Resource Catalog{% endblock %}
+
+{% block content %}
+<h2>Resource Catalog</h2>
+
+<form method="get">
+  <label>Type:
+    <input type="text" name="resource_type" value="{{ selected_type }}" placeholder="equipment/facility/technician">
+  </label>
+
+  <label>Capability:
+    <select name="capability_id">
+      <option value="">All</option>
+      {% for c in capabilities %}
+      <option value="{{ c['id'] }}" {% if selected_capability|string == c['id']|string %}selected{% endif %}>{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <button type="submit">Apply</button>
+</form>
+
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Status</th>
+      <th>Capabilities</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in resources %}
+    <tr>
+      <td>{{ r['code'] }}</td>
+      <td>{{ r['name'] }}</td>
+      <td>{{ r['resource_type'] }}</td>
+      <td>{{ r['status'] }}</td>
+      <td>{{ r['capabilities'] or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

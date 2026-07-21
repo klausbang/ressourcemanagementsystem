@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Planner Orders{% endblock %}
+
+{% block content %}
+<h2>Planner: Assign Resources to Ordered Tests</h2>
+
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      <th>Order</th>
+      <th>Customer</th>
+      <th>Test</th>
+      <th>Required Capability</th>
+      <th>Current Allocation</th>
+      <th>Assign Resource</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tests %}
+    <tr>
+      <td>{{ t['order_code'] }}</td>
+      <td>{{ t['customer_name'] }}</td>
+      <td>{{ t['test_name'] }}</td>
+      <td>{{ t['capability_name'] or '-' }}</td>
+      <td>
+        {% if t['allocated_resource_code'] %}
+          {{ t['allocated_resource_code'] }} - {{ t['allocated_resource_name'] }}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td>
+        <form method="post">
+          <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+          <select name="resource_id" required>
+            <option value="">Select</option>
+            {% for c in by_capability.get(t['capability_id'], []) %}
+            <option value="{{ c['resource_id'] }}" {% if t['allocated_resource_id'] and t['allocated_resource_id'] == c['resource_id'] %}selected{% endif %}>
+              {{ c['code'] }} - {{ c['name'] }} ({{ c['status'] }})
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit">Save</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

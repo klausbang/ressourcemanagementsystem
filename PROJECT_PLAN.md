@@ -55,7 +55,7 @@ Status legend: Not Started | In Progress | Done | Blocked
 
 - Phase 1 - Scope Baseline and Documentation Skeleton: Done
 - Phase 2 - First Demonstrator (Static Mockup, Local): Done
-- Phase 3 - Minimal Working Local Application: Not Started
+- Phase 3 - Minimal Working Local Application: Done
 - Phase 4 - Architecture and Data Design Deliverables: Not Started
 - Phase 5 - Cloud Deployment Readiness and Final Stage: Not Started
 - Phase 6 - AI Collaboration and Open Questions Governance: Not Started
@@ -70,6 +70,12 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Task 7 (Dummy example data for prompt scenarios): Done
 - Task 8 (Acceptance checks for mockups): Done
 
+### Phase 3 Task Status
+- Task 10 (Backend scope and Flask+SQLite runtime design): Done
+- Task 11 (Basic role checks for admin/planner): Done
+- Task 12 (Local CRUD and order allocation flows): Done
+- Task 13 (Seed routine for reproducible demo data): Done
+
 ## Activity Log
 - 2026-07-21: Initial plan created from prompt and saved to project.
 - 2026-07-21: Preferences confirmed for SQLite, static wireframes first, basic role checks in first working local app, PNG/SVG diagrams, and Railway in final stage.
@@ -79,6 +85,10 @@ Status legend: Not Started | In Progress | Done | Blocked
 - 2026-07-21: Phase 2 Task 6 completed by creating three static wireframes for resource catalog, admin capability assignment, and planner order allocation.
 - 2026-07-21: Phase 2 Task 7 completed by creating docs/mockup-dummy-data.html with scenario-aligned data.
 - 2026-07-21: Phase 2 Task 8 completed by creating docs/mockup-acceptance-checks.html and linking all Phase 2 pages from docs/index.html.
+- 2026-07-21: Phase 3 Task 10 completed by creating the minimal Flask app skeleton, SQLite schema, route placeholders, and docs/phase3-backend-scope.html.
+- 2026-07-21: Phase 3 Task 11 completed by adding login/logout, session role handling, and admin/planner route guards.
+- 2026-07-21: Phase 3 Task 12 completed by implementing admin capability/resource management and planner order allocation flows with validation.
+- 2026-07-21: Phase 3 Task 13 completed by adding reproducible demo seed routines and app startup initialization for local demonstration data.
 
 ## Open Questions Queue Policy
 - Blocker: Must be answered before current phase can continue.

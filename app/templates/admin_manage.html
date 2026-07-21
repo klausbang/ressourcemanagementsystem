@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Manage{% endblock %}
+
+{% block content %}
+<h2>Admin: Manage Capabilities and Resources</h2>
+
+<section>
+  <h3>Create Capability</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="create_capability">
+    <label>Name <input type="text" name="name" required></label>
+    <label>Description <input type="text" name="description"></label>
+    <button type="submit">Save Capability</button>
+  </form>
+</section>
+
+<section>
+  <h3>Create Resource</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="create_resource">
+    <label>Code <input type="text" name="code" required></label>
+    <label>Name <input type="text" name="name" required></label>
+    <label>Type <input type="text" name="resource_type" placeholder="equipment/facility/technician" required></label>
+    <button type="submit">Save Resource</button>
+  </form>
+</section>
+
+<section>
+  <h3>Assign Capability to Resource</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="assign_capability">
+    <label>Resource
+      <select name="resource_id" required>
+        <option value="">Select</option>
+        {% for r in resources %}
+        <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>Capability
+      <select name="capability_id" required>
+        <option value="">Select</option>
+        {% for c in capabilities %}
+        <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <button type="submit">Assign</button>
+  </form>
+</section>
+
+<section>
+  <h3>Current Resource-Capability Mapping</h3>
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        <th>Resource Code</th>
+        <th>Resource Name</th>
+        <th>Capability</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in mappings %}
+      <tr>
+        <td>{{ m['code'] }}</td>
+        <td>{{ m['resource_name'] }}</td>
+        <td>{{ m['capability_name'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

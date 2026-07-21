@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h2>Login</h2>
+<p>Use seeded users: <code>admin.demo</code> or <code>planner.demo</code>.</p>
+
+<form method="post">
+  <label>Username
+    <input type="text" name="username" required>
+  </label>
+  <button type="submit">Sign In</button>
+</form>
+{% endblock %}

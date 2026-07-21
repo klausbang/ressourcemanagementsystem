@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Phase 3 Backend Scope</title>
+</head>
+<body>
+  <header>
+    <h1>Phase 3 Backend Scope (Flask + SQLite)</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Entities</h2>
+      <ul>
+        <li>users (admin/planner roles)</li>
+        <li>resources</li>
+        <li>capabilities</li>
+        <li>resource_capabilities</li>
+        <li>customer_orders</li>
+        <li>ordered_tests</li>
+        <li>allocations</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Route Scope</h2>
+      <ul>
+        <li>GET / : resource catalog with filters</li>
+        <li>Admin scope: capability/resource CRUD and capability assignment</li>
+        <li>Planner scope: list orders/tests and assign resource to test</li>
+        <li>Basic login/logout for role-aware actions</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Validation Rules (Minimum)</h2>
+      <ul>
+        <li>Required fields on create/update forms</li>
+        <li>Unique resource code and capability name</li>
+        <li>Allocation requires resource to have test capability</li>
+        <li>Role checks for admin/planner actions</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Template Scope</h2>
+      <ul>
+        <li>resource_catalog.html</li>
+        <li>admin_manage.html</li>
+        <li>planner_orders.html</li>
+        <li>login.html</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
