@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Planner Order Allocation</title>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Planner Order Allocation</h1>
+    <p>Role focus: Test Planner</p>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>Allow planners to assign resources to ordered tests for each customer order.</p>
+    </section>
+
+    <section>
+      <h2>Customer Order Selector (Static Mockup)</h2>
+      <form>
+        <label>Select Order
+          <select>
+            <option>ORD-2026-001 - Calibrate multimeter (Customer: Acme Instruments)</option>
+            <option>ORD-2026-002 - Vibration + Humidity tests (Customer: Nova Mobile)</option>
+          </select>
+        </label>
+      </form>
+    </section>
+
+    <section>
+      <h2>Ordered Tests and Allocation (Dummy Data)</h2>
+      <table border="1" cellpadding="6">
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th>Required Capability</th>
+            <th>Candidate Resources</th>
+            <th>Selected Resource</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Multimeter Calibration</td>
+            <td>Multimeter Calibration</td>
+            <td>EQ-001, TECH-110</td>
+            <td>
+              <select>
+                <option>EQ-001 - Multimeter Calibrator A</option>
+                <option>TECH-110 - Lars Holm</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>Vibration Test</td>
+            <td>Vibration Test</td>
+            <td>EQ-020, TECH-102</td>
+            <td>
+              <select>
+                <option>EQ-020 - Vibration Tester V-9</option>
+                <option>TECH-102 - Maya Jensen</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>Humidity Test</td>
+            <td>Humidity Test</td>
+            <td>FAC-004, TECH-102</td>
+            <td>
+              <select>
+                <option>FAC-004 - Humidity Chamber Room B</option>
+                <option>TECH-102 - Maya Jensen</option>
+              </select>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><button type="button">Save Allocation</button></p>
+    </section>
+  </main>
+</body>
+</html>

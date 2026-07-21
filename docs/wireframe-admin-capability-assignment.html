@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Admin Capability Assignment</title>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Admin Capability Assignment</h1>
+    <p>Role focus: RMS Administrator</p>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>Allow administrators to create capabilities and assign capabilities to selected resources.</p>
+    </section>
+
+    <section>
+      <h2>Create Capability (Static Mockup)</h2>
+      <form>
+        <label>Capability Name
+          <input type="text" value="Humidity Test">
+        </label>
+        <label>Description
+          <input type="text" value="Ability to perform controlled humidity exposure test">
+        </label>
+        <button type="button">Create Capability</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Assign Capability to Resource (Static Mockup)</h2>
+      <form>
+        <label>Select Resource
+          <select>
+            <option>EQ-020 - Vibration Tester V-9</option>
+            <option>FAC-004 - Humidity Chamber Room B</option>
+            <option>TECH-102 - Maya Jensen</option>
+          </select>
+        </label>
+
+        <fieldset>
+          <legend>Select Capabilities</legend>
+          <label><input type="checkbox" checked> Vibration Test</label><br>
+          <label><input type="checkbox" checked> Humidity Test</label><br>
+          <label><input type="checkbox"> Multimeter Calibration</label>
+        </fieldset>
+
+        <button type="button">Assign Selected</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Current Resource-Capability Mapping (Dummy Data)</h2>
+      <table border="1" cellpadding="6">
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Capabilities</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>EQ-001 - Multimeter Calibrator A</td>
+            <td>Multimeter Calibration</td>
+          </tr>
+          <tr>
+            <td>EQ-020 - Vibration Tester V-9</td>
+            <td>Vibration Test</td>
+          </tr>
+          <tr>
+            <td>FAC-004 - Humidity Chamber Room B</td>
+            <td>Humidity Test</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

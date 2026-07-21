@@ -1,0 +1,46 @@
+This is a prompt for making a Software Requirewments Specification (SRS) for a Ressource Management System (RMS).
+Make this first version of the SRS as simple and short as possible, including only the most important requirements to be able to create the first mock up of the RSM as a demonstrator of some of the possibilities with a RMS.
+
+
+The RMS is a web application used in a small company the perform electrical and mechanical test on customer products.
+
+The users of the RMS shall be able to allocate ressources to the performance of orders from customers for the test to be performed.
+
+Examples:
+A customer may order calibration of a multimeter.
+Another customer may order two mechanical tests on a product under development, a new mobile phone. The two tests are vibration test and humidity test.
+
+
+The RMS maintains a database of ressources: 
+Test procedures (written procedures)
+Test equipment (e.g a multimeter calibrator, a vibration tester, a humidity tester)
+Test facilities (rooms)
+Test technicians (people)
+RSM administrators (people)
+Test planners (people)
+
+Ressources have capabilities.
+
+
+The RMS shall run on a Railway server with an appropriate database management system.
+The programming language is Python, probably running Flask.
+
+The first versions of the RMS
+
+The RMS administrators shall be able to add ressources and capabilities and assign capabilities to ressources.
+
+Test planners shall be able to assign ressources to a customer order.
+
+
+In addition to the SRS, also create an architectual drawing of the web based application and an ER-model of the database.
+Make the documentation SRS, architecture, ER model, and other documentation, including the plan, as HTML files. Make a documentation landing page that guides the reader round in the documentation.
+
+Make a development plan for the development of the RMS with activities and tasks. Do not estimate duration of tasks as I will use AI tools, like GitHub Copilot and Claude Code for the development so time estimates does not make sense for me.
+
+
+Make also a documentation page where you and other AI tools can ask me questions. Mark the questions with a priority so that I know when something is very important to answer now (blockers) , and what can be postponed until later to answer.
+
+Include also activities and tasks for the deployment in the cloud, but keep the first version local.
+
+The plan shall show this staged development, where we begin locally, maybe even with dummy mock ups, and then later on working local versions, and finally working versions in the cloud.
+

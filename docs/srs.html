@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS SRS v1 (Minimal Scope)</title>
+</head>
+<body>
+  <header>
+    <h1>Resource Management System (RMS) - SRS v1</h1>
+    <p>Version: 0.1 | Date: 2026-07-21</p>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>This SRS defines the minimum requirements needed to build a first demonstrator of a web-based RMS for a small test company.</p>
+    </section>
+
+    <section>
+      <h2>2. Business Context</h2>
+      <ul>
+        <li>The company performs electrical and mechanical tests on customer products.</li>
+        <li>The RMS supports planning and allocation of resources to customer orders.</li>
+        <li>Example orders include multimeter calibration and vibration/humidity tests for a mobile phone under development.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. User Roles (v1)</h2>
+      <ul>
+        <li>RMS Administrator: manages resources, capabilities, and assignments of capabilities to resources.</li>
+        <li>Test Planner: assigns resources to customer orders.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Core Functional Requirements (v1)</h2>
+      <h3>4.1 Resource and Capability Management</h3>
+      <ul>
+        <li>The system shall store resources in these categories: test procedures, test equipment, test facilities, test technicians, administrators, and test planners.</li>
+        <li>The system shall allow administrators to create and update capabilities.</li>
+        <li>The system shall allow administrators to assign one or more capabilities to a resource.</li>
+      </ul>
+
+      <h3>4.2 Customer Orders and Allocation</h3>
+      <ul>
+        <li>The system shall allow creation of customer orders with one or more requested tests.</li>
+        <li>The system shall allow planners to assign available resources to each ordered test.</li>
+      </ul>
+
+      <h3>4.3 Access Control (Basic)</h3>
+      <ul>
+        <li>The system shall enforce basic role checks for admin-only and planner-only actions.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Data Requirements (v1)</h2>
+      <ul>
+        <li>Store users and roles.</li>
+        <li>Store resources and capabilities with many-to-many mapping.</li>
+        <li>Store customer orders, ordered tests, and resource allocations.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Non-Functional Requirements (v1)</h2>
+      <ul>
+        <li>Technology: Python with Flask.</li>
+        <li>Local first: working local version uses SQLite.</li>
+        <li>Cloud target: Railway hosting in later stage.</li>
+        <li>Documentation: SRS, architecture, ER model, development plan, and AI questions page in HTML.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Out of Scope for v1</h2>
+      <ul>
+        <li>Advanced scheduling optimization and conflict auto-resolution.</li>
+        <li>Test execution result capture and reporting workflows.</li>
+        <li>Production-grade identity management.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

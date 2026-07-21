@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Resource Catalog</title>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Resource Catalog</h1>
+    <p>Role focus: shared reference view (Admin and Planner)</p>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>Provide a quick overview of available resources and their capabilities before assignment work.</p>
+    </section>
+
+    <section>
+      <h2>Filters (Static Mockup)</h2>
+      <form>
+        <label>Resource Type
+          <select>
+            <option>All</option>
+            <option>Test Equipment</option>
+            <option>Test Facility</option>
+            <option>Test Procedure</option>
+            <option>Test Technician</option>
+          </select>
+        </label>
+        <label>Capability
+          <input type="text" value="Vibration Test">
+        </label>
+        <button type="button">Apply</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Resource List (Dummy Data)</h2>
+      <table border="1" cellpadding="6">
+        <thead>
+          <tr>
+            <th>Resource ID</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Capabilities</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>EQ-001</td>
+            <td>Multimeter Calibrator A</td>
+            <td>Test Equipment</td>
+            <td>Multimeter Calibration</td>
+            <td>Available</td>
+          </tr>
+          <tr>
+            <td>EQ-020</td>
+            <td>Vibration Tester V-9</td>
+            <td>Test Equipment</td>
+            <td>Vibration Test</td>
+            <td>Available</td>
+          </tr>
+          <tr>
+            <td>FAC-004</td>
+            <td>Humidity Chamber Room B</td>
+            <td>Test Facility</td>
+            <td>Humidity Test</td>
+            <td>Available</td>
+          </tr>
+          <tr>
+            <td>TECH-102</td>
+            <td>Maya Jensen</td>
+            <td>Test Technician</td>
+            <td>Vibration Test, Humidity Test</td>
+            <td>Available</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
