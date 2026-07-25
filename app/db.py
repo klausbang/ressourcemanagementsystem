@@ -51,10 +51,11 @@ CREATE TABLE IF NOT EXISTS ordered_tests (
 
 CREATE TABLE IF NOT EXISTS allocations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ordered_test_id INTEGER NOT NULL UNIQUE,
+    ordered_test_id INTEGER NOT NULL,
     resource_id INTEGER NOT NULL,
     planner_user_id INTEGER NOT NULL,
     notes TEXT,
+    UNIQUE (ordered_test_id, resource_id),
     FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
     FOREIGN KEY (resource_id) REFERENCES resources(id),
     FOREIGN KEY (planner_user_id) REFERENCES users(id)
@@ -106,28 +107,40 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
 
     db.execute("""
-        INSERT OR IGNORE INTO ordered_tests (order_id, test_name, required_capability_id)
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
         SELECT o.id, ?, c.id
         FROM customer_orders o
         JOIN capabilities c ON c.name = ?
         WHERE o.order_code = ?
-    """, ("Multimeter Calibration", "Multimeter Calibration", "ORD-2026-001"))
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("Multimeter Calibration", "Multimeter Calibration", "ORD-2026-001", "Multimeter Calibration"))
 
     db.execute("""
-        INSERT OR IGNORE INTO ordered_tests (order_id, test_name, required_capability_id)
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
         SELECT o.id, ?, c.id
         FROM customer_orders o
         JOIN capabilities c ON c.name = ?
         WHERE o.order_code = ?
-    """, ("Vibration Test", "Vibration Test", "ORD-2026-002"))
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("Vibration Test", "Vibration Test", "ORD-2026-002", "Vibration Test"))
 
     db.execute("""
-        INSERT OR IGNORE INTO ordered_tests (order_id, test_name, required_capability_id)
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
         SELECT o.id, ?, c.id
         FROM customer_orders o
         JOIN capabilities c ON c.name = ?
         WHERE o.order_code = ?
-    """, ("Humidity Test", "Humidity Test", "ORD-2026-002"))
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("Humidity Test", "Humidity Test", "ORD-2026-002", "Humidity Test"))
 
     db.execute("""
         INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)

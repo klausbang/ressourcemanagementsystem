@@ -1,29 +1,154 @@
 {% extends 'base.html' %}
+{% import '_macros.html' as macros %}
 
 {% block title %}Admin Manage{% endblock %}
 
 {% block content %}
-<h2>Admin: Manage Capabilities and Resources</h2>
+<h2>Admin: Manage Users, Capabilities, and Resources</h2>
 
 <section>
-  <h3>Create Capability</h3>
+  <h3>Users</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="create_user">
+    <label>Username <input type="text" name="username" required></label>
+    <label>Role
+      <select name="role" required>
+        <option value="admin">admin</option>
+        <option value="planner">planner</option>
+      </select>
+    </label>
+    <button type="submit">Create User</button>
+  </form>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        {{ macros.sort_th('Username', 'username', 'users', 'admin.admin_manage') }}
+        {{ macros.sort_th('Role', 'role', 'users', 'admin.admin_manage') }}
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="{{ 'dup-row' if u['_dup'] }}">
+        <td><input type="text" name="username" value="{{ u['username'] }}" form="user-save-{{ u['id'] }}"></td>
+        <td>
+          <select name="role" form="user-save-{{ u['id'] }}">
+            <option value="admin" {% if u['role'] == 'admin' %}selected{% endif %}>admin</option>
+            <option value="planner" {% if u['role'] == 'planner' %}selected{% endif %}>planner</option>
+          </select>
+        </td>
+        <td>
+          <button type="submit" form="user-save-{{ u['id'] }}">Save</button>
+          <button type="submit" form="user-delete-{{ u['id'] }}">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% for u in users %}
+  <form id="user-save-{{ u['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="update_user">
+    <input type="hidden" name="user_id" value="{{ u['id'] }}">
+  </form>
+  <form id="user-delete-{{ u['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_user">
+    <input type="hidden" name="user_id" value="{{ u['id'] }}">
+  </form>
+  {% endfor %}
+</section>
+
+<section>
+  <h3>Capabilities</h3>
   <form method="post">
     <input type="hidden" name="action" value="create_capability">
     <label>Name <input type="text" name="name" required></label>
     <label>Description <input type="text" name="description"></label>
     <button type="submit">Save Capability</button>
   </form>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        {{ macros.sort_th('Name', 'name', 'capabilities', 'admin.admin_manage') }}
+        {{ macros.sort_th('Description', 'description', 'capabilities', 'admin.admin_manage') }}
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in capabilities %}
+      <tr class="{{ 'dup-row' if c['_dup'] }}">
+        <td><input type="text" name="name" value="{{ c['name'] }}" form="capability-save-{{ c['id'] }}"></td>
+        <td><input type="text" name="description" value="{{ c['description'] or '' }}" form="capability-save-{{ c['id'] }}"></td>
+        <td>
+          <button type="submit" form="capability-save-{{ c['id'] }}">Save</button>
+          <button type="submit" form="capability-delete-{{ c['id'] }}">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% for c in capabilities %}
+  <form id="capability-save-{{ c['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="update_capability">
+    <input type="hidden" name="capability_id" value="{{ c['id'] }}">
+  </form>
+  <form id="capability-delete-{{ c['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_capability">
+    <input type="hidden" name="capability_id" value="{{ c['id'] }}">
+  </form>
+  {% endfor %}
 </section>
 
 <section>
-  <h3>Create Resource</h3>
+  <h3>Resources</h3>
   <form method="post">
     <input type="hidden" name="action" value="create_resource">
     <label>Code <input type="text" name="code" required></label>
     <label>Name <input type="text" name="name" required></label>
     <label>Type <input type="text" name="resource_type" placeholder="equipment/facility/technician" required></label>
+    <label>Status <input type="text" name="status" placeholder="available"></label>
     <button type="submit">Save Resource</button>
   </form>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        {{ macros.sort_th('Code', 'code', 'resources', 'admin.admin_manage') }}
+        {{ macros.sort_th('Name', 'name', 'resources', 'admin.admin_manage') }}
+        {{ macros.sort_th('Type', 'resource_type', 'resources', 'admin.admin_manage') }}
+        {{ macros.sort_th('Status', 'status', 'resources', 'admin.admin_manage') }}
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in resources %}
+      <tr class="{{ 'dup-row' if r['_dup'] }}">
+        <td><input type="text" name="code" value="{{ r['code'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td>
+          <button type="submit" form="resource-save-{{ r['id'] }}">Save</button>
+          <button type="submit" form="resource-delete-{{ r['id'] }}">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% for r in resources %}
+  <form id="resource-save-{{ r['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="update_resource">
+    <input type="hidden" name="resource_id" value="{{ r['id'] }}">
+  </form>
+  <form id="resource-delete-{{ r['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_resource">
+    <input type="hidden" name="resource_id" value="{{ r['id'] }}">
+  </form>
+  {% endfor %}
 </section>
 
 <section>
@@ -50,24 +175,30 @@
 
     <button type="submit">Assign</button>
   </form>
-</section>
 
-<section>
-  <h3>Current Resource-Capability Mapping</h3>
   <table border="1" cellpadding="6">
     <thead>
       <tr>
-        <th>Resource Code</th>
-        <th>Resource Name</th>
-        <th>Capability</th>
+        {{ macros.sort_th('Resource Code', 'code', 'mappings', 'admin.admin_manage') }}
+        {{ macros.sort_th('Resource Name', 'resource_name', 'mappings', 'admin.admin_manage') }}
+        {{ macros.sort_th('Capability', 'capability_name', 'mappings', 'admin.admin_manage') }}
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for m in mappings %}
-      <tr>
+      <tr class="{{ 'dup-row' if m['_dup'] }}">
         <td>{{ m['code'] }}</td>
         <td>{{ m['resource_name'] }}</td>
         <td>{{ m['capability_name'] }}</td>
+        <td>
+          <form method="post">
+            <input type="hidden" name="action" value="remove_capability">
+            <input type="hidden" name="resource_id" value="{{ m['resource_id'] }}">
+            <input type="hidden" name="capability_id" value="{{ m['capability_id'] }}">
+            <button type="submit">Remove</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

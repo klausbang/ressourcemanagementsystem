@@ -11,7 +11,7 @@
 erDiagram
     users ||--o{ allocations : "planner_user_id"
     resources ||--o{ allocations : "resource_id"
-    ordered_tests ||--o| allocations : "ordered_test_id (unique)"
+    ordered_tests ||--o{ allocations : "ordered_test_id"
     customer_orders ||--o{ ordered_tests : "order_id"
     capabilities ||--o{ ordered_tests : "required_capability_id"
     resources ||--o{ resource_capabilities : "resource_id"
@@ -58,8 +58,8 @@ erDiagram
 
     allocations {
         int id PK
-        int ordered_test_id UK "also FK -> ordered_tests.id"
-        int resource_id FK
+        int ordered_test_id UK "also FK -> ordered_tests.id; UK is composite with resource_id"
+        int resource_id UK "also FK -> resources.id; UK is composite with ordered_test_id"
         int planner_user_id FK
         string notes
     }

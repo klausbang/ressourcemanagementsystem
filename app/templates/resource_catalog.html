@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import '_macros.html' as macros %}
 
 {% block title %}Resource Catalog{% endblock %}
 
@@ -25,16 +26,16 @@
 <table border="1" cellpadding="6">
   <thead>
     <tr>
-      <th>Code</th>
-      <th>Name</th>
-      <th>Type</th>
-      <th>Status</th>
-      <th>Capabilities</th>
+      {{ macros.sort_th('Code', 'code', 'resources', 'common.resource_catalog') }}
+      {{ macros.sort_th('Name', 'name', 'resources', 'common.resource_catalog') }}
+      {{ macros.sort_th('Type', 'resource_type', 'resources', 'common.resource_catalog') }}
+      {{ macros.sort_th('Status', 'status', 'resources', 'common.resource_catalog') }}
+      {{ macros.sort_th('Capabilities', 'capabilities', 'resources', 'common.resource_catalog') }}
     </tr>
   </thead>
   <tbody>
     {% for r in resources %}
-    <tr>
+    <tr class="{{ 'dup-row' if r['_dup'] }}">
       <td>{{ r['code'] }}</td>
       <td>{{ r['name'] }}</td>
       <td>{{ r['resource_type'] }}</td>

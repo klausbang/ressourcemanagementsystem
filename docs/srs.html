@@ -40,14 +40,17 @@
       <h3>4.1 Resource and Capability Management</h3>
       <ul>
         <li>The system shall store resources in these categories: test procedures, test equipment, test facilities, test technicians, administrators, and test planners.</li>
-        <li>The system shall allow administrators to create and update capabilities.</li>
-        <li>The system shall allow administrators to assign one or more capabilities to a resource.</li>
+        <li>The system shall allow administrators full CRUD (create, read, update, delete) on user accounts, capabilities, and resources.</li>
+        <li>The system shall allow administrators to assign and unassign capabilities on a resource.</li>
+        <li>The system shall prevent deletion of a capability, resource, or user that is still referenced by an ordered test, allocation, or planner assignment, and shall report a clear reason instead of failing silently.</li>
       </ul>
 
       <h3>4.2 Customer Orders and Allocation</h3>
       <ul>
-        <li>The system shall allow creation of customer orders with one or more requested tests.</li>
-        <li>The system shall allow planners to assign available resources to each ordered test.</li>
+        <li>The system shall allow planners full CRUD (create, read, update, delete) on customer orders and ordered tests.</li>
+        <li>The system shall allow planners to assign multiple resources to the same ordered test (e.g. equipment, facility, procedure, and technician together), and to unassign any one of them independently, provided each assigned resource has the test's required capability.</li>
+        <li>The system shall prevent the same resource from being assigned twice to the same ordered test.</li>
+        <li>Deleting a customer order shall also remove its ordered tests and all of their allocations; deleting an ordered test shall also remove all of its allocations.</li>
       </ul>
 
       <h3>4.3 Access Control (Basic)</h3>

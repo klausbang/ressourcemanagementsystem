@@ -3,8 +3,12 @@ from functools import wraps
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 from .db import init_db, get_db
+from .table_utils import rows_with_meta
 
 bp = Blueprint("common", __name__)
+
+RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "capabilities"}
+RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "capabilities"]
 
 
 def current_role() -> str | None:
@@ -56,7 +60,13 @@ def resource_catalog():
 
     query += " GROUP BY r.id ORDER BY r.code"
 
-    resources = db.execute(query, params).fetchall()
+    resources = rows_with_meta(
+        db.execute(query, params).fetchall(),
+        dup_keys=RESOURCE_DUP_KEYS,
+        sort_key=request.args.get("resources_sort"),
+        sort_dir=request.args.get("resources_dir", "asc"),
+        sortable_keys=RESOURCE_SORTABLE_KEYS,
+    )
     capabilities = db.execute("SELECT id, name FROM capabilities ORDER BY name").fetchall()
 
     return render_template(

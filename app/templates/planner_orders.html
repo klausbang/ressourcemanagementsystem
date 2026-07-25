@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import '_macros.html' as macros %}
 
 {% block title %}Planner Orders{% endblock %}
 
@@ -35,6 +36,43 @@
   <button type="submit">Create Order</button>
 </form>
 
+<h3>Existing Customer Orders</h3>
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      {{ macros.sort_th('Order Code', 'order_code', 'orders', 'planner.planner_orders') }}
+      {{ macros.sort_th('Customer Name', 'customer_name', 'orders', 'planner.planner_orders') }}
+      {{ macros.sort_th('Product Name', 'product_name', 'orders', 'planner.planner_orders') }}
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for o in orders %}
+    <tr class="{{ 'dup-row' if o['_dup'] }}">
+      <td><input type="text" name="order_code" value="{{ o['order_code'] }}" form="order-save-{{ o['id'] }}"></td>
+      <td><input type="text" name="customer_name" value="{{ o['customer_name'] }}" form="order-save-{{ o['id'] }}"></td>
+      <td><input type="text" name="product_name" value="{{ o['product_name'] }}" form="order-save-{{ o['id'] }}"></td>
+      <td>
+        <button type="submit" form="order-save-{{ o['id'] }}">Save</button>
+        <button type="submit" form="order-delete-{{ o['id'] }}">Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><em>Deleting an order also deletes its ordered tests and any allocations for those tests.</em></p>
+
+{% for o in orders %}
+<form id="order-save-{{ o['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="update_order">
+  <input type="hidden" name="order_id" value="{{ o['id'] }}">
+</form>
+<form id="order-delete-{{ o['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="delete_order">
+  <input type="hidden" name="order_id" value="{{ o['id'] }}">
+</form>
+{% endfor %}
+
 <h2>Planner: Add Ordered Test to Order</h2>
 <form method="post">
   <input type="hidden" name="action" value="add_test">
@@ -60,50 +98,110 @@
   <button type="submit">Add Test</button>
 </form>
 
-<h2>Planner: Assign Resources to Ordered Tests</h2>
-
+<h3>Existing Ordered Tests</h3>
 <table border="1" cellpadding="6">
   <thead>
     <tr>
-      <th>Order</th>
-      <th>Customer</th>
-      <th>Test</th>
-      <th>Required Capability</th>
-      <th>Current Allocation</th>
-      <th>Assign Resource</th>
+      {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
+      {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
+      {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
-    {% for t in tests %}
-    <tr>
+    {% for t in ordered_tests_rows %}
+    <tr class="{{ 'dup-row' if t['_dup'] }}">
       <td>{{ t['order_code'] }}</td>
-      <td>{{ t['customer_name'] }}</td>
-      <td>{{ t['test_name'] }}</td>
-      <td>{{ t['capability_name'] or '-' }}</td>
+      <td><input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}"></td>
       <td>
-        {% if t['allocated_resource_code'] %}
-          {{ t['allocated_resource_code'] }} - {{ t['allocated_resource_name'] }}
-        {% else %}
-          -
-        {% endif %}
+        <select name="required_capability_id" form="test-save-{{ t['ordered_test_id'] }}">
+          <option value="">None</option>
+          {% for c in capabilities %}
+          <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
       </td>
       <td>
-        <form method="post">
-          <input type="hidden" name="action" value="assign_resource">
-          <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
-          <select name="resource_id" required>
-            <option value="">Select</option>
-            {% for c in by_capability.get(t['capability_id'], []) %}
-            <option value="{{ c['resource_id'] }}" {% if t['allocated_resource_id'] and t['allocated_resource_id'] == c['resource_id'] %}selected{% endif %}>
-              {{ c['code'] }} - {{ c['name'] }} ({{ c['status'] }})
-            </option>
-            {% endfor %}
-          </select>
-          <button type="submit">Save</button>
-        </form>
+        <button type="submit" form="test-save-{{ t['ordered_test_id'] }}">Save</button>
+        <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}">Delete</button>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+<p><em>Deleting an ordered test also deletes its allocation, if any.</em></p>
+
+{% for t in ordered_tests_rows %}
+<form id="test-save-{{ t['ordered_test_id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="update_test">
+  <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+</form>
+<form id="test-delete-{{ t['ordered_test_id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="delete_test">
+  <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+</form>
+{% endfor %}
+
+<h2>Planner: Assign Resources to Ordered Tests</h2>
+
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      {{ macros.sort_th('Order', 'order_code', 'alloc', 'planner.planner_orders') }}
+      {{ macros.sort_th('Customer', 'customer_name', 'alloc', 'planner.planner_orders') }}
+      {{ macros.sort_th('Test', 'test_name', 'alloc', 'planner.planner_orders') }}
+      {{ macros.sort_th('Required Capability', 'capability_name', 'alloc', 'planner.planner_orders') }}
+      {{ macros.sort_th('Assigned Resources', 'allocated_summary', 'alloc', 'planner.planner_orders') }}
+      <th>Assign Another Resource</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tests %}
+    <tr class="{{ 'dup-row' if t['_dup'] }}">
+      <td>{{ t['order_code'] }}</td>
+      <td>{{ t['customer_name'] }}</td>
+      <td>{{ t['test_name'] }}</td>
+      <td>{{ t['capability_name'] or '-' }}</td>
+      <td>
+        {% if t['allocated_resources'] %}
+        <ul>
+          {% for a in t['allocated_resources'] %}
+          <li>
+            {{ a['resource_code'] }} - {{ a['resource_name'] }} ({{ a['resource_type'] }})
+            <form method="post" style="display:inline">
+              <input type="hidden" name="action" value="delete_allocation">
+              <input type="hidden" name="allocation_id" value="{{ a['allocation_id'] }}">
+              <button type="submit">Remove</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td>
+        {% if t['available_candidates'] %}
+        <form method="post">
+          <input type="hidden" name="action" value="assign_resource">
+          <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+          <select name="resource_id" required>
+            <option value="">Select</option>
+            {% for c in t['available_candidates'] %}
+            <option value="{{ c['resource_id'] }}">
+              {{ c['code'] }} - {{ c['name'] }} ({{ c['status'] }})
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit">Add</button>
+        </form>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><em>A test can have several resources assigned at once (e.g. equipment, facility, procedure, and technician), as long as each candidate resource has the test's required capability.</em></p>
 {% endblock %}

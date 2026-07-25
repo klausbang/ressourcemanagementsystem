@@ -29,8 +29,8 @@
       <h2>Route Scope</h2>
       <ul>
         <li>GET / : resource catalog with filters</li>
-        <li>Admin scope: capability/resource CRUD and capability assignment</li>
-        <li>Planner scope: create customer orders, add ordered tests to an order, list orders/tests, and assign resource to test</li>
+        <li>Admin scope (single POST-dispatch route, action field per operation): full CRUD on users, capabilities, and resources; assign/remove capability-to-resource mapping</li>
+        <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders and ordered tests; assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently</li>
         <li>Basic login/logout for role-aware actions</li>
       </ul>
     </section>
@@ -39,9 +39,12 @@
       <h2>Validation Rules (Minimum)</h2>
       <ul>
         <li>Required fields on create/update forms</li>
-        <li>Unique resource code and capability name</li>
-        <li>Unique order code; order must exist before adding an ordered test to it</li>
-        <li>Allocation requires resource to have test capability</li>
+        <li>Unique username, resource code, capability name, and order code (checked on both create and update, excluding the row being edited)</li>
+        <li>Role field restricted to admin/planner on user create/update</li>
+        <li>Order must exist before adding an ordered test to it</li>
+        <li>Allocation requires resource to have the test's required capability, and the same resource cannot be assigned twice to the same ordered test (unique on ordered_test_id + resource_id) &mdash; a test can otherwise have any number of different resources allocated at once (e.g. equipment, facility, procedure, and technician together)</li>
+        <li>Deletes that would violate a foreign key (e.g. deleting a capability still required by an ordered test, a resource or user still referenced by an allocation) are caught and reported with a specific reason instead of a raw database error</li>
+        <li>Deleting a customer order cascades to its ordered tests and all of their allocations; deleting an ordered test cascades to all of its allocations. These cascades are enforced at the database level (<code>ON DELETE CASCADE</code>), not in application code</li>
         <li>Role checks for admin/planner actions</li>
       </ul>
     </section>
@@ -53,6 +56,17 @@
         <li>admin_manage.html</li>
         <li>planner_orders.html</li>
         <li>login.html</li>
+        <li>_macros.html (shared, non-page: sortable column header links)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Table Sorting and Duplicate-Row Highlighting</h2>
+      <ul>
+        <li>Every listing table (resource catalog; admin users, capabilities, resources, and resource-capability mapping; planner customer orders, ordered tests, and resource assignment) has clickable, sortable column headers for every displayed column.</li>
+        <li>Sorting is implemented server-side with no JavaScript: each header is a link that sets a table-scoped <code>&lt;table_id&gt;_sort</code> / <code>&lt;table_id&gt;_dir</code> query parameter (e.g. <code>resources_sort=code&amp;resources_dir=desc</code>), so multiple independent tables on one page (e.g. the four admin tables) sort independently, and existing filters are preserved when re-sorting.</li>
+        <li>Any row whose full set of displayed columns exactly matches another row in the same table is flagged and highlighted (amber background, <code>.dup-row</code>), even though the underlying database row is distinct (different primary key). This surfaces cases such as two identical ordered tests added to the same order.</li>
+        <li>Sorting and duplicate detection share one helper, <code>app/table_utils.py:rows_with_meta</code>, applied per table in each route.</li>
       </ul>
     </section>
   </main>

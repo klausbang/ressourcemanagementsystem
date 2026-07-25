@@ -41,10 +41,9 @@
       </table>
       <p>Combinations used in this diagram:</p>
       <ul>
-        <li><code>A ||--o{ B</code>: one A relates to zero or many B (e.g. one customer_order has zero or many ordered_tests).</li>
-        <li><code>A ||--o| B</code>: one A relates to zero or one B (e.g. one ordered_test has zero or one allocation).</li>
+        <li><code>A ||--o{ B</code>: one A relates to zero or many B (e.g. one customer_order has zero or many ordered_tests; one ordered_test has zero or many allocations, since a test can now have several resources assigned at once).</li>
       </ul>
-      <p>Other standard crow's-foot combinations, not used here but shown for reference: <code>A ||--|| B</code> (one to exactly one), <code>A }o--o{ B</code> (many to many, both optional), <code>A }|--|{ B</code> (many to many, both mandatory).</p>
+      <p>Other standard crow's-foot combinations, not used here but shown for reference: <code>A ||--o| B</code> (one to zero-or-one), <code>A ||--|| B</code> (one to exactly one), <code>A }o--o{ B</code> (many to many, both optional), <code>A }|--|{ B</code> (many to many, both mandatory).</p>
 
       <h3>3.2 Key Abbreviations</h3>
       <table border="1" cellpadding="6" cellspacing="0">
@@ -68,7 +67,7 @@
         <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
         <li>customer_orders: order header per customer request.</li>
         <li>ordered_tests: one or more tests requested under each customer order.</li>
-        <li>allocations: planner assignment of a resource to an ordered test.</li>
+        <li>allocations: planner assignment of a resource to an ordered test; one ordered test can have several allocations (e.g. equipment, facility, and technician assigned together).</li>
       </ul>
     </section>
 
@@ -78,7 +77,7 @@
         <li>One customer_order has many ordered_tests.</li>
         <li>One capability can be linked to many ordered_tests as a required capability.</li>
         <li>resources and capabilities are linked many-to-many through resource_capabilities.</li>
-        <li>Each ordered_test can have at most one allocation in v1 (unique ordered_test_id in allocations).</li>
+        <li>Each ordered_test can have zero or many allocations, one per distinct resource, so equipment, facility, procedure, and technician resources can all be assigned to the same test; the same resource cannot be assigned twice to the same test (unique on ordered_test_id + resource_id).</li>
         <li>Each allocation references one planner user to track who assigned the resource.</li>
       </ul>
     </section>
