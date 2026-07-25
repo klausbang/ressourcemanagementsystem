@@ -3,6 +3,63 @@
 {% block title %}Planner Orders{% endblock %}
 
 {% block content %}
+<style>
+  .field-error { color: #b91c1c; font-size: 0.85em; margin: 2px 0 8px; }
+  input.invalid { border: 2px solid #b91c1c; }
+</style>
+
+<h2>Planner: Create Customer Order</h2>
+<form method="post">
+  <input type="hidden" name="action" value="create_order">
+  <label>Order Code
+    <input type="text" name="order_code" value="{{ order_form_values.get('order_code', '') }}"
+           class="{{ 'invalid' if order_form_errors.get('order_code') }}" required>
+  </label>
+  {% if order_form_errors.get('order_code') %}
+  <div class="field-error">{{ order_form_errors['order_code'] }}</div>
+  {% endif %}
+  <label>Customer Name
+    <input type="text" name="customer_name" value="{{ order_form_values.get('customer_name', '') }}"
+           class="{{ 'invalid' if order_form_errors.get('customer_name') }}" required>
+  </label>
+  {% if order_form_errors.get('customer_name') %}
+  <div class="field-error">{{ order_form_errors['customer_name'] }}</div>
+  {% endif %}
+  <label>Product Name
+    <input type="text" name="product_name" value="{{ order_form_values.get('product_name', '') }}"
+           class="{{ 'invalid' if order_form_errors.get('product_name') }}" required>
+  </label>
+  {% if order_form_errors.get('product_name') %}
+  <div class="field-error">{{ order_form_errors['product_name'] }}</div>
+  {% endif %}
+  <button type="submit">Create Order</button>
+</form>
+
+<h2>Planner: Add Ordered Test to Order</h2>
+<form method="post">
+  <input type="hidden" name="action" value="add_test">
+  <label>Order
+    <select name="order_id" required>
+      <option value="">Select</option>
+      {% for o in orders %}
+      <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Test Name
+    <input type="text" name="test_name" required>
+  </label>
+  <label>Required Capability
+    <select name="required_capability_id">
+      <option value="">None</option>
+      {% for c in capabilities %}
+      <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Add Test</button>
+</form>
+
 <h2>Planner: Assign Resources to Ordered Tests</h2>
 
 <table border="1" cellpadding="6">
@@ -32,6 +89,7 @@
       </td>
       <td>
         <form method="post">
+          <input type="hidden" name="action" value="assign_resource">
           <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
           <select name="resource_id" required>
             <option value="">Select</option>

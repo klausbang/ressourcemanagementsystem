@@ -30,7 +30,7 @@
       <ul>
         <li>GET / : resource catalog with filters</li>
         <li>Admin scope: capability/resource CRUD and capability assignment</li>
-        <li>Planner scope: list orders/tests and assign resource to test</li>
+        <li>Planner scope: create customer orders, add ordered tests to an order, list orders/tests, and assign resource to test</li>
         <li>Basic login/logout for role-aware actions</li>
       </ul>
     </section>
@@ -40,6 +40,7 @@
       <ul>
         <li>Required fields on create/update forms</li>
         <li>Unique resource code and capability name</li>
+        <li>Unique order code; order must exist before adding an ordered test to it</li>
         <li>Allocation requires resource to have test capability</li>
         <li>Role checks for admin/planner actions</li>
       </ul>

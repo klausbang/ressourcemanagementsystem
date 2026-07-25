@@ -75,6 +75,7 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Task 11 (Basic role checks for admin/planner): Done
 - Task 12 (Local CRUD and order allocation flows): Done
 - Task 13 (Seed routine for reproducible demo data): Done
+- Task 12a (Planner order/ordered-test creation, added after initial Phase 3 completion): Done
 
 ### Phase 4 Task Status
 - Task 15 (Architecture document with local and cloud separation): Done
@@ -97,6 +98,7 @@ Status legend: Not Started | In Progress | Done | Blocked
 - 2026-07-21: Phase 4 Task 15 completed by replacing docs/architecture.html with detailed architecture documentation and embedding docs/architecture-diagram.svg.
 - 2026-07-21: Phase 4 Task 16 completed by replacing docs/er-model.html with detailed entities/relationships and embedding docs/er-diagram.svg.
 - 2026-07-21: Phase 4 Task 17 completed by cross-linking architecture and ER diagrams from docs/index.html and finalizing diagram embedding in both pages.
+- 2026-07-25: Phase 3 Task 12a completed by adding planner-facing "Create Customer Order" and "Add Ordered Test" forms/routes (app/routes_planner.py, app/templates/planner_orders.html) with unique order-code and existing-order validation, and updating docs/phase3-backend-scope.html route/validation scope to match.
 
 ## Open Questions Queue Policy
 - Blocker: Must be answered before current phase can continue.

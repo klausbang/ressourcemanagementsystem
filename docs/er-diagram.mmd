@@ -1,0 +1,65 @@
+%% Notation legend (see docs/er-model.html section 3 for the rendered version)
+%% Relationship symbols (crow's foot):
+%%   ||  = exactly one        o|  = zero or one
+%%   |{  = one or many        o{  = zero or many
+%%   A ||--o{ B  = one A to zero-or-many B
+%%   A ||--o| B  = one A to zero-or-one B
+%% Key abbreviations:
+%%   PK = Primary Key (uniquely identifies a row)
+%%   FK = Foreign Key (references another table's PK)
+%%   UK = Unique Key (unique, non-primary column)
+erDiagram
+    users ||--o{ allocations : "planner_user_id"
+    resources ||--o{ allocations : "resource_id"
+    ordered_tests ||--o| allocations : "ordered_test_id (unique)"
+    customer_orders ||--o{ ordered_tests : "order_id"
+    capabilities ||--o{ ordered_tests : "required_capability_id"
+    resources ||--o{ resource_capabilities : "resource_id"
+    capabilities ||--o{ resource_capabilities : "capability_id"
+
+    users {
+        int id PK
+        string username UK
+        string role "admin|planner"
+    }
+
+    resources {
+        int id PK
+        string code UK
+        string name
+        string resource_type
+        string status "default available"
+    }
+
+    capabilities {
+        int id PK
+        string name UK
+        string description
+    }
+
+    resource_capabilities {
+        int resource_id PK "also FK -> resources.id"
+        int capability_id PK "also FK -> capabilities.id"
+    }
+
+    customer_orders {
+        int id PK
+        string order_code UK
+        string customer_name
+        string product_name
+    }
+
+    ordered_tests {
+        int id PK
+        int order_id FK
+        string test_name
+        int required_capability_id FK
+    }
+
+    allocations {
+        int id PK
+        int ordered_test_id UK "also FK -> ordered_tests.id"
+        int resource_id FK
+        int planner_user_id FK
+        string notes
+    }

@@ -21,10 +21,46 @@
       <h2>2. ER Diagram</h2>
       <img src="er-diagram.svg" alt="RMS ER diagram" width="100%">
       <p>The diagram reflects current SQLite schema entities and keys used in the minimal working local app.</p>
+      <p>Source: <a href="er-diagram.mmd">er-diagram.mmd</a> (Mermaid ER syntax). Regenerate the SVG after schema changes with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/er-diagram.mmd -o docs/er-diagram.svg -b white</pre>
     </section>
 
     <section>
-      <h2>3. Core Entities</h2>
+      <h2>3. Diagram Notation Legend</h2>
+      <h3>3.1 Relationship Symbols (Crow's Foot Notation)</h3>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr><th>Symbol</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>||</code></td><td>Exactly one</td></tr>
+          <tr><td><code>o|</code></td><td>Zero or one</td></tr>
+          <tr><td><code>o{</code></td><td>Zero or many</td></tr>
+          <tr><td><code>|{</code></td><td>One or many</td></tr>
+        </tbody>
+      </table>
+      <p>Combinations used in this diagram:</p>
+      <ul>
+        <li><code>A ||--o{ B</code>: one A relates to zero or many B (e.g. one customer_order has zero or many ordered_tests).</li>
+        <li><code>A ||--o| B</code>: one A relates to zero or one B (e.g. one ordered_test has zero or one allocation).</li>
+      </ul>
+      <p>Other standard crow's-foot combinations, not used here but shown for reference: <code>A ||--|| B</code> (one to exactly one), <code>A }o--o{ B</code> (many to many, both optional), <code>A }|--|{ B</code> (many to many, both mandatory).</p>
+
+      <h3>3.2 Key Abbreviations</h3>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr><th>Abbreviation</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PK</td><td>Primary Key &mdash; uniquely identifies each row in the table.</td></tr>
+          <tr><td>FK</td><td>Foreign Key &mdash; references the primary key of another table.</td></tr>
+          <tr><td>UK</td><td>Unique Key &mdash; a non-primary column constrained to unique values.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Core Entities</h2>
       <ul>
         <li>users: login identity and role (admin/planner).</li>
         <li>resources: procedures, equipment, facilities, technicians, and related resource records.</li>
@@ -37,7 +73,7 @@
     </section>
 
     <section>
-      <h2>4. Relationship Rules</h2>
+      <h2>5. Relationship Rules</h2>
       <ul>
         <li>One customer_order has many ordered_tests.</li>
         <li>One capability can be linked to many ordered_tests as a required capability.</li>
@@ -48,7 +84,7 @@
     </section>
 
     <section>
-      <h2>5. Integrity Constraints</h2>
+      <h2>6. Integrity Constraints</h2>
       <ul>
         <li>Unique keys on username, resource code, capability name, and order code.</li>
         <li>Foreign keys enforce referential integrity between mapping/transactional tables and master tables.</li>
@@ -57,7 +93,7 @@
     </section>
 
     <section>
-      <h2>6. Migration Notes for Cloud Phase</h2>
+      <h2>7. Migration Notes for Cloud Phase</h2>
       <ul>
         <li>Model is DB-engine agnostic and can be migrated from SQLite to PostgreSQL.</li>
         <li>Preserve primary and foreign key semantics during migration.</li>
