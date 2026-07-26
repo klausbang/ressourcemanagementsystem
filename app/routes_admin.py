@@ -1,9 +1,9 @@
 import sqlite3
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, request, url_for
 
 from .db import get_db, init_db
-from .routes_common import require_role
+from .routes_common import render_ui, require_role
 from .table_utils import rows_with_meta
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -69,7 +69,7 @@ def _load_admin_context(db) -> dict:
 
 
 def _render_admin(db):
-    return render_template("admin_manage.html", **_load_admin_context(db))
+    return render_ui("admin_manage.html", **_load_admin_context(db))
 
 
 @bp.route("/", methods=["GET", "POST"])

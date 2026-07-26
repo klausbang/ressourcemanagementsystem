@@ -1,4 +1,5 @@
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
@@ -7,12 +8,24 @@ from .table_utils import rows_with_meta
 
 bp = Blueprint("common", __name__)
 
+UI_MODES = ("simple", "modern")
+
 RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "capabilities"}
 RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "capabilities"]
 
 
 def current_role() -> str | None:
     return session.get("role")
+
+
+def current_ui_mode() -> str:
+    return session.get("ui_mode", "simple")
+
+
+def render_ui(template_name: str, **context):
+    mode = current_ui_mode()
+    context.setdefault("ui_mode", mode)
+    return render_template(f"{mode}/{template_name}", **context)
 
 
 def require_role(expected_role: str):
@@ -28,6 +41,31 @@ def require_role(expected_role: str):
         return wrapped
 
     return decorator
+
+
+@bp.route("/ui-mode/<mode>")
+def set_ui_mode(mode):
+    if mode not in UI_MODES:
+        flash("Unknown interface mode.", "error")
+        return redirect(url_for("common.resource_catalog"))
+
+    session["ui_mode"] = mode
+
+    referrer = request.referrer
+    if referrer:
+        parsed = urlparse(referrer)
+        if parsed.netloc == request.host:
+            target = parsed.path or url_for("common.resource_catalog")
+            if parsed.query:
+                target = f"{target}?{parsed.query}"
+            return redirect(target)
+
+    return redirect(url_for("common.resource_catalog"))
+
+
+@bp.route("/help")
+def help_page():
+    return render_ui("help.html")
 
 
 @bp.route("/")
@@ -69,13 +107,24 @@ def resource_catalog():
     )
     capabilities = db.execute("SELECT id, name FROM capabilities ORDER BY name").fetchall()
 
-    return render_template(
+    stats = db.execute(
+        """
+        SELECT
+            COUNT(*) AS total_resources,
+            SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS available_resources,
+            COUNT(DISTINCT resource_type) AS resource_types
+        FROM resources
+        """
+    ).fetchone()
+
+    return render_ui(
         "resource_catalog.html",
         resources=resources,
         capabilities=capabilities,
         selected_type=resource_type,
         selected_capability=capability_id,
         role=current_role(),
+        stats=stats,
     )
 
 
@@ -88,12 +137,12 @@ def login():
         username = request.form.get("username", "").strip()
         if not username:
             flash("Username is required.", "error")
-            return render_template("login.html")
+            return render_ui("login.html")
 
         user = db.execute("SELECT id, username, role FROM users WHERE username = ?", (username,)).fetchone()
         if user is None:
             flash("Unknown user.", "error")
-            return render_template("login.html")
+            return render_ui("login.html")
 
         session["user_id"] = user["id"]
         session["username"] = user["username"]
@@ -101,11 +150,14 @@ def login():
         flash(f"Signed in as {user['username']} ({user['role']}).", "info")
         return redirect(url_for("common.resource_catalog"))
 
-    return render_template("login.html")
+    return render_ui("login.html")
 
 
 @bp.route("/logout")
 def logout():
+    ui_mode = session.get("ui_mode")
     session.clear()
+    if ui_mode:
+        session["ui_mode"] = ui_mode
     flash("Signed out.", "info")
     return redirect(url_for("common.resource_catalog"))

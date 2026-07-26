@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Dual Interface (Simple / Modern)</title>
+</head>
+<body>
+  <header>
+    <h1>Dual Interface: Simple and Modern</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>RMS ships with two interfaces over the same routes and the same data: <strong>Simple</strong> (the original plain-HTML, zero-CSS, zero-JS interface) and <strong>Modern</strong> (a styled, tabbed, card-based interface with a small amount of unobtrusive JavaScript). Users switch between them at any time with a button present in both, and their choice persists for the session.</p>
+    </section>
+
+    <section>
+      <h2>2. Why Keep Both</h2>
+      <ul>
+        <li>Simple stays as a minimal, dependency-free fallback and a quick way to see raw data with no styling opinions.</li>
+        <li>Modern is the primary, usability-focused experience: dashboards with quick stats, tabbed navigation instead of one long scroll, card-based multi-resource assignment, badges, empty states, and inline help.</li>
+        <li>Both interfaces submit to the exact same POST routes with the same field names, so there is only one implementation of business logic and validation to maintain.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. How Mode Switching Works</h2>
+      <ul>
+        <li>The active mode is stored in <code>session['ui_mode']</code> (<code>"simple"</code> or <code>"modern"</code>, default <code>"simple"</code>) via <code>app/routes_common.py:current_ui_mode()</code>.</li>
+        <li><code>GET /ui-mode/&lt;mode&gt;</code> sets the mode and redirects back to the referring page (including its query string, e.g. active sort/filter state), falling back to the resource catalog if there is no safe same-origin referrer.</li>
+        <li>Every view renders through <code>render_ui(template_name, **context)</code> instead of Flask's <code>render_template</code> directly. It resolves the template as <code>f"{mode}/{template_name}"</code>, so <code>admin_manage.html</code> means <code>templates/simple/admin_manage.html</code> in Simple mode and <code>templates/modern/admin_manage.html</code> in Modern mode.</li>
+        <li>No route, no CRUD action name, and no form field name differs between modes &mdash; only the template selected to render the response.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Template Organization</h2>
+      <pre>app/templates/
+  simple/   base.html, login.html, resource_catalog.html,
+            admin_manage.html, planner_orders.html, help.html, _macros.html
+  modern/   base.html, login.html, resource_catalog.html,
+            admin_manage.html, planner_orders.html, help.html, _macros.html</pre>
+      <p>Each mode has its own <code>_macros.html</code> with a same-signature <code>sort_th(label, key, table_id, endpoint)</code> macro, so route code and existing sort/duplicate-detection logic (<code>app/table_utils.py</code>) are unaffected by which mode is active.</p>
+    </section>
+
+    <section>
+      <h2>5. Modern UI Design System</h2>
+      <ul>
+        <li><strong>Assets</strong>: <code>app/static/css/modern.css</code> (self-contained, no CDN/network dependency) and <code>app/static/js/modern.js</code> (mobile nav toggle, flash auto-dismiss/close, confirm-before-delete via <code>data-confirm</code> attributes).</li>
+        <li><strong>Layout</strong>: sticky top bar with branding, role-aware nav, a user/role chip, and the mode-toggle button; responsive down to narrow viewports via a hamburger menu.</li>
+        <li><strong>Navigation within a page</strong>: Admin (Users / Capabilities / Resources / Capability assignments) and Planner (Customer orders / Ordered tests / Resource assignment) each use CSS-only radio-driven tabs &mdash; no JavaScript required for the core interaction, so it still works with JS disabled.</li>
+        <li><strong>Resource assignment</strong>: presented as one card per ordered test with a removable chip per assigned resource and an "add resource" control, instead of one wide table row &mdash; chosen specifically because a test can now have several resources assigned at once.</li>
+        <li><strong>Duplicate highlighting</strong>: same underlying <code>_dup</code> flag as Simple mode, styled as an amber row with a ⚠️ tooltip explaining what it means (via the modern <code>_macros.html:dup_flag()</code> macro).</li>
+        <li><strong>Help</strong>: a dedicated <code>/help</code> page (role overview, admin/planner workflows, table features, referential-integrity behavior) plus inline contextual copy (card subtitles, section-help notes, a callout on the resource-assignment tab) rather than a single wall of text.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Adding a New Page</h2>
+      <ol>
+        <li>Add the route/view logic once, as usual.</li>
+        <li>Call <code>render_ui("your_page.html", **context)</code> instead of <code>render_template</code>.</li>
+        <li>Create <code>templates/simple/your_page.html</code> extending <code>simple/base.html</code>.</li>
+        <li>Create <code>templates/modern/your_page.html</code> extending <code>modern/base.html</code>.</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

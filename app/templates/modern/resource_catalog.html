@@ -1,0 +1,90 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Resource Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Resource Catalog</div>
+  <h1>Find a resource</h1>
+  <p class="lead">Browse every test procedure, piece of equipment, facility, and technician registered in the system, and see which capabilities each one has.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile">
+    <div class="stat-value">{{ stats['total_resources'] or 0 }}</div>
+    <div class="stat-label">Total resources</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">{{ stats['available_resources'] or 0 }}</div>
+    <div class="stat-label">Available now</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">{{ stats['resource_types'] or 0 }}</div>
+    <div class="stat-label">Resource types</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Filters</div>
+  <form method="get" class="form-grid">
+    <div class="field">
+      <label for="resource_type">Type</label>
+      <input type="text" id="resource_type" name="resource_type" value="{{ selected_type }}" placeholder="equipment / facility / technician">
+    </div>
+    <div class="field">
+      <label for="capability_id">Capability</label>
+      <select id="capability_id" name="capability_id">
+        <option value="">All capabilities</option>
+        {% for c in capabilities %}
+        <option value="{{ c['id'] }}" {% if selected_capability|string == c['id']|string %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <button type="submit" class="btn btn-primary">Apply filters</button>
+    </div>
+  </form>
+</div>
+
+{% if not role %}
+<div class="callout">
+  You're browsing as a guest. <a href="{{ url_for('common.login') }}">Log in</a> as an admin or planner to manage resources, capabilities, orders, and allocations.
+</div>
+{% endif %}
+
+<div class="section-head">
+  <h2>Resources</h2>
+</div>
+{% if resources %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead>
+      <tr>
+        {{ macros.sort_th('Code', 'code', 'resources', 'common.resource_catalog') }}
+        {{ macros.sort_th('Name', 'name', 'resources', 'common.resource_catalog') }}
+        {{ macros.sort_th('Type', 'resource_type', 'resources', 'common.resource_catalog') }}
+        {{ macros.sort_th('Status', 'status', 'resources', 'common.resource_catalog') }}
+        {{ macros.sort_th('Capabilities', 'capabilities', 'resources', 'common.resource_catalog') }}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in resources %}
+      <tr class="{{ 'dup-row' if r['_dup'] }}">
+        <td>{{ r['code'] }}{% if r['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+        <td>{{ r['name'] }}</td>
+        <td>{{ macros.type_badge(r['resource_type']) }}</td>
+        <td>{{ macros.status_badge(r['status']) }}</td>
+        <td>{{ r['capabilities'] or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="icon">🔍</span>
+  No resources match these filters.
+</div>
+{% endif %}
+{% endblock %}

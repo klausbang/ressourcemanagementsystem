@@ -1,7 +1,7 @@
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, request, session, url_for
 
 from .db import get_db, init_db
-from .routes_common import require_role
+from .routes_common import render_ui, require_role
 from .table_utils import rows_with_meta
 
 bp = Blueprint("planner", __name__, url_prefix="/planner")
@@ -123,7 +123,7 @@ def _render_planner_orders(db, order_form_values=None, order_form_errors=None):
     context = _load_planner_context(db)
     context["order_form_values"] = order_form_values or {}
     context["order_form_errors"] = order_form_errors or {}
-    return render_template("planner_orders.html", **context)
+    return render_ui("planner_orders.html", **context)
 
 
 @bp.route("/", methods=["GET", "POST"])

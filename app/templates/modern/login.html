@@ -1,0 +1,28 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Log in{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <h2>Log in</h2>
+    <p class="card-subtitle">Enter your username to access role-specific tools.</p>
+
+    <form method="post">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <div class="demo-accounts">
+      <strong>Demo accounts</strong> (no password needed):
+      <ul style="margin: 6px 0 0; padding-left: 18px;">
+        <li><code>admin.demo</code> &mdash; RMS Administrator</li>
+        <li><code>planner.demo</code> &mdash; Test Planner</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

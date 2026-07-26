@@ -1,0 +1,33 @@
+{% macro sort_th(label, key, table_id, endpoint) %}
+{% set sort_param = table_id ~ '_sort' %}
+{% set dir_param = table_id ~ '_dir' %}
+{% set current_sort = request.args.get(sort_param) %}
+{% set current_dir = request.args.get(dir_param, 'asc') %}
+{% set next_dir = 'desc' if (current_sort == key and current_dir == 'asc') else 'asc' %}
+{% set link_args = request.args.to_dict() %}
+{% set _ = link_args.update({sort_param: key, dir_param: next_dir}) %}
+<th class="sortable {{ 'sorted-' ~ current_dir if current_sort == key }}" aria-sort="{{ (current_dir == 'asc' and 'ascending' or 'descending') if current_sort == key else 'none' }}">
+  <a href="{{ url_for(endpoint, **link_args) }}" title="Sort by {{ label }}">
+    <span>{{ label }}</span>
+    <span class="sort-icon" aria-hidden="true">{% if current_sort == key %}{{ '▲' if current_dir == 'asc' else '▼' }}{% else %}⇅{% endif %}</span>
+  </a>
+</th>
+{% endmacro %}
+
+{% macro status_badge(status) %}
+{% if status == 'available' %}<span class="badge badge-available">{{ status }}</span>
+{% else %}<span class="badge badge-status-other">{{ status }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro role_badge(role) %}
+<span class="badge role-badge role-{{ role }}">{{ role }}</span>
+{% endmacro %}
+
+{% macro type_badge(resource_type) %}
+<span class="badge badge-type">{{ resource_type }}</span>
+{% endmacro %}
+
+{% macro dup_flag() %}
+<span class="dup-flag" title="This row's visible columns exactly match another row — check for an accidental duplicate.">⚠️</span>
+{% endmacro %}

@@ -16,8 +16,10 @@
       <a href="{{ url_for('common.resource_catalog') }}">Resource Catalog</a>
       <a href="{{ url_for('admin.admin_manage') }}">Admin</a>
       <a href="{{ url_for('planner.planner_orders') }}">Planner</a>
+      <a href="{{ url_for('common.help_page') }}">Help</a>
       <a href="{{ url_for('common.login') }}">Login</a>
       <a href="{{ url_for('common.logout') }}">Logout</a>
+      <a href="{{ url_for('common.set_ui_mode', mode='modern') }}">Switch to Modern Interface</a>
     </nav>
     {% if session.get('username') %}
     <p>Signed in as {{ session.get('username') }} ({{ session.get('role') }})</p>

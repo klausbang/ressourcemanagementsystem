@@ -1,0 +1,262 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Planner{% endblock %}
+
+{% block content %}
+<style>
+  #tab-orders:checked ~ .tabs-body #panel-orders,
+  #tab-tests:checked ~ .tabs-body #panel-tests,
+  #tab-assign:checked ~ .tabs-body #panel-assign { display: block; }
+
+  #tab-orders:checked ~ .tab-list label[for="tab-orders"],
+  #tab-tests:checked ~ .tab-list label[for="tab-tests"],
+  #tab-assign:checked ~ .tab-list label[for="tab-assign"] {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+
+  .test-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; background: var(--color-surface); }
+  .test-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .test-card-title { font-weight: 700; }
+  .test-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Planner</div>
+  <h1>Manage orders, tests &amp; resource assignments</h1>
+  <p class="lead">Create customer orders, add the tests they require, and assign one or more resources — equipment, facility, procedure, technician — to each test.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile"><div class="stat-value">{{ orders|length }}</div><div class="stat-label">Customer orders</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ ordered_tests_rows|length }}</div><div class="stat-label">Ordered tests</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ tests|selectattr('allocated_resources')|list|length }}</div><div class="stat-label">Tests with a resource assigned</div></div>
+</div>
+
+<div class="tabs">
+  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" checked>
+  <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input">
+  <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input">
+
+  <div class="tab-list" role="tablist">
+    <label for="tab-orders" class="tab-label">🗂️ Customer orders</label>
+    <label for="tab-tests" class="tab-label">🧪 Ordered tests</label>
+    <label for="tab-assign" class="tab-label">🔧 Resource assignment</label>
+  </div>
+
+  <div class="tabs-body">
+    <section class="tab-panel" id="panel-orders">
+      <div class="card">
+        <div class="card-title">Create a customer order</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_order">
+          <div class="field">
+            <label for="order_code">Order code</label>
+            <input type="text" id="order_code" name="order_code"
+                   value="{{ order_form_values.get('order_code', '') }}"
+                   class="{{ 'invalid' if order_form_errors.get('order_code') }}" required>
+            {% if order_form_errors.get('order_code') %}<div class="field-error">{{ order_form_errors['order_code'] }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="customer_name">Customer name</label>
+            <input type="text" id="customer_name" name="customer_name"
+                   value="{{ order_form_values.get('customer_name', '') }}"
+                   class="{{ 'invalid' if order_form_errors.get('customer_name') }}" required>
+            {% if order_form_errors.get('customer_name') %}<div class="field-error">{{ order_form_errors['customer_name'] }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="product_name">Product name</label>
+            <input type="text" id="product_name" name="product_name"
+                   value="{{ order_form_values.get('product_name', '') }}"
+                   class="{{ 'invalid' if order_form_errors.get('product_name') }}" required>
+            {% if order_form_errors.get('product_name') %}<div class="field-error">{{ order_form_errors['product_name'] }}</div>{% endif %}
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Create order</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing customer orders</h2></div>
+      {% if orders %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Order Code', 'order_code', 'orders', 'planner.planner_orders') }}
+            {{ macros.sort_th('Customer Name', 'customer_name', 'orders', 'planner.planner_orders') }}
+            {{ macros.sort_th('Product Name', 'product_name', 'orders', 'planner.planner_orders') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for o in orders %}
+            <tr class="{{ 'dup-row' if o['_dup'] }}">
+              <td>
+                {% if o['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+                <input type="text" name="order_code" value="{{ o['order_code'] }}" form="order-save-{{ o['id'] }}">
+              </td>
+              <td><input type="text" name="customer_name" value="{{ o['customer_name'] }}" form="order-save-{{ o['id'] }}"></td>
+              <td><input type="text" name="product_name" value="{{ o['product_name'] }}" form="order-save-{{ o['id'] }}"></td>
+              <td class="inline-form">
+                <button type="submit" form="order-save-{{ o['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="order-delete-{{ o['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete order '{{ o['order_code'] }}'? This also deletes its ordered tests and allocations.">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🗂️</span>No customer orders yet.</div>
+      {% endif %}
+      <p class="section-help">Deleting an order also deletes its ordered tests and any allocations for those tests.</p>
+
+      {% for o in orders %}
+      <form id="order-save-{{ o['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_order">
+        <input type="hidden" name="order_id" value="{{ o['id'] }}">
+      </form>
+      <form id="order-delete-{{ o['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_order">
+        <input type="hidden" name="order_id" value="{{ o['id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-tests">
+      <div class="card">
+        <div class="card-title">Add an ordered test</div>
+        <div class="card-subtitle">The required capability determines which resources can later be assigned to this test.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="add_test">
+          <div class="field">
+            <label for="test-order">Order</label>
+            <select id="test-order" name="order_id" required>
+              <option value="">Select an order</option>
+              {% for o in orders %}
+              <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="test-name">Test name</label>
+            <input type="text" id="test-name" name="test_name" required>
+          </div>
+          <div class="field">
+            <label for="test-capability">Required capability</label>
+            <select id="test-capability" name="required_capability_id">
+              <option value="">None</option>
+              {% for c in capabilities %}
+              <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Add test</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing ordered tests</h2></div>
+      {% if ordered_tests_rows %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
+            {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
+            {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for t in ordered_tests_rows %}
+            <tr class="{{ 'dup-row' if t['_dup'] }}">
+              <td>{{ t['order_code'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+              <td><input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}"></td>
+              <td>
+                <select name="required_capability_id" form="test-save-{{ t['ordered_test_id'] }}">
+                  <option value="">None</option>
+                  {% for c in capabilities %}
+                  <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="inline-form">
+                <button type="submit" form="test-save-{{ t['ordered_test_id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete test '{{ t['test_name'] }}'? This also deletes any resource allocations for it.">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🧪</span>No ordered tests yet. Create a customer order first, then add tests to it here.</div>
+      {% endif %}
+      <p class="section-help">Deleting an ordered test also deletes its allocation(s), if any.</p>
+
+      {% for t in ordered_tests_rows %}
+      <form id="test-save-{{ t['ordered_test_id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_test">
+        <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+      </form>
+      <form id="test-delete-{{ t['ordered_test_id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_test">
+        <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-assign">
+      <div class="callout">
+        <strong>Tip:</strong> a test can have several resources assigned at once — e.g. equipment, a facility, a procedure, and a technician together. Only resources that have the test's required capability are offered, and a resource can't be added twice to the same test.
+      </div>
+
+      {% if tests %}
+      {% for t in tests %}
+      <div class="test-card {{ 'dup-row' if t['_dup'] }}">
+        <div class="test-card-head">
+          <div>
+            <div class="test-card-title">{{ t['test_name'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</div>
+            <div class="test-card-meta">{{ t['order_code'] }} &middot; {{ t['customer_name'] }} &middot; requires {{ t['capability_name'] or 'no specific capability' }}</div>
+          </div>
+        </div>
+
+        {% if t['allocated_resources'] %}
+        <ul class="chip-list">
+          {% for a in t['allocated_resources'] %}
+          <li class="chip">
+            {{ a['resource_code'] }} - {{ a['resource_name'] }} <span class="badge badge-type">{{ a['resource_type'] }}</span>
+            <form method="post">
+              <input type="hidden" name="action" value="delete_allocation">
+              <input type="hidden" name="allocation_id" value="{{ a['allocation_id'] }}">
+              <button type="submit" title="Remove {{ a['resource_code'] }} from this test" data-confirm="Remove {{ a['resource_code'] }} from '{{ t['test_name'] }}'?">✕</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="section-help" style="margin-top:0;">No resources assigned yet.</p>
+        {% endif %}
+
+        {% if t['available_candidates'] %}
+        <form method="post" class="inline-form" style="margin-top:10px;">
+          <input type="hidden" name="action" value="assign_resource">
+          <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+          <select name="resource_id" required>
+            <option value="">Add a resource…</option>
+            {% for c in t['available_candidates'] %}
+            <option value="{{ c['resource_id'] }}">{{ c['code'] }} - {{ c['name'] }} ({{ c['status'] }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-secondary btn-sm">➕ Add</button>
+        </form>
+        {% elif not t['capability_name'] %}
+        <p class="section-help">This test has no required capability set, so no candidate resources can be matched. Set one in the Ordered Tests tab.</p>
+        {% else %}
+        <p class="section-help">All matching resources for "{{ t['capability_name'] }}" are already assigned.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><span class="icon">🔧</span>No ordered tests to assign resources to yet.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

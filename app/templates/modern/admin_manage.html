@@ -1,0 +1,315 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<style>
+  #tab-users:checked ~ .tabs-body #panel-users,
+  #tab-capabilities:checked ~ .tabs-body #panel-capabilities,
+  #tab-resources:checked ~ .tabs-body #panel-resources,
+  #tab-mappings:checked ~ .tabs-body #panel-mappings { display: block; }
+
+  #tab-users:checked ~ .tab-list label[for="tab-users"],
+  #tab-capabilities:checked ~ .tab-list label[for="tab-capabilities"],
+  #tab-resources:checked ~ .tab-list label[for="tab-resources"],
+  #tab-mappings:checked ~ .tab-list label[for="tab-mappings"] {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Admin</div>
+  <h1>Manage users, capabilities &amp; resources</h1>
+  <p class="lead">Set up who can use the system, what capabilities exist, what resources you have, and which resources can perform which capabilities.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile"><div class="stat-value">{{ users|length }}</div><div class="stat-label">Users</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ capabilities|length }}</div><div class="stat-label">Capabilities</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ resources|length }}</div><div class="stat-label">Resources</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
+</div>
+
+<div class="tabs">
+  <input type="radio" name="admin-tabs" id="tab-users" class="tab-input" checked>
+  <input type="radio" name="admin-tabs" id="tab-capabilities" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-resources" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input">
+
+  <div class="tab-list" role="tablist">
+    <label for="tab-users" class="tab-label">👤 Users</label>
+    <label for="tab-capabilities" class="tab-label">🎓 Capabilities</label>
+    <label for="tab-resources" class="tab-label">🔧 Resources</label>
+    <label for="tab-mappings" class="tab-label">🔗 Capability assignments</label>
+  </div>
+
+  <div class="tabs-body">
+    <section class="tab-panel" id="panel-users">
+      <div class="card">
+        <div class="card-title">Create a user</div>
+        <div class="card-subtitle">Usernames must be unique. There are no passwords in this demonstrator — role alone controls access.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_user">
+          <div class="field">
+            <label for="new-username">Username</label>
+            <input type="text" id="new-username" name="username" required>
+          </div>
+          <div class="field">
+            <label for="new-role">Role</label>
+            <select id="new-role" name="role" required>
+              <option value="admin">admin</option>
+              <option value="planner">planner</option>
+            </select>
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Create user</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing users</h2></div>
+      {% if users %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Username', 'username', 'users', 'admin.admin_manage') }}
+            {{ macros.sort_th('Role', 'role', 'users', 'admin.admin_manage') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for u in users %}
+            <tr class="{{ 'dup-row' if u['_dup'] }}">
+              <td>
+                {% if u['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+                <input type="text" name="username" value="{{ u['username'] }}" form="user-save-{{ u['id'] }}">
+              </td>
+              <td>
+                <select name="role" form="user-save-{{ u['id'] }}">
+                  <option value="admin" {% if u['role'] == 'admin' %}selected{% endif %}>admin</option>
+                  <option value="planner" {% if u['role'] == 'planner' %}selected{% endif %}>planner</option>
+                </select>
+              </td>
+              <td class="inline-form">
+                <button type="submit" form="user-save-{{ u['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="user-delete-{{ u['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete user '{{ u['username'] }}'? This cannot be undone.">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">👤</span>No users yet.</div>
+      {% endif %}
+      <p class="section-help">Deleting a user is blocked if allocations were assigned by that user as planner — reassign or remove those allocations first.</p>
+
+      {% for u in users %}
+      <form id="user-save-{{ u['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_user">
+        <input type="hidden" name="user_id" value="{{ u['id'] }}">
+      </form>
+      <form id="user-delete-{{ u['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_user">
+        <input type="hidden" name="user_id" value="{{ u['id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-capabilities">
+      <div class="card">
+        <div class="card-title">Create a capability</div>
+        <div class="card-subtitle">A capability is a named skill or function (e.g. "Vibration Test") that a resource can have and a test can require.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_capability">
+          <div class="field">
+            <label for="new-cap-name">Name</label>
+            <input type="text" id="new-cap-name" name="name" required>
+          </div>
+          <div class="field">
+            <label for="new-cap-desc">Description</label>
+            <input type="text" id="new-cap-desc" name="description">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Save capability</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing capabilities</h2></div>
+      {% if capabilities %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Name', 'name', 'capabilities', 'admin.admin_manage') }}
+            {{ macros.sort_th('Description', 'description', 'capabilities', 'admin.admin_manage') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for c in capabilities %}
+            <tr class="{{ 'dup-row' if c['_dup'] }}">
+              <td>
+                {% if c['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+                <input type="text" name="name" value="{{ c['name'] }}" form="capability-save-{{ c['id'] }}">
+              </td>
+              <td><input type="text" name="description" value="{{ c['description'] or '' }}" form="capability-save-{{ c['id'] }}"></td>
+              <td class="inline-form">
+                <button type="submit" form="capability-save-{{ c['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="capability-delete-{{ c['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete capability '{{ c['name'] }}'?">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🎓</span>No capabilities yet.</div>
+      {% endif %}
+      <p class="section-help">Deleting a capability is blocked while an ordered test still requires it.</p>
+
+      {% for c in capabilities %}
+      <form id="capability-save-{{ c['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_capability">
+        <input type="hidden" name="capability_id" value="{{ c['id'] }}">
+      </form>
+      <form id="capability-delete-{{ c['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_capability">
+        <input type="hidden" name="capability_id" value="{{ c['id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-resources">
+      <div class="card">
+        <div class="card-title">Create a resource</div>
+        <div class="card-subtitle">Resources include equipment, facilities, procedures, and technicians.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_resource">
+          <div class="field">
+            <label for="new-res-code">Code</label>
+            <input type="text" id="new-res-code" name="code" required>
+          </div>
+          <div class="field">
+            <label for="new-res-name">Name</label>
+            <input type="text" id="new-res-name" name="name" required>
+          </div>
+          <div class="field">
+            <label for="new-res-type">Type</label>
+            <input type="text" id="new-res-type" name="resource_type" placeholder="equipment / facility / technician" required>
+          </div>
+          <div class="field">
+            <label for="new-res-status">Status</label>
+            <input type="text" id="new-res-status" name="status" placeholder="available">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Save resource</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing resources</h2></div>
+      {% if resources %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Code', 'code', 'resources', 'admin.admin_manage') }}
+            {{ macros.sort_th('Name', 'name', 'resources', 'admin.admin_manage') }}
+            {{ macros.sort_th('Type', 'resource_type', 'resources', 'admin.admin_manage') }}
+            {{ macros.sort_th('Status', 'status', 'resources', 'admin.admin_manage') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for r in resources %}
+            <tr class="{{ 'dup-row' if r['_dup'] }}">
+              <td>
+                {% if r['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+                <input type="text" name="code" value="{{ r['code'] }}" form="resource-save-{{ r['id'] }}">
+              </td>
+              <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
+              <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
+              <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
+              <td class="inline-form">
+                <button type="submit" form="resource-save-{{ r['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="resource-delete-{{ r['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete resource '{{ r['code'] }}'?">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🔧</span>No resources yet.</div>
+      {% endif %}
+      <p class="section-help">Deleting a resource is blocked while it still has allocations.</p>
+
+      {% for r in resources %}
+      <form id="resource-save-{{ r['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_resource">
+        <input type="hidden" name="resource_id" value="{{ r['id'] }}">
+      </form>
+      <form id="resource-delete-{{ r['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_resource">
+        <input type="hidden" name="resource_id" value="{{ r['id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-mappings">
+      <div class="card">
+        <div class="card-title">Assign a capability to a resource</div>
+        <div class="card-subtitle">This is what lets a planner find and assign this resource for a test that requires this capability.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="assign_capability">
+          <div class="field">
+            <label for="map-resource">Resource</label>
+            <select id="map-resource" name="resource_id" required>
+              <option value="">Select a resource</option>
+              {% for r in resources %}
+              <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="map-capability">Capability</label>
+            <select id="map-capability" name="capability_id" required>
+              <option value="">Select a capability</option>
+              {% for c in capabilities %}
+              <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Assign</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Current assignments</h2></div>
+      {% if mappings %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Resource Code', 'code', 'mappings', 'admin.admin_manage') }}
+            {{ macros.sort_th('Resource Name', 'resource_name', 'mappings', 'admin.admin_manage') }}
+            {{ macros.sort_th('Capability', 'capability_name', 'mappings', 'admin.admin_manage') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for m in mappings %}
+            <tr class="{{ 'dup-row' if m['_dup'] }}">
+              <td>{{ m['code'] }}{% if m['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+              <td>{{ m['resource_name'] }}</td>
+              <td>{{ m['capability_name'] }}</td>
+              <td>
+                <form method="post" style="display:inline">
+                  <input type="hidden" name="action" value="remove_capability">
+                  <input type="hidden" name="resource_id" value="{{ m['resource_id'] }}">
+                  <input type="hidden" name="capability_id" value="{{ m['capability_id'] }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🔗</span>No capability assignments yet.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

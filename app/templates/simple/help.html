@@ -1,0 +1,40 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}Help{% endblock %}
+
+{% block content %}
+<h2>Help &amp; Getting Started</h2>
+
+<h3>Interfaces</h3>
+<p>This app has two interfaces showing the same data: <strong>Simple</strong> (plain, no styling, this one) and <strong>Modern</strong> (styled, tabbed, card-based). Use the "Switch to Modern Interface" link in the nav above to change. Your choice is remembered until you switch back or your session ends.</p>
+
+<h3>Roles</h3>
+<ul>
+  <li><strong>RMS Administrator</strong> (demo login: <code>admin.demo</code>): manages users, capabilities, resources, and which capabilities each resource has.</li>
+  <li><strong>Test Planner</strong> (demo login: <code>planner.demo</code>): manages customer orders, the tests ordered under them, and which resources are assigned to each test.</li>
+</ul>
+<p>Log in with just a username &mdash; this is a local demonstrator with no passwords.</p>
+
+<h3>Resource Catalog</h3>
+<p>The home page (no login required) lists all resources with their type, status, and capabilities, filterable by type or capability.</p>
+
+<h3>Admin Workflow</h3>
+<ol>
+  <li>Create capabilities (e.g. "Vibration Test") and resources (equipment, facility, procedure, technician, etc.).</li>
+  <li>Assign one or more capabilities to each resource so planners can find it for matching tests.</li>
+  <li>Manage user accounts and their role (admin or planner).</li>
+</ol>
+
+<h3>Planner Workflow</h3>
+<ol>
+  <li>Create a customer order (order code, customer name, product name).</li>
+  <li>Add one or more ordered tests to that order, each optionally requiring a capability.</li>
+  <li>Assign resources to each ordered test. A test can have <strong>several</strong> resources assigned at once (e.g. equipment, facility, and a technician together) &mdash; only resources with the test's required capability are offered, and the same resource cannot be assigned twice to the same test.</li>
+</ol>
+
+<h3>Table Features</h3>
+<ul>
+  <li><strong>Sorting</strong>: click any column header to sort by it; click again to reverse the direction.</li>
+  <li><strong>Duplicate highlighting</strong>: a row shaded amber has the exact same values in every displayed column as another row in that table &mdash; a hint to check for an accidental duplicate entry.</li>
+</ul>
+{% endblock %}

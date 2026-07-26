@@ -1,0 +1,57 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Help{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Help</div>
+  <h1>Getting started</h1>
+  <p class="lead">A quick guide to the two interfaces, the two roles, and how the main workflows fit together.</p>
+</div>
+
+<div class="card help-section">
+  <h3>🖥️ Simple vs. Modern</h3>
+  <p>This app has two interfaces showing exactly the same data: <strong>Simple</strong> (plain HTML, no styling) and <strong>Modern</strong> (this one — styled, tabbed, card-based). Switch anytime with the <span class="kbd">Switch to Simple</span> / <span class="kbd">Switch to Modern</span> button in the top bar. Your choice is remembered for your session.</p>
+</div>
+
+<div class="card help-section">
+  <h3>👤 Roles</h3>
+  <p>Log in with just a username — this is a local demonstrator with no passwords.</p>
+  <ul>
+    <li><strong>RMS Administrator</strong> (<code>admin.demo</code>): manages users, capabilities, resources, and which capabilities each resource has.</li>
+    <li><strong>Test Planner</strong> (<code>planner.demo</code>): manages customer orders, the tests ordered under them, and which resources are assigned to each test.</li>
+  </ul>
+</div>
+
+<div class="card help-section">
+  <h3>🔧 Admin workflow</h3>
+  <ol>
+    <li>Create <strong>capabilities</strong> (e.g. "Vibration Test") on the Capabilities tab.</li>
+    <li>Create <strong>resources</strong> — equipment, facilities, procedures, technicians — on the Resources tab.</li>
+    <li>On the Capability assignments tab, link each resource to the capabilities it has, so planners can find it for matching tests.</li>
+    <li>Manage user accounts and roles on the Users tab.</li>
+  </ol>
+</div>
+
+<div class="card help-section">
+  <h3>🗂️ Planner workflow</h3>
+  <ol>
+    <li>Create a <strong>customer order</strong> (order code, customer name, product name) on the Customer orders tab.</li>
+    <li>Add one or more <strong>ordered tests</strong> to that order on the Ordered tests tab, each optionally requiring a capability.</li>
+    <li>On the Resource assignment tab, assign resources to each test. A test can have <strong>several</strong> resources at once — e.g. equipment, a facility, and a technician together. Only resources with the test's required capability are offered, and the same resource can't be assigned twice to one test.</li>
+  </ol>
+</div>
+
+<div class="card help-section">
+  <h3>📊 Table features</h3>
+  <ul>
+    <li><strong>Sorting</strong> — click any column header to sort by it; click again to reverse direction.</li>
+    <li><strong>Duplicate highlighting</strong> — a row shaded amber (with a ⚠️ next to its first cell) has the exact same values in every displayed column as another row in that table. It's a hint to check for an accidental duplicate entry, not an error on its own.</li>
+  </ul>
+</div>
+
+<div class="card help-section">
+  <h3>🔗 Referential integrity</h3>
+  <p>Deletes are blocked with a clear message if they would leave other data dangling — e.g. you can't delete a capability that's still required by an ordered test, or a resource/user still referenced by an allocation. Deleting a customer order or an ordered test, however, intentionally cascades and removes its dependent tests/allocations, since those only make sense in context.</p>
+</div>
+{% endblock %}

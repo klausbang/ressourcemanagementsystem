@@ -51,12 +51,15 @@
 
     <section>
       <h2>Template Scope</h2>
+      <p>Every page exists once per interface mode under <code>templates/simple/</code> and <code>templates/modern/</code>; see docs/dual-ui.html for how mode selection and rendering work.</p>
       <ul>
         <li>resource_catalog.html</li>
         <li>admin_manage.html</li>
         <li>planner_orders.html</li>
         <li>login.html</li>
-        <li>_macros.html (shared, non-page: sortable column header links)</li>
+        <li>help.html</li>
+        <li>_macros.html (per-mode, non-page: sortable column header links, badges)</li>
+        <li>base.html (per-mode layout; modern/base.html also links app/static/css/modern.css and app/static/js/modern.js)</li>
       </ul>
     </section>
 
