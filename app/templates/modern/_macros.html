@@ -31,3 +31,28 @@
 {% macro dup_flag() %}
 <span class="dup-flag" title="This row's visible columns exactly match another row — check for an accidental duplicate.">⚠️</span>
 {% endmacro %}
+
+{% macro wo_status_badge(status) %}
+{% if status == 'completed' %}<span class="badge badge-available">completed</span>
+{% elif status == 'in_progress' %}<span class="badge badge-type">in progress</span>
+{% elif status == 'on_hold' %}<span class="badge badge-status-other">on hold</span>
+{% elif status == 'planned' %}<span class="badge">planned</span>
+{% else %}<span class="badge">no work order</span>
+{% endif %}
+{% endmacro %}
+
+{% macro wo_result_badge(result) %}
+{% if result == 'pass' %}<span class="badge badge-available">pass</span>
+{% elif result == 'fail' %}<span class="badge badge-danger">fail</span>
+{% elif result == 'n_a' %}<span class="badge">n/a</span>
+{% endif %}
+{% endmacro %}
+
+{% macro report_status_badge(status) %}
+{% if status == 'approved' %}<span class="badge badge-available">approved</span>
+{% elif status == 'rejected' %}<span class="badge badge-danger">rejected</span>
+{% elif status == 'submitted' %}<span class="badge badge-type">submitted</span>
+{% elif status == 'draft' %}<span class="badge">draft</span>
+{% else %}<span class="badge">{{ status }}</span>
+{% endif %}
+{% endmacro %}

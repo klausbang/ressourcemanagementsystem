@@ -8,7 +8,7 @@ from .table_utils import rows_with_meta
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-VALID_ROLES = ("admin", "planner")
+VALID_ROLES = ("admin", "planner", "technician")
 
 USER_SORTABLE_KEYS = {"username", "role"}
 USER_DUP_KEYS = ["username", "role"]
@@ -25,12 +25,22 @@ MAPPING_DUP_KEYS = ["code", "resource_name", "capability_name"]
 
 def _load_admin_context(db) -> dict:
     users = rows_with_meta(
-        db.execute("SELECT id, username, role FROM users ORDER BY username").fetchall(),
+        db.execute(
+            """
+            SELECT u.id, u.username, u.role, u.linked_resource_id, r.code AS linked_resource_code
+            FROM users u
+            LEFT JOIN resources r ON r.id = u.linked_resource_id
+            ORDER BY u.username
+            """
+        ).fetchall(),
         dup_keys=USER_DUP_KEYS,
         sort_key=request.args.get("users_sort"),
         sort_dir=request.args.get("users_dir", "asc"),
         sortable_keys=USER_SORTABLE_KEYS,
     )
+    technician_resources = db.execute(
+        "SELECT id, code, name FROM resources WHERE resource_type = 'technician' ORDER BY code"
+    ).fetchall()
     resources = rows_with_meta(
         db.execute("SELECT id, code, name, resource_type, status FROM resources ORDER BY code").fetchall(),
         dup_keys=RESOURCE_DUP_KEYS,
@@ -65,6 +75,7 @@ def _load_admin_context(db) -> dict:
         "resources": resources,
         "capabilities": capabilities,
         "mappings": mappings,
+        "technician_resources": technician_resources,
     }
 
 
@@ -84,15 +95,21 @@ def admin_manage():
         if action == "create_user":
             username = request.form.get("username", "").strip()
             role = request.form.get("role", "").strip()
+            linked_resource_id = request.form.get("linked_resource_id", "").strip() or None
+            if role != "technician":
+                linked_resource_id = None
 
             if not (username and role):
                 flash("Username and role are required.", "error")
             elif role not in VALID_ROLES:
-                flash("Role must be admin or planner.", "error")
+                flash("Role must be admin, planner, or technician.", "error")
             elif db.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
                 flash(f"Username {username} already exists.", "error")
             else:
-                db.execute("INSERT INTO users (username, role) VALUES (?, ?)", (username, role))
+                db.execute(
+                    "INSERT INTO users (username, role, linked_resource_id) VALUES (?, ?, ?)",
+                    (username, role, linked_resource_id),
+                )
                 db.commit()
                 flash(f"User {username} created.", "info")
 
@@ -100,15 +117,21 @@ def admin_manage():
             user_id = request.form.get("user_id", "").strip()
             username = request.form.get("username", "").strip()
             role = request.form.get("role", "").strip()
+            linked_resource_id = request.form.get("linked_resource_id", "").strip() or None
+            if role != "technician":
+                linked_resource_id = None
 
             if not (user_id and username and role):
                 flash("Username and role are required.", "error")
             elif role not in VALID_ROLES:
-                flash("Role must be admin or planner.", "error")
+                flash("Role must be admin, planner, or technician.", "error")
             elif db.execute("SELECT 1 FROM users WHERE username = ? AND id != ?", (username, user_id)).fetchone():
                 flash(f"Username {username} already exists.", "error")
             else:
-                db.execute("UPDATE users SET username = ?, role = ? WHERE id = ?", (username, role, user_id))
+                db.execute(
+                    "UPDATE users SET username = ?, role = ?, linked_resource_id = ? WHERE id = ?",
+                    (username, role, linked_resource_id, user_id),
+                )
                 db.commit()
                 flash(f"User {username} updated.", "info")
 

@@ -14,7 +14,7 @@
   <main>
     <section>
       <h2>1. Scope</h2>
-      <p>This ER model defines the Phase 3 and Phase 4 data structure for local RMS operation and future migration planning.</p>
+      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), and the technician work order and test report workflow added in Phase 7, plus future migration planning.</p>
     </section>
 
     <section>
@@ -42,8 +42,9 @@
       <p>Combinations used in this diagram:</p>
       <ul>
         <li><code>A ||--o{ B</code>: one A relates to zero or many B (e.g. one customer_order has zero or many ordered_tests; one ordered_test has zero or many allocations, since a test can now have several resources assigned at once).</li>
+        <li><code>A ||--o| B</code>: one A relates to zero or one B (e.g. one ordered_test has at most one work_order; one work_order has at most one test_report), reflecting a <code>UNIQUE</code> foreign key column.</li>
       </ul>
-      <p>Other standard crow's-foot combinations, not used here but shown for reference: <code>A ||--o| B</code> (one to zero-or-one), <code>A ||--|| B</code> (one to exactly one), <code>A }o--o{ B</code> (many to many, both optional), <code>A }|--|{ B</code> (many to many, both mandatory).</p>
+      <p>Other standard crow's-foot combinations, not used here but shown for reference: <code>A ||--|| B</code> (one to exactly one), <code>A }o--o{ B</code> (many to many, both optional), <code>A }|--|{ B</code> (many to many, both mandatory).</p>
 
       <h3>3.2 Key Abbreviations</h3>
       <table border="1" cellpadding="6" cellspacing="0">
@@ -61,13 +62,18 @@
     <section>
       <h2>4. Core Entities</h2>
       <ul>
-        <li>users: login identity and role (admin/planner).</li>
+        <li>users: login identity and role (admin/planner/technician). A technician user optionally links to one resource row (<code>linked_resource_id</code>) &mdash; this is how the system finds "my assigned tests" for that technician.</li>
         <li>resources: procedures, equipment, facilities, technicians, and related resource records.</li>
         <li>capabilities: named test capabilities.</li>
         <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
         <li>customer_orders: order header per customer request.</li>
         <li>ordered_tests: one or more tests requested under each customer order.</li>
         <li>allocations: planner assignment of a resource to an ordered test; one ordered test can have several allocations (e.g. equipment, facility, and technician assigned together).</li>
+        <li>test_procedures: a documented test process (title, summary, prose steps, required equipment/facility, safety notes) authored against a capability; shown to technicians as reference material.</li>
+        <li>procedure_checks: the structured, fillable checklist for a test_procedure &mdash; one row per check-item with its pre-authored expected value.</li>
+        <li>work_orders: the technician's job record for one ordered_test (at most one per test) &mdash; who's doing it, which procedure, and its planned/in_progress/on_hold/completed lifecycle.</li>
+        <li>test_reports: the formal, fillable-and-printable test report generated from a work_order once a procedure is attached; carries the equipment-under-test identification, an overall result, and the technician-then-reviewer sign-off workflow (draft &rarr; submitted &rarr; approved/rejected).</li>
+        <li>report_steps: a snapshot of a test_report's checklist &mdash; each row copies one procedure_checks row's description/expected value at report-creation time, then the technician fills in the actual value and pass/fail/n-a result.</li>
       </ul>
     </section>
 
@@ -79,15 +85,22 @@
         <li>resources and capabilities are linked many-to-many through resource_capabilities.</li>
         <li>Each ordered_test can have zero or many allocations, one per distinct resource, so equipment, facility, procedure, and technician resources can all be assigned to the same test; the same resource cannot be assigned twice to the same test (unique on ordered_test_id + resource_id).</li>
         <li>Each allocation references one planner user to track who assigned the resource.</li>
+        <li>One resource can be the <code>linked_resource_id</code> of zero or many users (in practice exactly one technician login per technician resource, but this is an application convention, not a database constraint).</li>
+        <li>One capability can have many test_procedures; one test_procedure has many procedure_checks (its ordered checklist).</li>
+        <li>Each ordered_test has at most one work_order (unique on ordered_test_id); each work_order belongs to one technician user and, once a procedure is chosen, one test_procedure.</li>
+        <li>Each work_order has at most one test_report (unique on work_order_id); creating the report copies that work order's procedure_checks into new report_steps rows scoped to the report.</li>
+        <li>Each test_report references two distinct users: the authoring technician (<code>technician_user_id</code>) and, once reviewed, the approving/rejecting reviewer (<code>reviewer_user_id</code>) &mdash; enforced in application logic to never be the same person.</li>
       </ul>
     </section>
 
     <section>
       <h2>6. Integrity Constraints</h2>
       <ul>
-        <li>Unique keys on username, resource code, capability name, and order code.</li>
+        <li>Unique keys on username, resource code, capability name, order code, work_order_code, and report_code.</li>
         <li>Foreign keys enforce referential integrity between mapping/transactional tables and master tables.</li>
         <li>Allocation validation in application logic ensures assigned resource has required capability for the ordered test.</li>
+        <li>Work order and test report status fields are constrained by <code>CHECK</code> to their valid lifecycle values (e.g. work_orders.status IN planned/in_progress/on_hold/completed; test_reports.status IN draft/submitted/approved/rejected); the pass/fail/n-a result columns are similarly constrained or <code>NULL</code>.</li>
+        <li>Application logic (not a database constraint) enforces the review workflow: only the report's own technician can edit or submit a draft; only a <em>different</em> technician or a planner can approve/reject a submitted report; rejecting requires a comment.</li>
       </ul>
     </section>
 

@@ -1,0 +1,260 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Technician{% endblock %}
+
+{% block content %}
+<style>
+  #tab-my-tests:checked ~ .tabs-body #panel-my-tests,
+  #tab-procedures:checked ~ .tabs-body #panel-procedures { display: block; }
+
+  #tab-my-tests:checked ~ .tab-list label[for="tab-my-tests"],
+  #tab-procedures:checked ~ .tab-list label[for="tab-procedures"] {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Technician</div>
+  <h1>My test assignments</h1>
+  <p class="lead">Tests a planner has assigned to you, the equipment and facilities allocated alongside you, and the work orders you run to perform them.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile"><div class="stat-value">{{ tests|length }}</div><div class="stat-label">Assigned tests</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ open_count }}</div><div class="stat-label">Open work orders</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ completed_count }}</div><div class="stat-label">Completed</div></div>
+</div>
+
+{% if not resource_id %}
+<div class="callout">
+  <strong>No linked resource.</strong> Your user account isn't linked to a technician resource yet, so no assigned tests can be shown. Ask an admin to set "Linked technician resource" on your user (Admin &rarr; Users).
+</div>
+{% endif %}
+
+<div class="tabs">
+  <input type="radio" name="tech-tabs" id="tab-my-tests" class="tab-input" checked>
+  <input type="radio" name="tech-tabs" id="tab-procedures" class="tab-input">
+
+  <div class="tab-list" role="tablist">
+    <label for="tab-my-tests" class="tab-label">🧪 My assigned tests</label>
+    <label for="tab-procedures" class="tab-label">📋 Test procedure library</label>
+  </div>
+
+  <div class="tabs-body">
+    <section class="tab-panel" id="panel-my-tests">
+      {% if tests %}
+      {% for t in tests %}
+      {% set wo = t['work_order'] %}
+      <div class="test-card {{ 'dup-row' if t['_dup'] }}">
+        <div class="test-card-head">
+          <div>
+            <div class="test-card-title">{{ t['test_name'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</div>
+            <div class="test-card-meta">{{ t['order_code'] }} &middot; {{ t['customer_name'] }} &middot; {{ t['product_name'] }} &middot; requires {{ t['capability_name'] or 'no specific capability' }}</div>
+          </div>
+          {{ macros.wo_status_badge(t['wo_status']) }}
+        </div>
+
+        {% if t['assigned_resources'] %}
+        <ul class="chip-list">
+          {% for r in t['assigned_resources'] %}
+          <li class="chip">{{ r['code'] }} - {{ r['name'] }} <span class="badge badge-type">{{ r['resource_type'] }}</span></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if not wo %}
+        <div class="wo-box">
+          <div class="card-subtitle" style="margin-bottom:10px;">No work order yet for this test.</div>
+          <form method="post" class="form-grid">
+            <input type="hidden" name="action" value="create_work_order">
+            <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+            <div class="field">
+              <label for="procedure-{{ t['ordered_test_id'] }}">Test procedure</label>
+              <select id="procedure-{{ t['ordered_test_id'] }}" name="procedure_id">
+                <option value="">None</option>
+                {% for p in (t['available_procedures'] or all_procedures) %}
+                <option value="{{ p['id'] }}">{{ p['title'] }}</option>
+                {% endfor %}
+              </select>
+              {% if not t['available_procedures'] %}
+              <div class="hint">No procedure is documented for "{{ t['capability_name'] }}" specifically — showing the full library instead.</div>
+              {% endif %}
+            </div>
+            <div class="field">
+              <label for="date-{{ t['ordered_test_id'] }}">Scheduled date</label>
+              <input type="date" id="date-{{ t['ordered_test_id'] }}" name="scheduled_date">
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="notes-new-{{ t['ordered_test_id'] }}">Notes</label>
+              <textarea id="notes-new-{{ t['ordered_test_id'] }}" name="notes" rows="2"></textarea>
+            </div>
+            <div class="field"><button type="submit" class="btn btn-primary">Create work order</button></div>
+          </form>
+        </div>
+        {% else %}
+        <div class="wo-box">
+          <div class="wo-head">
+            <span class="wo-code">{{ wo['work_order_code'] }}</span>
+            {{ macros.wo_status_badge(wo['status']) }}
+            {% if wo['result'] %}{{ macros.wo_result_badge(wo['result']) }}{% endif %}
+          </div>
+          <div class="wo-meta">
+            {% if wo['procedure_title'] %}Procedure: {{ wo['procedure_title'] }} &middot; {% endif %}
+            {% if wo['scheduled_date'] %}Scheduled: {{ wo['scheduled_date'] }} &middot; {% endif %}
+            {% if wo['started_at'] %}Started: {{ wo['started_at'] }} &middot; {% endif %}
+            {% if wo['completed_at'] %}Completed: {{ wo['completed_at'] }}{% endif %}
+          </div>
+
+          {% if not wo['procedure_id'] %}
+          <form method="post" class="inline-form" style="margin-bottom:10px;">
+            <input type="hidden" name="action" value="update_procedure">
+            <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+            <select name="procedure_id" required>
+              <option value="">Select a test procedure…</option>
+              {% for p in (t['available_procedures'] or all_procedures) %}
+              <option value="{{ p['id'] }}">{{ p['title'] }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary btn-sm">Set procedure</button>
+          </form>
+          <p class="section-help" style="margin-top:0;">A test procedure is required before a test report can be generated for this work order.</p>
+          {% else %}
+          {% set proc = all_procedures|selectattr('id', 'equalto', wo['procedure_id'])|first %}
+          {% if proc %}
+          <details class="procedure-detail">
+            <summary>View test process, equipment &amp; facility for this procedure</summary>
+            <div class="detail-body">
+              {% if proc['summary'] %}<p>{{ proc['summary'] }}</p>{% endif %}
+              <ol class="steps-list">
+                {% for step in proc['steps'].split('\n') %}
+                <li>{{ step.split('. ', 1)[1] if '. ' in step[:4] else step }}</li>
+                {% endfor %}
+              </ol>
+              <div class="proc-meta-grid">
+                <div><div class="label">Equipment needed</div>{{ proc['equipment_needed'] or '—' }}</div>
+                <div><div class="label">Facility needed</div>{{ proc['facility_needed'] or '—' }}</div>
+              </div>
+              {% if proc['safety_notes'] %}
+              <div class="callout"><strong>Safety:</strong> {{ proc['safety_notes'] }}</div>
+              {% endif %}
+            </div>
+          </details>
+          {% endif %}
+
+          <div class="wo-actions" style="margin-top:10px;">
+            {% if t['report'] %}
+            <a href="{{ url_for('reports.report_detail', report_id=t['report']['id']) }}" class="btn btn-secondary btn-sm">📄 {{ t['report']['report_code'] }}</a>
+            {{ macros.report_status_badge(t['report']['status']) }}
+            {% else %}
+            <form method="post" action="{{ url_for('reports.create_report') }}">
+              <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+              <button type="submit" class="btn btn-secondary btn-sm">📄 Create test report</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if wo['status'] == 'planned' %}
+          <div class="wo-actions">
+            <form method="post"><input type="hidden" name="action" value="start_work_order"><input type="hidden" name="work_order_id" value="{{ wo['id'] }}"><button type="submit" class="btn btn-primary btn-sm">▶ Start</button></form>
+          </div>
+          <form method="post" class="inline-form" style="margin-top:10px;">
+            <input type="hidden" name="action" value="update_notes">
+            <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+            <textarea name="notes" rows="2" placeholder="Notes" style="flex:1; min-width:200px;">{{ wo['notes'] or '' }}</textarea>
+            <button type="submit" class="btn btn-secondary btn-sm">Save notes</button>
+          </form>
+
+          {% elif wo['status'] == 'in_progress' %}
+          <div class="wo-actions">
+            <form method="post"><input type="hidden" name="action" value="hold_work_order"><input type="hidden" name="work_order_id" value="{{ wo['id'] }}"><button type="submit" class="btn btn-secondary btn-sm">⏸ Hold</button></form>
+          </div>
+          <form method="post" class="form-grid" style="margin-top:10px;">
+            <input type="hidden" name="action" value="complete_work_order">
+            <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+            <div class="field">
+              <label for="result-{{ wo['id'] }}">Result</label>
+              <select id="result-{{ wo['id'] }}" name="result" required>
+                <option value="">Select result</option>
+                <option value="pass">Pass</option>
+                <option value="fail">Fail</option>
+                <option value="n_a">N/A</option>
+              </select>
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="complete-notes-{{ wo['id'] }}">Closing notes</label>
+              <textarea id="complete-notes-{{ wo['id'] }}" name="notes" rows="2">{{ wo['notes'] or '' }}</textarea>
+            </div>
+            <div class="field"><button type="submit" class="btn btn-primary">✅ Complete work order</button></div>
+          </form>
+
+          {% elif wo['status'] == 'on_hold' %}
+          <div class="wo-actions">
+            <form method="post"><input type="hidden" name="action" value="resume_work_order"><input type="hidden" name="work_order_id" value="{{ wo['id'] }}"><button type="submit" class="btn btn-primary btn-sm">▶ Resume</button></form>
+          </div>
+          <form method="post" class="inline-form" style="margin-top:10px;">
+            <input type="hidden" name="action" value="update_notes">
+            <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+            <textarea name="notes" rows="2" placeholder="Notes" style="flex:1; min-width:200px;">{{ wo['notes'] or '' }}</textarea>
+            <button type="submit" class="btn btn-secondary btn-sm">Save notes</button>
+          </form>
+
+          {% else %}
+          {% if wo['notes'] %}<div class="wo-notes">{{ wo['notes'] }}</div>{% endif %}
+          <details class="procedure-detail">
+            <summary>Edit notes</summary>
+            <form method="post" class="inline-form detail-body">
+              <input type="hidden" name="action" value="update_notes">
+              <input type="hidden" name="work_order_id" value="{{ wo['id'] }}">
+              <textarea name="notes" rows="2" style="flex:1; min-width:200px;">{{ wo['notes'] or '' }}</textarea>
+              <button type="submit" class="btn btn-secondary btn-sm">Save notes</button>
+            </form>
+          </details>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><span class="icon">🧪</span>No tests are currently assigned to you. Ask your planner to allocate your technician resource to an ordered test.</div>
+      {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-procedures">
+      <div class="callout">
+        <strong>Reference only.</strong> These test procedures document the standard process, required equipment/facility, and safety notes for each capability. Pick one when creating a work order.
+      </div>
+      {% if all_procedures %}
+      {% for p in all_procedures %}
+      <div class="test-card">
+        <div class="test-card-head">
+          <div>
+            <div class="test-card-title">{{ p['title'] }}</div>
+            <div class="test-card-meta">{{ p['capability_name'] or 'No specific capability' }}</div>
+          </div>
+        </div>
+        {% if p['summary'] %}<p>{{ p['summary'] }}</p>{% endif %}
+        <ol class="steps-list">
+          {% for step in p['steps'].split('\n') %}
+          <li>{{ step.split('. ', 1)[1] if '. ' in step[:4] else step }}</li>
+          {% endfor %}
+        </ol>
+        <div class="proc-meta-grid">
+          <div><div class="label">Equipment needed</div>{{ p['equipment_needed'] or '—' }}</div>
+          <div><div class="label">Facility needed</div>{{ p['facility_needed'] or '—' }}</div>
+        </div>
+        {% if p['safety_notes'] %}
+        <div class="callout"><strong>Safety:</strong> {{ p['safety_notes'] }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><span class="icon">📋</span>No test procedures documented yet.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

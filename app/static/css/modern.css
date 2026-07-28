@@ -143,6 +143,7 @@ a { color: var(--color-primary); }
 }
 .role-admin { background: #ede9fe; color: #6d28d9; }
 .role-planner { background: #dcfce7; color: #15803d; }
+.role-technician { background: #ffedd5; color: #c2410c; }
 
 /* ---------- Buttons ---------- */
 
@@ -377,6 +378,7 @@ table.modern-table input[type="text"], table.modern-table select {
 .badge-available { background: var(--color-success-light); color: var(--color-success); border-color: #bbf7d0; }
 .badge-status-other { background: var(--color-warning-light); color: var(--color-warning); border-color: #fde68a; }
 .badge-type { background: var(--color-info-light); color: var(--color-info); border-color: #bfdbfe; }
+.badge-danger { background: var(--color-danger-light); color: var(--color-danger); border-color: #fecaca; }
 
 .chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
@@ -472,6 +474,29 @@ table.modern-table input[type="text"], table.modern-table select {
 .help-section { margin-bottom: 26px; }
 .help-section h3 { display: flex; align-items: center; gap: 8px; }
 .kbd { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 6px; font-size: 0.82rem; }
+
+/* ---------- Test/report cards (technician & report pages) ---------- */
+
+.test-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 14px; background: var(--color-surface); }
+.test-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.test-card-title { font-weight: 700; }
+.test-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
+
+.wo-box { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; margin-top: 12px; }
+.wo-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.wo-code { font-weight: 700; font-family: monospace; }
+.wo-meta { color: var(--color-text-muted); font-size: 0.8rem; margin-bottom: 8px; }
+.wo-notes { white-space: pre-wrap; font-size: 0.86rem; margin: 6px 0; }
+.wo-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+
+.steps-list { margin: 6px 0 0; padding-left: 20px; font-size: 0.86rem; }
+.steps-list li { margin-bottom: 4px; }
+.proc-meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; font-size: 0.85rem; }
+.proc-meta-grid .label { font-weight: 600; color: var(--color-text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+details.procedure-detail { margin-top: 10px; }
+details.procedure-detail summary { cursor: pointer; font-weight: 600; color: var(--color-primary); font-size: 0.85rem; }
+details.procedure-detail .detail-body { margin-top: 8px; }
 
 /* ---------- Section heading with helper text ---------- */
 

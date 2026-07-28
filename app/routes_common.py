@@ -43,6 +43,21 @@ def require_role(expected_role: str):
     return decorator
 
 
+def require_any_role(*expected_roles: str):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            role = current_role()
+            if role not in expected_roles:
+                flash(f"Access denied. Required role: {' or '.join(expected_roles)}.", "error")
+                return redirect(url_for("common.login"))
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
 @bp.route("/ui-mode/<mode>")
 def set_ui_mode(mode):
     if mode not in UI_MODES:
@@ -147,7 +162,12 @@ def login():
         session["user_id"] = user["id"]
         session["username"] = user["username"]
         session["role"] = user["role"]
+        if user["role"] == "technician":
+            # The technician workspace only exists in the modern UI.
+            session["ui_mode"] = "modern"
         flash(f"Signed in as {user['username']} ({user['role']}).", "info")
+        if user["role"] == "technician":
+            return redirect(url_for("technician.technician_dashboard"))
         return redirect(url_for("common.resource_catalog"))
 
     return render_ui("login.html")

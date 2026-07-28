@@ -1,0 +1,81 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Test Reports{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Test Reports</div>
+  <h1>Test report review queue &amp; history</h1>
+  <p class="lead">Reports submitted by a technician wait here for approval by another technician or a planner before they're final.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile"><div class="stat-value">{{ pending_reviews|length }}</div><div class="stat-label">Awaiting your review</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ all_reports|length }}</div><div class="stat-label">Total reports</div></div>
+</div>
+
+<div class="section-head"><h2>Awaiting your review</h2></div>
+{% if pending_reviews %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead><tr>
+      <th>Report</th>
+      <th>Order</th>
+      <th>Test</th>
+      <th>Technician</th>
+      <th>Submitted</th>
+      <th>Actions</th>
+    </tr></thead>
+    <tbody>
+      {% for r in pending_reviews %}
+      <tr>
+        <td>{{ r['report_code'] }}</td>
+        <td>{{ r['order_code'] }} &middot; {{ r['customer_name'] }}</td>
+        <td>{{ r['test_name'] }}</td>
+        <td>{{ r['technician_username'] }}</td>
+        <td>{{ r['created_at'] }}</td>
+        <td><a href="{{ url_for('reports.report_detail', report_id=r['id']) }}" class="btn btn-primary btn-sm">Review</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><span class="icon">✅</span>Nothing waiting for your review right now.</div>
+{% endif %}
+
+<div class="section-head" style="margin-top:28px;"><h2>All reports</h2></div>
+{% if all_reports %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead><tr>
+      <th>Report</th>
+      <th>Order</th>
+      <th>Test</th>
+      <th>Technician</th>
+      <th>Status</th>
+      <th>Result</th>
+      <th>Reviewer</th>
+      <th>Actions</th>
+    </tr></thead>
+    <tbody>
+      {% for r in all_reports %}
+      <tr>
+        <td>{{ r['report_code'] }}</td>
+        <td>{{ r['order_code'] }} &middot; {{ r['customer_name'] }}</td>
+        <td>{{ r['test_name'] }}</td>
+        <td>{{ r['technician_username'] }}</td>
+        <td>{{ macros.report_status_badge(r['status']) }}</td>
+        <td>{% if r['overall_result'] %}{{ macros.wo_result_badge(r['overall_result']) }}{% else %}—{% endif %}</td>
+        <td>{{ r['reviewer_username'] or '—' }}</td>
+        <td><a href="{{ url_for('reports.report_detail', report_id=r['id']) }}" class="btn btn-secondary btn-sm">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><span class="icon">📄</span>No test reports have been created yet.</div>
+{% endif %}
+{% endblock %}

@@ -20,6 +20,7 @@
   <ul>
     <li><strong>RMS Administrator</strong> (<code>admin.demo</code>): manages users, capabilities, resources, and which capabilities each resource has.</li>
     <li><strong>Test Planner</strong> (<code>planner.demo</code>): manages customer orders, the tests ordered under them, and which resources are assigned to each test.</li>
+    <li><strong>Test Technician</strong> (<code>technician.demo</code>, <code>technician2.demo</code>): sees the tests assigned to them, creates and runs work orders against a test procedure, fills in the test report, and reviews reports submitted by other technicians.</li>
   </ul>
 </div>
 
@@ -39,6 +40,28 @@
     <li>Create a <strong>customer order</strong> (order code, customer name, product name) on the Customer orders tab.</li>
     <li>Add one or more <strong>ordered tests</strong> to that order on the Ordered tests tab, each optionally requiring a capability.</li>
     <li>On the Resource assignment tab, assign resources to each test. A test can have <strong>several</strong> resources at once — e.g. equipment, a facility, and a technician together. Only resources with the test's required capability are offered, and the same resource can't be assigned twice to one test.</li>
+  </ol>
+</div>
+
+<div class="card help-section">
+  <h3>🧰 Technician workflow</h3>
+  <ol>
+    <li>The Technician dashboard shows every ordered test where the technician's linked resource has been assigned by a planner.</li>
+    <li>For each test, open <strong>Create work order</strong>, optionally pick a matching test procedure, set a scheduled date, and add notes.</li>
+    <li>Move the work order through its lifecycle: <strong>Start</strong> (planned → in progress), <strong>Hold</strong>/<strong>Resume</strong> if interrupted, then <strong>Complete</strong> with a pass/fail/n-a result and closing notes.</li>
+    <li>The selected test procedure's steps, required equipment, facility, and safety notes are shown alongside the work order so the technician has everything needed to perform the test.</li>
+    <li>A read-only <strong>Test procedure library</strong> tab lists every documented test process for reference.</li>
+  </ol>
+  <p class="section-help">An admin links a technician's user account to a technician resource on the Admin → Users tab (field "Linked technician resource") — that's what determines which assigned tests appear for them.</p>
+</div>
+
+<div class="card help-section">
+  <h3>📄 Test reports</h3>
+  <ol>
+    <li>Once a work order has a test procedure assigned, the technician can <strong>Create test report</strong> — this generates a fillable template pre-loaded with the equipment/facility used, the technician's name, the unit-under-test's name (from the order), and one row per procedure check-item with its expected value.</li>
+    <li>The technician fills in the equipment serial number, the actual value and pass/fail/n-a result for each step, an overall result, and any notes, then <strong>Submits for review</strong> — this locks the report and time-stamps the technician's sign-off.</li>
+    <li>Any <strong>other</strong> technician or a planner can then open it from <strong>Test Reports → Awaiting your review</strong> and <strong>Approve</strong> or <strong>Reject</strong> it (a comment is required on rejection). A rejected report can be reopened by its technician for corrections and resubmitted.</li>
+    <li>The report page doubles as a printable <strong>A4</strong> form — use the <strong>Print / Save as PDF</strong> button at any stage (blank template during the test, or the completed and signed report afterwards).</li>
   </ol>
 </div>
 

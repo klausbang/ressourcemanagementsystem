@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="760" viewBox="0 0 1160 760">
   <defs>
     <style>
       .title { font: 700 28px Arial, sans-serif; fill: #1f2937; }
@@ -16,45 +16,53 @@
     </marker>
   </defs>
 
-  <text x="30" y="40" class="title">RMS Web Application Architecture (Phase 4)</text>
+  <text x="30" y="40" class="title">RMS Web Application Architecture (Phase 7)</text>
 
-  <rect x="40" y="90" width="220" height="120" class="box"/>
+  <rect x="40" y="90" width="220" height="150" class="box"/>
   <text x="60" y="120" class="label">Web Browser</text>
-  <text x="60" y="145" class="text">Admin and Planner UI</text>
-  <text x="60" y="168" class="text">HTML forms + tables</text>
+  <text x="60" y="145" class="text">Admin, Planner, and</text>
+  <text x="60" y="165" class="text">Technician UI</text>
+  <text x="60" y="188" class="text">HTML forms + tables</text>
+  <text x="60" y="210" class="text">(Simple / Modern interfaces)</text>
 
-  <rect x="320" y="70" width="350" height="180" class="accent"/>
+  <rect x="320" y="70" width="380" height="210" class="accent"/>
   <text x="345" y="105" class="label">Flask Application</text>
-  <text x="345" y="130" class="text">routes_common.py</text>
+  <text x="345" y="130" class="text">routes_common.py (login, UI mode, catalog)</text>
   <text x="345" y="152" class="text">routes_admin.py</text>
   <text x="345" y="174" class="text">routes_planner.py</text>
-  <text x="345" y="196" class="text">Session role checks + validation</text>
+  <text x="345" y="196" class="text">routes_technician.py (work orders)</text>
+  <text x="345" y="218" class="text">routes_reports.py (test reports + review)</text>
+  <text x="345" y="245" class="text">Session role checks + validation</text>
 
-  <rect x="730" y="90" width="310" height="120" class="data"/>
-  <text x="755" y="120" class="label">SQLite Database (Local)</text>
-  <text x="755" y="145" class="text">rms.db</text>
-  <text x="755" y="168" class="text">users, resources, capabilities, orders, allocations</text>
+  <rect x="760" y="90" width="360" height="150" class="data"/>
+  <text x="785" y="120" class="label">SQLite Database (Local)</text>
+  <text x="785" y="145" class="text">rms.db</text>
+  <text x="785" y="168" class="text">users, resources, capabilities, orders, allocations,</text>
+  <text x="785" y="190" class="text">test_procedures, work_orders,</text>
+  <text x="785" y="212" class="text">test_reports, report_steps</text>
 
-  <rect x="320" y="290" width="350" height="160" class="box"/>
-  <text x="345" y="325" class="label">Domain and Data Access Layer</text>
-  <text x="345" y="350" class="text">db.py schema + connection lifecycle</text>
-  <text x="345" y="372" class="text">seed routines for reproducible demo data</text>
-  <text x="345" y="394" class="text">capability-resource allocation validation</text>
+  <rect x="320" y="330" width="380" height="180" class="box"/>
+  <text x="345" y="365" class="label">Domain and Data Access Layer</text>
+  <text x="345" y="390" class="text">db.py schema + connection lifecycle</text>
+  <text x="345" y="412" class="text">in-place schema migration (existing SQLite files)</text>
+  <text x="345" y="434" class="text">seed routines for reproducible demo data</text>
+  <text x="345" y="456" class="text">capability-resource allocation validation</text>
+  <text x="345" y="478" class="text">work order / test report lifecycle rules</text>
 
-  <rect x="730" y="300" width="310" height="140" class="future"/>
-  <text x="755" y="335" class="label">Future Cloud Target (Railway)</text>
-  <text x="755" y="360" class="text">Flask app container/service</text>
-  <text x="755" y="382" class="text">PostgreSQL managed database</text>
-  <text x="755" y="404" class="text">Environment variables + migration step</text>
+  <rect x="760" y="340" width="360" height="140" class="future"/>
+  <text x="785" y="375" class="label">Future Cloud Target (Railway)</text>
+  <text x="785" y="400" class="text">Flask app container/service</text>
+  <text x="785" y="422" class="text">PostgreSQL managed database</text>
+  <text x="785" y="444" class="text">Environment variables + migration step</text>
 
-  <line x1="260" y1="150" x2="320" y2="150" class="arrow"/>
-  <line x1="670" y1="150" x2="730" y2="150" class="arrow"/>
-  <line x1="495" y1="250" x2="495" y2="290" class="arrow"/>
-  <line x1="670" y1="350" x2="730" y2="350" class="arrow dash"/>
+  <line x1="260" y1="165" x2="320" y2="165" class="arrow"/>
+  <line x1="700" y1="165" x2="760" y2="165" class="arrow"/>
+  <line x1="510" y1="280" x2="510" y2="330" class="arrow"/>
+  <line x1="700" y1="410" x2="760" y2="410" class="arrow dash"/>
 
-  <text x="45" y="515" class="label">Interaction Flow</text>
-  <text x="45" y="540" class="text">1) User accesses a route in Flask.</text>
-  <text x="45" y="562" class="text">2) Route validates role and input, then reads/writes SQLite via db.py.</text>
-  <text x="45" y="584" class="text">3) Flask renders HTML template response.</text>
-  <text x="45" y="606" class="text">4) Later stage: same route logic can target PostgreSQL on Railway.</text>
+  <text x="45" y="565" class="label">Interaction Flow</text>
+  <text x="45" y="590" class="text">1) User accesses a route in Flask (admin/planner/technician, Simple or Modern UI).</text>
+  <text x="45" y="612" class="text">2) Route validates role and input, then reads/writes SQLite via db.py.</text>
+  <text x="45" y="634" class="text">3) Flask renders HTML template response - technician/report pages always render Modern.</text>
+  <text x="45" y="656" class="text">4) Later stage: same route logic can target PostgreSQL on Railway.</text>
 </svg>

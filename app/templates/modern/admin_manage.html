@@ -61,7 +61,18 @@
             <select id="new-role" name="role" required>
               <option value="admin">admin</option>
               <option value="planner">planner</option>
+              <option value="technician">technician</option>
             </select>
+          </div>
+          <div class="field">
+            <label for="new-linked-resource">Linked technician resource</label>
+            <select id="new-linked-resource" name="linked_resource_id">
+              <option value="">None</option>
+              {% for r in technician_resources %}
+              <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+              {% endfor %}
+            </select>
+            <div class="hint">Only used for the technician role — links this login to the resource used to find their assigned tests.</div>
           </div>
           <div class="field"><button type="submit" class="btn btn-primary">Create user</button></div>
         </form>
@@ -74,6 +85,7 @@
           <thead><tr>
             {{ macros.sort_th('Username', 'username', 'users', 'admin.admin_manage') }}
             {{ macros.sort_th('Role', 'role', 'users', 'admin.admin_manage') }}
+            <th>Linked technician resource</th>
             <th>Actions</th>
           </tr></thead>
           <tbody>
@@ -87,6 +99,15 @@
                 <select name="role" form="user-save-{{ u['id'] }}">
                   <option value="admin" {% if u['role'] == 'admin' %}selected{% endif %}>admin</option>
                   <option value="planner" {% if u['role'] == 'planner' %}selected{% endif %}>planner</option>
+                  <option value="technician" {% if u['role'] == 'technician' %}selected{% endif %}>technician</option>
+                </select>
+              </td>
+              <td>
+                <select name="linked_resource_id" form="user-save-{{ u['id'] }}">
+                  <option value="">None</option>
+                  {% for r in technician_resources %}
+                  <option value="{{ r['id'] }}" {% if u['linked_resource_id'] == r['id'] %}selected{% endif %}>{{ r['code'] }} - {{ r['name'] }}</option>
+                  {% endfor %}
                 </select>
               </td>
               <td class="inline-form">
@@ -101,7 +122,7 @@
       {% else %}
       <div class="empty-state"><span class="icon">👤</span>No users yet.</div>
       {% endif %}
-      <p class="section-help">Deleting a user is blocked if allocations were assigned by that user as planner — reassign or remove those allocations first.</p>
+      <p class="section-help">Deleting a user is blocked if allocations were assigned by that user as planner — reassign or remove those allocations first. The linked technician resource is only meaningful for the technician role — it determines which allocated tests show up on that user's Technician dashboard.</p>
 
       {% for u in users %}
       <form id="user-save-{{ u['id'] }}" method="post" hidden>

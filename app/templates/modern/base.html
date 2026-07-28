@@ -26,6 +26,12 @@
         {% if session.get('role') == 'planner' %}
         <a href="{{ url_for('planner.planner_orders') }}" class="{{ 'active' if request.endpoint == 'planner.planner_orders' }}">Planner</a>
         {% endif %}
+        {% if session.get('role') == 'technician' %}
+        <a href="{{ url_for('technician.technician_dashboard') }}" class="{{ 'active' if request.endpoint == 'technician.technician_dashboard' }}">Technician</a>
+        {% endif %}
+        {% if session.get('role') in ('technician', 'planner') %}
+        <a href="{{ url_for('reports.reports_list') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('reports.') }}">Test Reports</a>
+        {% endif %}
         <a href="{{ url_for('common.help_page') }}" class="{{ 'active' if request.endpoint == 'common.help_page' }}">❓ Help</a>
       </nav>
 

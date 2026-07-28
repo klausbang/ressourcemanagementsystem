@@ -8,7 +8,9 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    role TEXT NOT NULL CHECK(role IN ('admin', 'planner'))
+    role TEXT NOT NULL CHECK(role IN ('admin', 'planner', 'technician')),
+    linked_resource_id INTEGER,
+    FOREIGN KEY (linked_resource_id) REFERENCES resources(id)
 );
 
 CREATE TABLE IF NOT EXISTS capabilities (
@@ -60,6 +62,80 @@ CREATE TABLE IF NOT EXISTS allocations (
     FOREIGN KEY (resource_id) REFERENCES resources(id),
     FOREIGN KEY (planner_user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS test_procedures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    capability_id INTEGER,
+    title TEXT NOT NULL,
+    summary TEXT,
+    steps TEXT NOT NULL,
+    equipment_needed TEXT,
+    facility_needed TEXT,
+    safety_notes TEXT,
+    FOREIGN KEY (capability_id) REFERENCES capabilities(id)
+);
+
+CREATE TABLE IF NOT EXISTS work_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_order_code TEXT NOT NULL UNIQUE,
+    ordered_test_id INTEGER NOT NULL UNIQUE,
+    technician_user_id INTEGER NOT NULL,
+    procedure_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'planned' CHECK(status IN ('planned', 'in_progress', 'on_hold', 'completed')),
+    scheduled_date TEXT,
+    started_at TEXT,
+    completed_at TEXT,
+    result TEXT CHECK(result IN ('pass', 'fail', 'n_a') OR result IS NULL),
+    notes TEXT,
+    FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (technician_user_id) REFERENCES users(id),
+    FOREIGN KEY (procedure_id) REFERENCES test_procedures(id)
+);
+
+CREATE TABLE IF NOT EXISTS procedure_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    procedure_id INTEGER NOT NULL,
+    step_number INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    expected_value TEXT,
+    FOREIGN KEY (procedure_id) REFERENCES test_procedures(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS test_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_code TEXT NOT NULL UNIQUE,
+    work_order_id INTEGER NOT NULL UNIQUE,
+    ordered_test_id INTEGER NOT NULL,
+    procedure_id INTEGER,
+    uut_name TEXT,
+    uut_serial_number TEXT,
+    technician_user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'submitted', 'approved', 'rejected')),
+    technician_signed_at TEXT,
+    overall_result TEXT CHECK(overall_result IN ('pass', 'fail', 'n_a') OR overall_result IS NULL),
+    notes TEXT,
+    reviewer_user_id INTEGER,
+    reviewer_decision TEXT CHECK(reviewer_decision IN ('approved', 'rejected') OR reviewer_decision IS NULL),
+    reviewer_comment TEXT,
+    reviewer_signed_at TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (procedure_id) REFERENCES test_procedures(id),
+    FOREIGN KEY (technician_user_id) REFERENCES users(id),
+    FOREIGN KEY (reviewer_user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS report_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER NOT NULL,
+    step_number INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    expected_value TEXT,
+    actual_value TEXT,
+    result TEXT CHECK(result IN ('pass', 'fail', 'n_a') OR result IS NULL),
+    FOREIGN KEY (report_id) REFERENCES test_reports(id) ON DELETE CASCADE
+);
 """
 
 
@@ -82,8 +158,54 @@ def close_db(_: Any = None) -> None:
         db.close()
 
 
+def _table_exists(db: sqlite3.Connection, name: str) -> bool:
+    return (
+        db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+        ).fetchone()
+        is not None
+    )
+
+
+def _migrate_users_table(db: sqlite3.Connection) -> None:
+    """Upgrade a users table created before the technician role/linked_resource_id existed."""
+    if not _table_exists(db, "users"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "linked_resource_id" in columns:
+        return
+
+    # Build the replacement under a temporary name, then drop the old table and
+    # rename the replacement into place. Renaming the *old* table directly would
+    # make SQLite rewrite other tables' FK text (e.g. allocations' "REFERENCES
+    # users(...)") to point at the temporary name, leaving it dangling for good.
+    # Doing it this way, other tables' FK text keeps saying "users" throughout,
+    # and it resolves correctly again once the replacement is renamed into place.
+    db.execute("PRAGMA foreign_keys = OFF")
+    try:
+        db.execute(
+            """
+            CREATE TABLE users_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                role TEXT NOT NULL CHECK(role IN ('admin', 'planner', 'technician')),
+                linked_resource_id INTEGER,
+                FOREIGN KEY (linked_resource_id) REFERENCES resources(id)
+            )
+            """
+        )
+        db.execute("INSERT INTO users_new (id, username, role) SELECT id, username, role FROM users")
+        db.execute("DROP TABLE users")
+        db.execute("ALTER TABLE users_new RENAME TO users")
+        db.commit()
+    finally:
+        db.execute("PRAGMA foreign_keys = ON")
+
+
 def init_db() -> None:
     db = get_db()
+    _migrate_users_table(db)
     db.executescript(SCHEMA_SQL)
     db.commit()
 
@@ -93,6 +215,8 @@ def init_demo_seed() -> None:
 
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('admin.demo', 'admin')")
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('planner.demo', 'planner')")
+    db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('technician.demo', 'technician')")
+    db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('technician2.demo', 'technician')")
 
     db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Multimeter Calibration", "Ability to calibrate multimeters"))
     db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Vibration Test", "Ability to run vibration tests"))
@@ -102,6 +226,7 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-020", "Vibration Tester V-9", "equipment", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("FAC-004", "Humidity Chamber Room B", "facility", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-102", "Maya Jensen", "technician", "available"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-103", "Sam Ibrahim", "technician", "available"))
 
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-001", "Acme Instruments", "Multimeter"))
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
@@ -174,4 +299,214 @@ def init_demo_seed() -> None:
         WHERE r.code = 'TECH-102'
     """)
 
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id
+        FROM resources r
+        JOIN capabilities c ON c.name IN ('Multimeter Calibration', 'Vibration Test', 'Humidity Test')
+        WHERE r.code = 'TECH-103'
+    """)
+
+    db.execute("""
+        UPDATE users SET linked_resource_id = (SELECT id FROM resources WHERE code = 'TECH-102')
+        WHERE username = 'technician.demo' AND linked_resource_id IS NULL
+    """)
+
+    db.execute("""
+        UPDATE users SET linked_resource_id = (SELECT id FROM resources WHERE code = 'TECH-103')
+        WHERE username = 'technician2.demo' AND linked_resource_id IS NULL
+    """)
+
+    _seed_procedure(
+        db,
+        capability_name="Multimeter Calibration",
+        title="Multimeter Calibration Procedure (Cal-DMM-01)",
+        summary="Verify and calibrate a digital multimeter's DC/AC voltage, resistance, and current ranges against a certified reference standard.",
+        steps="\n".join([
+            "1. Allow the multimeter and reference calibrator to stabilize at ambient temperature (20-25 C) for at least 30 minutes.",
+            "2. Visually inspect the unit for physical damage, loose terminals, or worn test leads.",
+            "3. Connect the multimeter to the calibrator via low-thermal test leads.",
+            "4. Zero/null the multimeter on each range before taking readings.",
+            "5. Apply reference DC voltage at 10%, 50%, and 90% of each range; record readings.",
+            "6. Apply reference AC voltage at 1 kHz on each voltage range; record readings.",
+            "7. Apply reference resistance values on each ohms range; record readings.",
+            "8. Apply reference DC/AC current on each current range; record readings.",
+            "9. Compare all recorded readings against manufacturer tolerance specifications.",
+            "10. Adjust internal calibration trimmers/firmware offsets if any reading exceeds tolerance, then repeat the affected range.",
+            "11. Affix a calibration sticker with date and due date, and archive the certificate.",
+        ]),
+        equipment_needed="Certified multimeter calibrator (EQ-001), low-thermal test lead set",
+        facility_needed="ESD-safe calibration bench, 20-25 C controlled environment",
+        safety_notes="Discharge any stored energy in the unit under test before connecting leads. Do not exceed the calibrator's rated output on any range.",
+    )
+    _seed_procedure_checks(db, "Multimeter Calibration Procedure (Cal-DMM-01)", [
+        ("DC Voltage - 2V range @ 1.000 V applied", "1.000 V +/- 0.002 V"),
+        ("DC Voltage - 20V range @ 10.00 V applied", "10.00 V +/- 0.02 V"),
+        ("AC Voltage - 2V range @ 1.000 V, 1 kHz applied", "1.000 V +/- 0.005 V"),
+        ("Resistance - 200 Ohm range @ 100.0 Ohm applied", "100.0 Ohm +/- 0.3 Ohm"),
+        ("DC Current - 200 mA range @ 100.0 mA applied", "100.0 mA +/- 0.3 mA"),
+        ("Visual/mechanical inspection", "No physical damage, leads and terminals intact"),
+    ])
+
+    _seed_procedure(
+        db,
+        capability_name="Vibration Test",
+        title="Random Vibration Test Procedure (Test Method 514.7)",
+        summary="Subject the product to a random vibration profile to verify it survives transportation and field vibration without mechanical or functional failure.",
+        steps="\n".join([
+            "1. Inspect the unit under test (UUT) for pre-existing damage and record baseline photos.",
+            "2. Perform a functional check of the UUT and record baseline performance.",
+            "3. Mount the UUT to the vibration table fixture using the specified torque pattern.",
+            "4. Attach control and monitoring accelerometers at the defined reference points.",
+            "5. Program the shaker controller with the specified random vibration spectrum (PSD profile) and duration.",
+            "6. Run a low-level resonance survey sine sweep to identify resonant frequencies.",
+            "7. Execute the full-level random vibration test in each of the three orthogonal axes (X, Y, Z).",
+            "8. Monitor the UUT continuously during test for intermittent failures using the functional monitoring harness.",
+            "9. Perform a post-test visual inspection and functional check.",
+            "10. Compare pre- and post-test functional results; document any deviation.",
+        ]),
+        equipment_needed="Electrodynamic shaker system, Vibration Tester V-9 (EQ-020), control/monitoring accelerometers, test fixture",
+        facility_needed="Vibration test lab with adequate power and ventilation",
+        safety_notes="Verify fixture torque and accelerometer cabling before energizing the shaker. Keep clear of the moving fixture during operation; E-stop training required.",
+    )
+    _seed_procedure_checks(db, "Random Vibration Test Procedure (Test Method 514.7)", [
+        ("Pre-test visual inspection", "No visible damage"),
+        ("Pre-test functional check", "Unit powers on and passes self-test"),
+        ("Resonance survey sine sweep", "No resonance shift greater than 5% vs. baseline"),
+        ("Random vibration - X axis", "No functional dropout during run"),
+        ("Random vibration - Y axis", "No functional dropout during run"),
+        ("Random vibration - Z axis", "No functional dropout during run"),
+        ("Post-test visual inspection", "No new visible damage"),
+        ("Post-test functional check", "Matches pre-test baseline, unit passes self-test"),
+    ])
+
+    _seed_procedure(
+        db,
+        capability_name="Humidity Test",
+        title="Damp Heat / Humidity Test Procedure (IEC 60068-2-78)",
+        summary="Expose the product to elevated temperature and humidity to verify resistance to moisture ingress, corrosion, and performance degradation.",
+        steps="\n".join([
+            "1. Perform and record a baseline functional check of the unit under test at ambient conditions.",
+            "2. Place the unit in the humidity chamber without packaging, ensuring adequate airflow around all surfaces.",
+            "3. Set chamber conditions to 40 C +/-2 C and 93% RH +/-3%, per the test specification.",
+            "4. Ramp the chamber to target conditions and begin the soak duration (standard: 96 hours).",
+            "5. Log chamber temperature and humidity at regular intervals throughout the test.",
+            "6. Perform interim functional checks at 24-hour intervals if the unit can be safely accessed.",
+            "7. At completion, remove the unit and allow it to stabilize at ambient conditions for 1-2 hours before handling.",
+            "8. Perform a final visual inspection for corrosion, condensation damage, or material degradation.",
+            "9. Perform a final functional check and compare against baseline results.",
+        ]),
+        equipment_needed="Data logger, functional test jig",
+        facility_needed="Humidity Chamber Room B (FAC-004)",
+        safety_notes="Allow condensation to evaporate before reconnecting power. Use insulated gloves when handling chamber racks during unloading.",
+    )
+    _seed_procedure_checks(db, "Damp Heat / Humidity Test Procedure (IEC 60068-2-78)", [
+        ("Pre-test functional check", "Unit powers on and passes self-test"),
+        ("Chamber conditions reached", "40 +/-2 C / 93 +/-3% RH within 1 hour of ramp"),
+        ("96-hour soak completed", "Continuous exposure, no interruption greater than 15 min"),
+        ("Post-test visual inspection", "No corrosion or condensation damage"),
+        ("Post-test functional check", "Matches pre-test baseline, unit passes self-test"),
+    ])
+
+    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "EQ-020")
+    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "TECH-102")
+    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "FAC-004")
+    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "TECH-102")
+
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, procedure_id, status,
+             scheduled_date, started_at, completed_at, result, notes)
+        SELECT
+            'WO-0001', ot.id, u.id, p.id, 'completed',
+            '2026-07-20', '2026-07-20 09:00', '2026-07-20 11:30', 'pass',
+            'Unit passed the random vibration profile per Test Method 514.7. No anomalies observed on functional monitoring; no visible damage on post-test inspection.'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'technician.demo'
+        JOIN test_procedures p ON p.title = 'Random Vibration Test Procedure (Test Method 514.7)'
+        WHERE o.order_code = 'ORD-2026-002' AND ot.test_name = 'Vibration Test'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """)
+
+    db.execute("""
+        INSERT INTO test_reports
+            (report_code, work_order_id, ordered_test_id, procedure_id, uut_name, uut_serial_number,
+             technician_user_id, status, technician_signed_at, overall_result, notes,
+             reviewer_user_id, reviewer_decision, reviewer_comment, reviewer_signed_at, created_at)
+        SELECT
+            'RPT-0001', wo.id, wo.ordered_test_id, wo.procedure_id, o.product_name, 'SN-88213-004',
+            wo.technician_user_id, 'approved', '2026-07-20 11:25', 'pass',
+            'Unit passed the random vibration profile per Test Method 514.7. No anomalies observed.',
+            u2.id, 'approved', 'Reviewed traces and photos, agree with pass result.', '2026-07-20 15:40', '2026-07-20 09:00'
+        FROM work_orders wo
+        JOIN ordered_tests ot ON ot.id = wo.ordered_test_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u2 ON u2.username = 'technician2.demo'
+        WHERE wo.work_order_code = 'WO-0001'
+          AND NOT EXISTS (SELECT 1 FROM test_reports tr WHERE tr.work_order_id = wo.id)
+    """)
+
+    db.execute("""
+        INSERT INTO report_steps (report_id, step_number, description, expected_value, actual_value, result)
+        SELECT tr.id, pc.step_number, pc.description, pc.expected_value, pc.expected_value, 'pass'
+        FROM test_reports tr
+        JOIN procedure_checks pc ON pc.procedure_id = tr.procedure_id
+        WHERE tr.report_code = 'RPT-0001'
+          AND NOT EXISTS (SELECT 1 FROM report_steps rs WHERE rs.report_id = tr.id)
+    """)
+
     db.commit()
+
+
+def _seed_procedure(
+    db: sqlite3.Connection,
+    capability_name: str,
+    title: str,
+    summary: str,
+    steps: str,
+    equipment_needed: str,
+    facility_needed: str,
+    safety_notes: str,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO test_procedures (capability_id, title, summary, steps, equipment_needed, facility_needed, safety_notes)
+        SELECT c.id, ?, ?, ?, ?, ?, ?
+        FROM capabilities c
+        WHERE c.name = ?
+          AND NOT EXISTS (SELECT 1 FROM test_procedures p WHERE p.title = ?)
+        """,
+        (title, summary, steps, equipment_needed, facility_needed, safety_notes, capability_name, title),
+    )
+
+
+def _seed_procedure_checks(db: sqlite3.Connection, procedure_title: str, checks: list[tuple[str, str]]) -> None:
+    proc = db.execute("SELECT id FROM test_procedures WHERE title = ?", (procedure_title,)).fetchone()
+    if proc is None:
+        return
+    existing = db.execute(
+        "SELECT 1 FROM procedure_checks WHERE procedure_id = ?", (proc["id"],)
+    ).fetchone()
+    if existing:
+        return
+    for step_number, (description, expected_value) in enumerate(checks, start=1):
+        db.execute(
+            "INSERT INTO procedure_checks (procedure_id, step_number, description, expected_value) VALUES (?, ?, ?, ?)",
+            (proc["id"], step_number, description, expected_value),
+        )
+
+
+def _seed_allocation(db: sqlite3.Connection, order_code: str, test_name: str, resource_code: str) -> None:
+    db.execute(
+        """
+        INSERT OR IGNORE INTO allocations (ordered_test_id, resource_id, planner_user_id, notes)
+        SELECT ot.id, r.id, u.id, 'Seeded demo allocation'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN resources r ON r.code = ?
+        JOIN users u ON u.username = 'planner.demo'
+        WHERE o.order_code = ? AND ot.test_name = ?
+        """,
+        (resource_code, order_code, test_name),
+    )

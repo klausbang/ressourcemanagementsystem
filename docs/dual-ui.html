@@ -54,7 +54,8 @@
         <li><strong>Navigation within a page</strong>: Admin (Users / Capabilities / Resources / Capability assignments) and Planner (Customer orders / Ordered tests / Resource assignment) each use CSS-only radio-driven tabs &mdash; no JavaScript required for the core interaction, so it still works with JS disabled.</li>
         <li><strong>Resource assignment</strong>: presented as one card per ordered test with a removable chip per assigned resource and an "add resource" control, instead of one wide table row &mdash; chosen specifically because a test can now have several resources assigned at once.</li>
         <li><strong>Duplicate highlighting</strong>: same underlying <code>_dup</code> flag as Simple mode, styled as an amber row with a ⚠️ tooltip explaining what it means (via the modern <code>_macros.html:dup_flag()</code> macro).</li>
-        <li><strong>Help</strong>: a dedicated <code>/help</code> page (role overview, admin/planner workflows, table features, referential-integrity behavior) plus inline contextual copy (card subtitles, section-help notes, a callout on the resource-assignment tab) rather than a single wall of text.</li>
+        <li><strong>Help</strong>: a dedicated <code>/help</code> page (role overview, admin/planner/technician workflows, table features, referential-integrity behavior) plus inline contextual copy (card subtitles, section-help notes, a callout on the resource-assignment tab) rather than a single wall of text.</li>
+        <li><strong>Technician &amp; test-report pages</strong> (Phase 7, Modern-only &mdash; see section 7): a tabbed technician dashboard (assigned tests / procedure library) built from the same card and chip components as the planner's resource-assignment tab; a test report page styled as a single A4 sheet with print-specific CSS (<code>@page</code>, chrome hidden under <code>@media print</code>); and a reports queue/history page reusing the standard <code>modern-table</code> styling.</li>
       </ul>
     </section>
 
@@ -66,6 +67,17 @@
         <li>Create <code>templates/simple/your_page.html</code> extending <code>simple/base.html</code>.</li>
         <li>Create <code>templates/modern/your_page.html</code> extending <code>modern/base.html</code>.</li>
       </ol>
+    </section>
+
+    <section>
+      <h2>7. Exception: Modern-Only Pages</h2>
+      <p>The technician workspace (<code>app/routes_technician.py</code>) and test reports (<code>app/routes_reports.py</code>), added in Phase 7, deliberately break the "one template per mode" rule above: they exist <strong>only</strong> under <code>templates/modern/</code> (<code>technician_dashboard.html</code>, <code>report_detail.html</code>, <code>reports_list.html</code>), and their views call Flask's <code>render_template("modern/...")</code> directly instead of <code>render_ui()</code>.</p>
+      <ul>
+        <li><strong>Why</strong>: this workflow &mdash; work orders, the fillable/printable A4 test report, and the review/approval queue &mdash; has no plain-HTML equivalent designed for it, and duplicating it into Simple would add real effort for a fallback mode nobody uses for this feature.</li>
+        <li><strong>Consequence</strong>: these pages always render the same way regardless of the session's <code>ui_mode</code>, and the "Switch to Simple" button in the Modern top bar has no effect on them &mdash; a Simple-mode user who navigates to <code>/technician/</code> or <code>/reports/...</code> still sees the Modern rendering.</li>
+        <li><strong>Login behavior</strong>: because of this, <code>common.login()</code> forces <code>session['ui_mode'] = 'modern'</code> for the technician role specifically, so a technician never lands on a Simple catalog page with no visible way to reach their own workspace (Simple's nav is unconditional and has no Technician/Test Reports link).</li>
+        <li>If a future page needs true dual-mode support, follow section 6 instead of this exception.</li>
+      </ul>
     </section>
   </main>
 </body>

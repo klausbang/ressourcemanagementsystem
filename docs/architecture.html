@@ -14,7 +14,7 @@
   <main>
     <section>
       <h2>1. Scope</h2>
-      <p>This architecture describes the minimal local RMS runtime in Phase 3 and defines how it evolves to Railway cloud deployment in later stages.</p>
+      <p>This architecture describes the local RMS runtime &mdash; resource/capability management and order allocation (Phase 3-4), plus the technician work order and test report workflow added in Phase 7 &mdash; and defines how it evolves to Railway cloud deployment in later stages.</p>
     </section>
 
     <section>
@@ -26,9 +26,9 @@
     <section>
       <h2>3. Runtime Components</h2>
       <ul>
-        <li>Client layer: browser-based HTML pages for admin and planner workflows.</li>
-        <li>Application layer: Flask blueprints for common, admin, and planner routes.</li>
-        <li>Domain/data layer: database schema, DB connection lifecycle, and seed routines.</li>
+        <li>Client layer: browser-based HTML pages, in two interfaces (Simple and Modern &mdash; see docs/dual-ui.html) for admin, planner, and technician workflows.</li>
+        <li>Application layer: Flask blueprints &mdash; <code>routes_common.py</code> (login/logout, UI-mode toggle, resource catalog, help), <code>routes_admin.py</code>, <code>routes_planner.py</code>, <code>routes_technician.py</code> (technician dashboard, work orders), and <code>routes_reports.py</code> (test report creation, fill-in, submit, and review/approval).</li>
+        <li>Domain/data layer: database schema, DB connection lifecycle, schema migration helper (for in-place upgrades of an existing SQLite file), and seed routines.</li>
         <li>Data layer (local): SQLite file database.</li>
       </ul>
     </section>
@@ -37,18 +37,19 @@
       <h2>4. Request Flow</h2>
       <ol>
         <li>User accesses route from browser.</li>
-        <li>Flask route performs role and input validation.</li>
+        <li>Flask route performs role and input validation (<code>require_role</code> for a single role, <code>require_any_role</code> where technicians and planners share access, e.g. the test reports view).</li>
         <li>Route executes queries against SQLite and applies business constraints.</li>
-        <li>Route returns rendered HTML template with flash feedback.</li>
+        <li>Route returns rendered HTML template with flash feedback. Technician and test-report pages render directly from the Modern templates regardless of the session's Simple/Modern toggle, since that workflow has no Simple-interface equivalent.</li>
       </ol>
     </section>
 
     <section>
-      <h2>5. Security and Access (Basic v1)</h2>
+      <h2>5. Security and Access (Basic)</h2>
       <ul>
-        <li>Role checks enforce admin-only and planner-only actions.</li>
-        <li>Session holds authenticated username and role.</li>
+        <li>Role checks enforce admin-only, planner-only, and technician-only actions, plus shared technician-or-planner access to the test reports view.</li>
+        <li>Session holds authenticated username and role; a technician's session is switched to the Modern UI automatically on login.</li>
         <li>Input validation prevents empty required fields and invalid allocation combinations.</li>
+        <li>Test report edit/submit is restricted to the report's own technician; review (approve/reject) is restricted to a different technician or a planner &mdash; both enforced in <code>routes_reports.py</code>, not by a database constraint.</li>
       </ul>
     </section>
 

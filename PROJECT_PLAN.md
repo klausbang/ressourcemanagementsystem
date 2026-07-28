@@ -1,6 +1,6 @@
 # RMS Development Plan (Local to Cloud)
 
-Last updated: 2026-07-21
+Last updated: 2026-07-28
 Plan source: /memories/session/plan.md
 
 ## Goal
@@ -32,6 +32,14 @@ Build a lean first version of the Resource Management System by moving through t
 23. Create an AI questions page in HTML with priority tags: Blocker, High, Medium, Low.
 24. Seed initial unresolved questions around business rules and allocation constraints (for example, scheduling conflicts, capacity limits, and order priority rules).
 25. Define a triage process for answering and retiring questions as requirements mature.
+26. Phase 7 - Technician Workflow and Test Reports
+27. Add a Test Technician role: a technician user account optionally links to its own technician resource, which determines which planner-allocated tests appear on that user's dashboard.
+28. Build a technician dashboard (Modern UI only) showing assigned tests, the equipment/facility allocated alongside the technician, and a per-test work order lifecycle (planned/in_progress/on_hold/completed).
+29. Add a test procedure library (capability-scoped process description, required equipment/facility, safety notes) plus a structured, ordered checklist of check-items with pre-authored expected values, for use in test reports.
+30. Add test report generation from a work order: a fillable template pre-loaded with test/order/equipment identification, technician name, unit-under-test fields, and one row per check-item with its expected value; technician fills in actual values, results, overall result, and notes.
+31. Add a technician-then-reviewer sign-off workflow (draft -> submitted -> approved/rejected, reopenable on rejection), where the reviewer must be a different technician or a planner, plus a shared reports queue/history view.
+32. Style the test report as a single printable A4 page usable both blank (during the test) and completed (after sign-off).
+33. Refresh core documentation (SRS, architecture, ER model/diagram, dual-UI notes, backend scope) to describe the Phase 7 additions, and produce a one-page sales brochure summarizing RMS capabilities.
 
 ## Verification
 1. Documentation completeness check: landing page links to all required pages and each page links back to landing.
@@ -59,6 +67,7 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Phase 4 - Architecture and Data Design Deliverables: Done
 - Phase 5 - Cloud Deployment Readiness and Final Stage: Not Started
 - Phase 6 - AI Collaboration and Open Questions Governance: Not Started
+- Phase 7 - Technician Workflow and Test Reports: Done
 
 ### Phase 1 Task Status
 - Task 2 (Minimum SRS scope extraction): Done
@@ -86,6 +95,15 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Task 16 (Detailed ER model entities and relationships): Done
 - Task 17 (Embed architecture and ER diagrams and cross-link docs): Done
 
+### Phase 7 Task Status
+- Task 27 (Test Technician role with linked-resource dashboard scoping): Done
+- Task 28 (Technician dashboard: assigned tests, allocated resources, work order lifecycle): Done
+- Task 29 (Test procedure library with structured, expected-value checklist): Done
+- Task 30 (Test report generation from work orders, fillable template): Done
+- Task 31 (Technician/reviewer sign-off workflow and shared reports queue): Done
+- Task 32 (Printable A4 test report styling): Done
+- Task 33 (Documentation refresh and sales brochure): Done
+
 ## Activity Log
 - 2026-07-21: Initial plan created from prompt and saved to project.
 - 2026-07-21: Preferences confirmed for SQLite, static wireframes first, basic role checks in first working local app, PNG/SVG diagrams, and Railway in final stage.
@@ -107,6 +125,9 @@ Status legend: Not Started | In Progress | Done | Blocked
 - 2026-07-25: Phase 3 Task 12b completed by adding full CRUD to app/routes_admin.py (users, capabilities, resources, resource-capability mapping) and app/routes_planner.py (customer orders, ordered tests, allocations), with uniqueness checks on update, friendly errors on foreign-key-restricted deletes, and database-level cascade deletes for order/test hierarchies; templates updated with inline editable tables (admin_manage.html, planner_orders.html); docs/srs.html and docs/phase3-backend-scope.html updated to describe the CRUD and referential-integrity scope.
 - 2026-07-25: Phase 3 Task 12d completed by changing the allocations table's uniqueness from single-column (ordered_test_id) to composite (ordered_test_id, resource_id) in app/db.py, so a planner can assign several different resources (equipment, facility, procedure, technician, etc.) to the same ordered test while still blocking the same resource being assigned twice to that test. app/routes_planner.py's assign_resource action switched from an upsert to a plain insert with a friendly "already assigned" check, and delete_allocation now removes one specific allocation (by allocation_id) instead of every allocation for a test. planner_orders.html's "Assign Resources to Ordered Tests" table now lists all currently assigned resources per test (each with its own Remove button) and offers only not-yet-assigned, capability-matching resources in the add dropdown. Updated docs/er-diagram.mmd (relationship changed from one-to-zero-or-one to one-to-zero-or-many) and regenerated docs/er-diagram.svg, plus docs/er-model.html, docs/srs.html, and docs/phase3-backend-scope.html to describe multi-resource allocation. The existing dev database's allocations table had to be dropped and recreated to pick up the new constraint, since SQLite does not support altering a UNIQUE constraint in place; any previously-made resource assignments were cleared by this migration (orders and ordered tests were not affected).
 - 2026-07-25: Phase 3 Task 12e completed by introducing a session-based UI mode (`session['ui_mode']`, default "simple") with a `GET /ui-mode/<mode>` toggle route and a `render_ui()` helper (app/routes_common.py) that resolves every template as `<mode>/<template>`, so all existing routes/CRUD actions/field names are unchanged and only the rendered template differs. Moved the original templates under templates/simple/ unmodified apart from adding the toggle button and a Help link. Built a full parallel templates/modern/ interface (own base.html/layout, login, resource catalog with quick stats, admin and planner pages restructured into CSS-only tabbed sections, and a card-based multi-resource-assignment view with removable chips) styled by a new self-contained app/static/css/modern.css design system and a small app/static/js/modern.js (mobile nav toggle, flash auto-dismiss, confirm-before-delete). Added a new `/help` route with role/workflow/table-feature explanations rendered per-mode (templates/simple/help.html, templates/modern/help.html), plus inline contextual help text (card subtitles, section notes, a callout on the resource-assignment tab, and a tooltip explaining duplicate-row highlighting). Added docs/dual-ui.html describing the architecture and cross-linked it from docs/index.html; updated docs/srs.html (new non-functional usability requirement) and docs/phase3-backend-scope.html (template scope). Verified via an HTTP-level test script covering both modes, all roles, mode toggling with query-string preservation, CRUD through the modern forms, and duplicate-row rendering; also verified HTML tag balance across the new templates and CSS brace balance.
+- 2026-07-26: Phase 7 Tasks 27-28 completed by adding a `technician` role (app/db.py: CHECK constraint extended, new `users.linked_resource_id` column with an in-place migration for existing SQLite files since SQLite can't alter a CHECK/FK in place), a new `work_orders` table, and `app/routes_technician.py` + `templates/modern/technician_dashboard.html` (Modern-only, see docs/dual-ui.html section 7): a dashboard of tests allocated to the technician's linked resource, showing co-allocated equipment/facility, with work orders moving through planned/in_progress/on_hold/completed. Seeded a second technician account/resource (technician2.demo/TECH-103) and a completed example work order for demo purposes.
+- 2026-07-26: Phase 7 Tasks 29-32 completed by adding `test_procedures`/`procedure_checks` (structured, expected-value checklists per procedure, seeded for all three demo capabilities) and `test_reports`/`report_steps` tables, plus `app/routes_reports.py` and three Modern-only templates (`report_detail.html`, `reports_list.html`). A technician generates a report from a work order once a procedure is set, pre-filled with test/order/equipment/technician identification and one row per check-item; fills in actual values/results/overall result/notes and submits (locks the report, time-stamps sign-off); any *other* technician or a planner approves/rejects (rejection requires a comment) from a shared reports queue; a rejected report can be reopened. The report page doubles as a single printable A4 form (`@page` sizing, `@media print` chrome hiding) for use both blank and completed. Verified end-to-end via an isolated throwaway order (created, exercised the full create/fill/submit/approve flow, then deleted to leave real in-progress user data untouched) plus targeted permission-boundary checks (self-review blocked, reject-without-comment blocked, premature-submit blocked).
+- 2026-07-28: Phase 7 Task 33 completed: refreshed docs/srs.html (v2: Test Technician role, work order/test procedure/test report requirements, updated data/non-functional/out-of-scope sections), docs/architecture.html + docs/architecture-diagram.svg (new blueprints, migration helper, review-permission notes), docs/er-diagram.mmd + regenerated docs/er-diagram.svg + docs/er-model.html (five new entities and their relationships), docs/dual-ui.html (new section 7 documenting the Modern-only exception for technician/report pages), docs/phase3-backend-scope.html and docs/index.html (entity/route/template/navigation updates), and docs/doc-style-guide.html (added Test Technician to the role-name convention). Added docs/brochure.html, a self-contained one-page A4 sales brochure (feature grid, 4-step workflow, role summary, tech stack); verified single-page fit and visual layout via a headless-Chrome PDF/screenshot render before finalizing. Archived to GitHub afterward.
 
 ## Open Questions Queue Policy
 - Blocker: Must be answered before current phase can continue.
