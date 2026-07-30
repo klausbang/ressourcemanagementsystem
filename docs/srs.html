@@ -113,8 +113,9 @@ Project (customer_orders)
         <li><strong>FR-TP-1</strong> [Must, Planned - Phase 8]: The system shall let a planner record one or more EUTs per project, each with a name/description and an optional serial number.</li>
         <li><strong>FR-TP-2</strong> [Must, Planned - Phase 8]: The system shall let a test activity optionally reference the EUT it belongs to, so activities can be filtered and reported per EUT as well as per project. Existing activities created before this requirement, or created without selecting an EUT, remain valid (the reference is optional, not mandatory), preserving current behavior for simple single-EUT projects.</li>
         <li><strong>FR-TP-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on test activities within a project, each with a name and a required capability.</li>
-        <li><strong>FR-TP-4</strong> [Should, Planned - Phase 10]: The system shall offer a reusable, ordered standard activity template (e.g. Kick-off, Testplan, EUT delivery, RE, RI, CI, CE, Burst, Surge, Voltage Dips, Power Frequency Magnetic Field, other tests, ESD, Report writing, Report review, Report to customer, EUT return) that a planner can apply to a new EUT to bulk-create its activities in one step, then freely reorder, add to, or remove from per project.</li>
+        <li><strong>FR-TP-4</strong> [Should, Delivered - Phase 10]: The system shall offer a reusable, ordered standard activity template (e.g. Kick-off, Testplan, EUT delivery, RE, RI, CI, CE, Burst, Surge, Voltage Dips, Power Frequency Magnetic Field, other tests, ESD, Report writing, Report review, Report to customer, EUT return) that a planner can apply to an order/EUT to bulk-create its activities in one step, then freely reorder, add to, or remove from per project.</li>
         <li><strong>AC-FR-TP-1.1:</strong> Given a project with 0 EUTs, when a planner adds an EUT and adds a test activity under it, then the activity is visible both on that EUT's test plan and, unfiltered, on the project's full activity list, without being entered twice.</li>
+        <li><strong>AC-FR-TP-4.1:</strong> Given an EUT with no test activities, when a planner applies the "Standard EMC Test Sequence" template to it, then all of the template's activities are created in one step, in the template's order, each carrying over its template-defined required capability (if any); the planner can then move any one activity up or down within that EUT independently of the template.</li>
       </ul>
 
       <h3>8.3 Resources (FR-RES)</h3>
@@ -220,6 +221,7 @@ Project (customer_orders)
         <li>Store work orders (one per test activity) with lifecycle status, schedule/execution timestamps, and result.</li>
         <li>Store test reports (one per work order) with unit-under-test identification, snapshotted report steps, overall result, notes, and technician/reviewer sign-off fields.</li>
         <li>From Phase 9 (delivered): mutual-exclusion groups and their facility-resource membership, and a site field on resources.</li>
+        <li>From Phase 10 (delivered): activity templates and their ordered items (activity name + optional required capability), and an optional sequence number on each test activity, scoped per order/EUT, so activities can be freely reordered.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -258,7 +260,7 @@ Project (customer_orders)
           <tr><td>7</td><td>Technician workflow, test reports, schedule view</td><td>FR-STA-1, FR-PLN-2, FR-RPT-1..5, FR-USE-2..3</td><td>Delivered</td></tr>
           <tr><td>8</td><td>EUT as a first-class entity; public landing page; role-based home routing</td><td>FR-PRJ-2, FR-TP-1..3, FR-USE-4, FR-USE-5</td><td>Delivered</td></tr>
           <tr><td>9</td><td>Lab/equipment mutual-exclusion constraints</td><td>FR-RES-5, FR-CON-1..2, FR-PLN-3</td><td>Delivered</td></tr>
-          <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Planned</td></tr>
+          <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Delivered</td></tr>
           <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Planned</td></tr>
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Planned</td></tr>
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Planned</td></tr>
@@ -275,6 +277,7 @@ Project (customer_orders)
         <li>Open: is a spreadsheet/PDF export (FR-INT-1) actually needed, or does customer-facing reporting stay inside RMS?</li>
         <li>Assumed (Phase 9): the confirmed exclusion-group examples are "CON chamber: CE/CI" and "SAC chamber: RE/RI"; is this the complete list, or are there other shared facilities/equipment we haven't heard about yet?</li>
         <li>Open: should FR-CON-2's block also apply at creation-time scheduling (same-day, coarse) rather than only at the in-progress transition, once the team has an opinion on how often two conflicting activities get scheduled for the same day without anyone noticing before start time?</li>
+        <li>Assumed (Phase 10): one template ("Standard EMC Test Sequence") covers the customer's example workflow; is more than one standard sequence needed in practice (e.g. per product category or per site), and if so should a template itself record which EUT/product types it's meant for?</li>
       </ul>
     </section>
   </main>

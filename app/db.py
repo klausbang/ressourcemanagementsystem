@@ -72,8 +72,26 @@ CREATE TABLE IF NOT EXISTS ordered_tests (
     eut_id INTEGER,
     test_name TEXT NOT NULL,
     required_capability_id INTEGER,
+    sequence INTEGER,
     FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL,
+    FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
+);
+
+CREATE TABLE IF NOT EXISTS activity_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS activity_template_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER NOT NULL,
+    step_number INTEGER NOT NULL,
+    activity_name TEXT NOT NULL,
+    required_capability_id INTEGER,
+    notes TEXT,
+    FOREIGN KEY (template_id) REFERENCES activity_templates(id) ON DELETE CASCADE,
     FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
 );
 
@@ -303,12 +321,38 @@ def _migrate_resources_table(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def _migrate_ordered_tests_sequence(db: sqlite3.Connection) -> None:
+    """Upgrade an ordered_tests table created before the optional sequence column existed."""
+    if not _table_exists(db, "ordered_tests"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(ordered_tests)").fetchall()}
+    if "sequence" in columns:
+        return
+
+    # A plain ADD COLUMN is enough here: sequence is nullable with no CHECK/FK/default,
+    # so SQLite can add it in place without a table rebuild.
+    db.execute("ALTER TABLE ordered_tests ADD COLUMN sequence INTEGER")
+
+    # Backfill existing rows with a stable 1..N order per (order_id, eut_id) group,
+    # based on current id order, so reordering has a real starting point instead of
+    # every pre-existing row sharing NULL.
+    rows = db.execute("SELECT id, order_id, eut_id FROM ordered_tests ORDER BY order_id, eut_id, id").fetchall()
+    counters: dict[tuple, int] = {}
+    for row in rows:
+        key = (row["order_id"], row["eut_id"])
+        counters[key] = counters.get(key, 0) + 1
+        db.execute("UPDATE ordered_tests SET sequence = ? WHERE id = ?", (counters[key], row["id"]))
+    db.commit()
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
     db.executescript(SCHEMA_SQL)
     _migrate_ordered_tests_table(db)
     _migrate_resources_table(db)
+    _migrate_ordered_tests_sequence(db)
     db.commit()
 
 
@@ -559,6 +603,49 @@ def init_demo_seed() -> None:
         WHERE username = 'technician2.demo' AND linked_resource_id IS NULL
     """)
 
+    _seed_activity_template(
+        db,
+        "Standard EMC Test Sequence",
+        "Kick-off through EUT return, per the customer's standard project workflow. Order can be freely changed per project after applying.",
+        [
+            ("Kick-off", None),
+            ("Testplan", None),
+            ("EUT delivery", None),
+            ("RE", "RE"),
+            ("RI", "RI"),
+            ("CI", "CI"),
+            ("CE", "CE"),
+            ("Burst", None),
+            ("Surge", None),
+            ("Voltage Dips", None),
+            ("Power Frequency Magnetic Field", None),
+            ("Other tests", None),
+            ("ESD", None),
+            ("Report writing", None),
+            ("Report review", None),
+            ("Report to customer", None),
+            ("EUT return", None),
+        ],
+    )
+
+    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-004", "Helios Devices", "Smart Thermostat"))
+    _seed_eut(db, "ORD-2026-004", "Rev A", "SN-71100-001")
+    _seed_eut(db, "ORD-2026-004", "Rev B", "SN-71100-002")
+
+    # Rev A: bulk-created directly from the template items, mirroring what the planner's
+    # "Apply Template" action produces, so the demo shows an already-applied EUT. Rev B is
+    # left with no activities on purpose, so the same action can be demonstrated live.
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence)
+        SELECT o.id, e.id, ati.activity_name, ati.required_capability_id, ati.step_number
+        FROM activity_templates at
+        JOIN activity_template_items ati ON ati.template_id = at.id
+        JOIN customer_orders o ON o.order_code = 'ORD-2026-004'
+        JOIN euts e ON e.order_id = o.id AND e.name = 'Rev A'
+        WHERE at.name = 'Standard EMC Test Sequence'
+          AND NOT EXISTS (SELECT 1 FROM ordered_tests ot2 WHERE ot2.order_id = o.id AND ot2.eut_id = e.id)
+    """)
+
     _seed_procedure(
         db,
         capability_name="Multimeter Calibration",
@@ -700,6 +787,27 @@ def init_demo_seed() -> None:
     """)
 
     db.commit()
+
+
+def _seed_activity_template(
+    db: sqlite3.Connection, name: str, notes: str, items: list[tuple[str, str | None]]
+) -> None:
+    db.execute("INSERT OR IGNORE INTO activity_templates (name, notes) VALUES (?, ?)", (name, notes))
+    template_id = db.execute("SELECT id FROM activity_templates WHERE name = ?", (name,)).fetchone()["id"]
+    if db.execute("SELECT 1 FROM activity_template_items WHERE template_id = ?", (template_id,)).fetchone():
+        return
+    for step_number, (activity_name, capability_name) in enumerate(items, start=1):
+        capability_id = None
+        if capability_name:
+            row = db.execute("SELECT id FROM capabilities WHERE name = ?", (capability_name,)).fetchone()
+            capability_id = row["id"] if row else None
+        db.execute(
+            """
+            INSERT INTO activity_template_items (template_id, step_number, activity_name, required_capability_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (template_id, step_number, activity_name, capability_id),
+        )
 
 
 def _seed_exclusion_group(db: sqlite3.Connection, name: str, notes: str, resource_codes: list[str]) -> None:

@@ -236,20 +236,59 @@
         </form>
       </div>
 
+      <div class="card">
+        <div class="card-title">Apply an activity template</div>
+        <div class="card-subtitle">Bulk-create an order/EUT's test activities from a reusable standard sequence (e.g. Kick-off through EUT return), in one step. Manage templates on the Admin &rarr; Activity templates tab.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="apply_template">
+          <div class="field">
+            <label for="apply-order">Order</label>
+            <select id="apply-order" name="order_id" required>
+              <option value="">Select an order</option>
+              {% for o in orders %}
+              <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="apply-eut">EUT (optional)</label>
+            <select id="apply-eut" name="eut_id">
+              <option value="">None / whole order</option>
+              {% for e in euts %}
+              <option value="{{ e['id'] }}">{{ e['order_code'] }} - {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="apply-template">Template</label>
+            <select id="apply-template" name="template_id" required>
+              <option value="">Select a template</option>
+              {% for tpl in templates %}
+              <option value="{{ tpl['id'] }}">{{ tpl['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Apply template</button></div>
+        </form>
+      </div>
+
       <div class="section-head"><h2>Existing ordered tests</h2></div>
       {% if ordered_tests_rows %}
       <div class="table-wrap">
         <table class="modern-table">
           <thead><tr>
+            <th>#</th>
             {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('EUT', 'eut_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
+            <th>Reorder</th>
             <th>Actions</th>
           </tr></thead>
           <tbody>
             {% for t in ordered_tests_rows %}
             <tr class="{{ 'dup-row' if t['_dup'] }}">
+              <td>{{ t['sequence'] if t['sequence'] is not none else '—' }}</td>
               <td>{{ t['order_code'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
               <td>
                 <select name="eut_id" form="test-save-{{ t['ordered_test_id'] }}">
@@ -267,6 +306,10 @@
                   <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
                   {% endfor %}
                 </select>
+              </td>
+              <td class="inline-form">
+                <form method="post"><input type="hidden" name="action" value="move_test"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="direction" value="up"><button type="submit" class="btn btn-secondary btn-sm" title="Move up">▲</button></form>
+                <form method="post"><input type="hidden" name="action" value="move_test"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="direction" value="down"><button type="submit" class="btn btn-secondary btn-sm" title="Move down">▼</button></form>
               </td>
               <td class="inline-form">
                 <button type="submit" form="test-save-{{ t['ordered_test_id'] }}" class="btn btn-secondary btn-sm">Save</button>

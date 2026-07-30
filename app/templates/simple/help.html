@@ -21,13 +21,14 @@
   <li>Assign one or more capabilities to each resource so planners can find it for matching tests.</li>
   <li>Manage user accounts and their role (admin or planner).</li>
   <li>If two facility resources are really the same shared physical chamber, put them in the same exclusion group so the system can flag or block overlapping activities.</li>
+  <li>Maintain reusable activity templates (e.g. "Standard EMC Test Sequence") &mdash; an ordered list of standard activities that a planner can apply to an order/EUT to bulk-create its test activities in one step.</li>
 </ol>
 
 <h3>Planner Workflow</h3>
 <ol>
   <li>Create a customer order (order code, customer name, product name).</li>
   <li>If the order involves more than one physical unit, add each as an EUT (Equipment/Unit Under Test) &mdash; this is optional and can be left out for a simple, single-unit order.</li>
-  <li>Add one or more ordered tests to that order, each optionally requiring a capability and optionally tagged to the EUT it belongs to.</li>
+  <li>Add one or more ordered tests to that order, each optionally requiring a capability and optionally tagged to the EUT it belongs to &mdash; or apply an activity template to bulk-create a whole standard sequence in one step, then reorder or add/remove activities per project as needed.</li>
   <li>Assign resources to each ordered test. A test can have <strong>several</strong> resources assigned at once (e.g. equipment, facility, and a technician together) &mdash; only resources with the test's required capability are offered, and the same resource cannot be assigned twice to the same test.</li>
 </ol>
 

@@ -192,6 +192,21 @@ def _load_schedule_context(db) -> dict:
     }
 
 
+def _next_sequence(db, order_id, eut_id) -> int:
+    """Next free sequence number for ordered_tests within one (order_id, eut_id) scope."""
+    if eut_id:
+        row = db.execute(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 AS n FROM ordered_tests WHERE order_id = ? AND eut_id = ?",
+            (order_id, eut_id),
+        ).fetchone()
+    else:
+        row = db.execute(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 AS n FROM ordered_tests WHERE order_id = ? AND eut_id IS NULL",
+            (order_id,),
+        ).fetchone()
+    return row["n"]
+
+
 def _load_planner_context(db) -> dict:
     raw_euts = db.execute(
         """
@@ -221,13 +236,14 @@ def _load_planner_context(db) -> dict:
             ot.eut_id,
             e.name AS eut_name,
             ot.test_name,
+            ot.sequence,
             c.id AS capability_id,
             c.name AS capability_name
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         LEFT JOIN euts e ON e.id = ot.eut_id
         LEFT JOIN capabilities c ON c.id = ot.required_capability_id
-        ORDER BY o.order_code, ot.id
+        ORDER BY o.order_code, ot.eut_id, ot.sequence, ot.id
         """
     ).fetchall()
 
@@ -307,6 +323,7 @@ def _load_planner_context(db) -> dict:
     )
 
     capabilities = db.execute("SELECT id, name FROM capabilities ORDER BY name").fetchall()
+    templates = db.execute("SELECT id, name FROM activity_templates ORDER BY name").fetchall()
 
     context = {
         "tests": tests,
@@ -315,6 +332,7 @@ def _load_planner_context(db) -> dict:
         "orders": orders,
         "euts": euts_rows,
         "capabilities": capabilities,
+        "templates": templates,
     }
     context.update(_load_schedule_context(db))
     return context
@@ -469,11 +487,75 @@ def planner_orders():
                 flash("Selected EUT does not belong to this order.", "error")
             else:
                 db.execute(
-                    "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id) VALUES (?, ?, ?, ?)",
-                    (order_id, eut_id, test_name, required_capability_id),
+                    "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence) VALUES (?, ?, ?, ?, ?)",
+                    (order_id, eut_id, test_name, required_capability_id, _next_sequence(db, order_id, eut_id)),
                 )
                 db.commit()
                 flash(f"Test '{test_name}' added.", "info")
+
+            return redirect(url_for("planner.planner_orders"))
+
+        if action == "apply_template":
+            order_id = request.form.get("order_id", "").strip()
+            eut_id = request.form.get("eut_id", "").strip() or None
+            template_id = request.form.get("template_id", "").strip()
+
+            if not (order_id and template_id):
+                flash("Order and template are required.", "error")
+            elif db.execute("SELECT 1 FROM customer_orders WHERE id = ?", (order_id,)).fetchone() is None:
+                flash("Selected order does not exist.", "error")
+            elif eut_id and db.execute(
+                "SELECT 1 FROM euts WHERE id = ? AND order_id = ?", (eut_id, order_id)
+            ).fetchone() is None:
+                flash("Selected EUT does not belong to this order.", "error")
+            else:
+                items = db.execute(
+                    "SELECT activity_name, required_capability_id FROM activity_template_items WHERE template_id = ? ORDER BY step_number",
+                    (template_id,),
+                ).fetchall()
+                if not items:
+                    flash("That template has no activities yet.", "error")
+                else:
+                    next_seq = _next_sequence(db, order_id, eut_id)
+                    for offset, item in enumerate(items):
+                        db.execute(
+                            "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence) VALUES (?, ?, ?, ?, ?)",
+                            (order_id, eut_id, item["activity_name"], item["required_capability_id"], next_seq + offset),
+                        )
+                    db.commit()
+                    flash(f"Applied template: {len(items)} activities added.", "info")
+
+            return redirect(url_for("planner.planner_orders"))
+
+        if action == "move_test":
+            ordered_test_id = request.form.get("ordered_test_id", "").strip()
+            direction = request.form.get("direction", "").strip()
+            item = db.execute(
+                "SELECT id, order_id, eut_id, sequence FROM ordered_tests WHERE id = ?", (ordered_test_id,)
+            ).fetchone()
+
+            if item is None or direction not in ("up", "down"):
+                flash("Cannot move that test.", "error")
+            else:
+                eut_clause = "eut_id = ?" if item["eut_id"] is not None else "eut_id IS NULL"
+                eut_params = [item["eut_id"]] if item["eut_id"] is not None else []
+                neighbor = db.execute(
+                    f"""
+                    SELECT id, sequence FROM ordered_tests
+                    WHERE order_id = ? AND {eut_clause}
+                      AND sequence {'<' if direction == 'up' else '>'} ?
+                    ORDER BY sequence {'DESC' if direction == 'up' else 'ASC'}
+                    LIMIT 1
+                    """,
+                    [item["order_id"], *eut_params, item["sequence"]],
+                ).fetchone()
+                if neighbor is None:
+                    flash("Already at that end of the list.", "info")
+                else:
+                    db.execute("UPDATE ordered_tests SET sequence = ? WHERE id = ?", (neighbor["sequence"], item["id"]))
+                    db.execute("UPDATE ordered_tests SET sequence = ? WHERE id = ?", (item["sequence"], neighbor["id"]))
+                    db.commit()
+                    flash("Test reordered.", "info")
 
             return redirect(url_for("planner.planner_orders"))
 
@@ -484,7 +566,7 @@ def planner_orders():
             required_capability_id = request.form.get("required_capability_id", "").strip() or None
 
             existing = db.execute(
-                "SELECT order_id FROM ordered_tests WHERE id = ?", (ordered_test_id,)
+                "SELECT order_id, eut_id, sequence FROM ordered_tests WHERE id = ?", (ordered_test_id,)
             ).fetchone()
 
             if not (ordered_test_id and test_name) or existing is None:
@@ -494,9 +576,15 @@ def planner_orders():
             ).fetchone() is None:
                 flash("Selected EUT does not belong to this test's order.", "error")
             else:
+                # Moving a test to a different EUT (or out of one) puts it at the end of
+                # its new scope's order, rather than keeping a sequence number that was
+                # only meaningful in the old scope.
+                sequence = existing["sequence"]
+                if eut_id != existing["eut_id"]:
+                    sequence = _next_sequence(db, existing["order_id"], eut_id)
                 db.execute(
-                    "UPDATE ordered_tests SET eut_id = ?, test_name = ?, required_capability_id = ? WHERE id = ?",
-                    (eut_id, test_name, required_capability_id, ordered_test_id),
+                    "UPDATE ordered_tests SET eut_id = ?, test_name = ?, required_capability_id = ?, sequence = ? WHERE id = ?",
+                    (eut_id, test_name, required_capability_id, sequence, ordered_test_id),
                 )
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")

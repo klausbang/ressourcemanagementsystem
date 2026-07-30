@@ -31,6 +31,9 @@
         <li>exclusion_groups (Phase 9; admin-defined shared-facility groups, e.g. "CON Chamber (TLC)")</li>
         <li>exclusion_group_resources (Phase 9; many-to-many, group &harr; facility resource)</li>
         <li>resources.site (Phase 9; optional TLC/TLS location field, added to the existing resources entity)</li>
+        <li>activity_templates (Phase 10; admin-defined reusable standard activity sequences, e.g. "Standard EMC Test Sequence")</li>
+        <li>activity_template_items (Phase 10; the ordered activities within a template, each with an optional required capability)</li>
+        <li>ordered_tests.sequence (Phase 10; optional display/reorder position, scoped per order/EUT, added to the existing ordered_tests entity)</li>
       </ul>
     </section>
 
@@ -39,8 +42,8 @@
       <ul>
         <li>GET / : public landing page (guides an anonymous visitor to log in); redirects a signed-in user straight to their own role's workspace (Admin/Planner/Technician), not the catalog</li>
         <li>GET /catalog : resource catalog with filters (requires a signed-in admin, planner, or technician); implemented but currently unlinked from navigation in both interfaces, reachable only by direct URL</li>
-        <li>Admin scope (single POST-dispatch route, action field per operation): full CRUD on users, capabilities, and resources (including a resource's optional <code>site</code>); assign/remove capability-to-resource mapping; link a technician user to their resource; full CRUD on exclusion groups and their facility-resource membership (Phase 9)</li>
-        <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders, EUTs (Phase 8), and ordered tests (optionally tagged to an EUT); assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently; a day-view Schedule/Gantt tab (Modern UI) that flags any two visible activities sharing a resource or exclusion group whose actual/inferred time windows overlap (Phase 9)</li>
+        <li>Admin scope (single POST-dispatch route, action field per operation): full CRUD on users, capabilities, and resources (including a resource's optional <code>site</code>); assign/remove capability-to-resource mapping; link a technician user to their resource; full CRUD on exclusion groups and their facility-resource membership (Phase 9); full CRUD on activity templates and their items, including reordering an item up/down within its template (Phase 10)</li>
+        <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders, EUTs (Phase 8), and ordered tests (optionally tagged to an EUT); assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently; a day-view Schedule/Gantt tab (Modern UI) that flags any two visible activities sharing a resource or exclusion group whose actual/inferred time windows overlap (Phase 9); apply an activity template to an order/EUT, bulk-creating its ordered tests in the template's order, and reorder any existing ordered test up/down within its order/EUT scope (Phase 10)</li>
         <li>Technician scope (<code>routes_technician.py</code>, single POST-dispatch route): dashboard of tests allocated to the technician's linked resource; create a work order per assigned test; set/change its test procedure; move it through planned/in_progress/on_hold/completed (start/resume are conflict-checked, see below); edit notes</li>
         <li>Test report scope (<code>routes_reports.py</code>): create a report from a work order (snapshots that procedure's check-items); fill in and save a draft report; submit for review; approve/reject a submitted report (any technician other than the author, or a planner); reopen a rejected report; list reports pending the current user's review and full report history</li>
         <li>Basic login/logout for role-aware actions; login switches a technician's session to the Modern UI automatically</li>
@@ -61,6 +64,7 @@
         <li>Deleting a customer order cascades to its ordered tests, all of their allocations, work orders, test reports, and report steps, and its EUTs; deleting an ordered test cascades the same way at that level. These cascades are enforced at the database level (<code>ON DELETE CASCADE</code>), not in application code. Deleting an EUT does <em>not</em> cascade to its ordered tests &mdash; it clears their <code>eut_id</code> back to NULL instead (<code>ON DELETE SET NULL</code>), since a test activity's schedule/allocations/results are not tied to the EUT record's lifetime</li>
         <li>Role checks for admin/planner/technician actions; the resource catalog itself requires any signed-in role (it is no longer visible to anonymous visitors)</li>
         <li>(Phase 9) Starting or resuming a work order is blocked, with a message naming the conflicting work order/activity, if another work order sharing a resource or exclusion group is already <code>in_progress</code> (<code>app/scheduling.py:find_running_conflict</code>) &mdash; not a database constraint, since it depends on live status across multiple ordered tests</li>
+        <li>(Phase 10) Applying a template requires the target order to exist and, if an EUT is given, that it belongs to that order; each created ordered test's <code>sequence</code> continues on from the highest existing value in that order/EUT scope. Moving an ordered test or a template item up/down is a same-scope swap of two rows' sequence/step_number values, with no effect at either end of the list. Deleting a template item renumbers the remaining items 1..N so gaps don't accumulate; deleting a template cascades to its items but never touches ordered_tests already created from it</li>
       </ul>
     </section>
 
@@ -85,7 +89,7 @@
     <section>
       <h2>Table Sorting and Duplicate-Row Highlighting</h2>
       <ul>
-        <li>Every listing table (resource catalog; admin users, capabilities, resources, resource-capability mapping, and exclusion groups; planner customer orders, EUTs, ordered tests, and resource assignment) has clickable, sortable column headers for every displayed column.</li>
+        <li>Every listing table (resource catalog; admin users, capabilities, resources, resource-capability mapping, exclusion groups, and activity templates; planner customer orders, EUTs, ordered tests, and resource assignment) has clickable, sortable column headers for every displayed column.</li>
         <li>Sorting is implemented server-side with no JavaScript: each header is a link that sets a table-scoped <code>&lt;table_id&gt;_sort</code> / <code>&lt;table_id&gt;_dir</code> query parameter (e.g. <code>resources_sort=code&amp;resources_dir=desc</code>), so multiple independent tables on one page (e.g. the four admin tables) sort independently, and existing filters are preserved when re-sorting.</li>
         <li>Any row whose full set of displayed columns exactly matches another row in the same table is flagged and highlighted (amber background, <code>.dup-row</code>), even though the underlying database row is distinct (different primary key). This surfaces cases such as two identical ordered tests added to the same order.</li>
         <li>Sorting and duplicate detection share one helper, <code>app/table_utils.py:rows_with_meta</code>, applied per table in each route.</li>

@@ -168,20 +168,54 @@
 </form>
 <p><em>Select the EUT this test belongs to when the order has more than one; leave unset for a single-EUT order.</em></p>
 
+<h2>Planner: Apply Activity Template</h2>
+<p><em>Bulk-create an order/EUT's test activities from a reusable standard sequence (e.g. Kick-off through EUT return) in one step. Manage templates on the Admin page.</em></p>
+<form method="post">
+  <input type="hidden" name="action" value="apply_template">
+  <label>Order
+    <select name="order_id" required>
+      <option value="">Select</option>
+      {% for o in orders %}
+      <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>EUT (optional)
+    <select name="eut_id">
+      <option value="">None / whole order</option>
+      {% for e in euts %}
+      <option value="{{ e['id'] }}">{{ e['order_code'] }} - {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Template
+    <select name="template_id" required>
+      <option value="">Select</option>
+      {% for tpl in templates %}
+      <option value="{{ tpl['id'] }}">{{ tpl['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Apply Template</button>
+</form>
+
 <h3>Existing Ordered Tests</h3>
 <table border="1" cellpadding="6">
   <thead>
     <tr>
+      <th>#</th>
       {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
       {{ macros.sort_th('EUT', 'eut_name', 'tests', 'planner.planner_orders') }}
       {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
       {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
+      <th>Reorder</th>
       <th>Actions</th>
     </tr>
   </thead>
   <tbody>
     {% for t in ordered_tests_rows %}
     <tr class="{{ 'dup-row' if t['_dup'] }}">
+      <td>{{ t['sequence'] if t['sequence'] is not none else '—' }}</td>
       <td>{{ t['order_code'] }}</td>
       <td>
         <select name="eut_id" form="test-save-{{ t['ordered_test_id'] }}">
@@ -199,6 +233,10 @@
           <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
           {% endfor %}
         </select>
+      </td>
+      <td>
+        <form method="post" style="display:inline"><input type="hidden" name="action" value="move_test"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="direction" value="up"><button type="submit">Up</button></form>
+        <form method="post" style="display:inline"><input type="hidden" name="action" value="move_test"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="direction" value="down"><button type="submit">Down</button></form>
       </td>
       <td>
         <button type="submit" form="test-save-{{ t['ordered_test_id'] }}">Save</button>

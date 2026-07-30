@@ -25,6 +25,9 @@ MAPPING_DUP_KEYS = ["code", "resource_name", "capability_name"]
 EXCLUSION_GROUP_SORTABLE_KEYS = {"name", "notes"}
 EXCLUSION_GROUP_DUP_KEYS = ["name", "notes"]
 
+TEMPLATE_SORTABLE_KEYS = {"name", "notes"}
+TEMPLATE_DUP_KEYS = ["name", "notes"]
+
 
 def _load_admin_context(db) -> dict:
     users = rows_with_meta(
@@ -98,6 +101,28 @@ def _load_admin_context(db) -> dict:
             r for r in resources if r["resource_type"] == "facility" and r["id"] not in member_ids
         ]
 
+    templates = rows_with_meta(
+        db.execute("SELECT id, name, notes FROM activity_templates ORDER BY name").fetchall(),
+        dup_keys=TEMPLATE_DUP_KEYS,
+        sort_key=request.args.get("templates_sort"),
+        sort_dir=request.args.get("templates_dir", "asc"),
+        sortable_keys=TEMPLATE_SORTABLE_KEYS,
+    )
+    item_rows = db.execute(
+        """
+        SELECT ati.id, ati.template_id, ati.step_number, ati.activity_name, ati.required_capability_id,
+               c.name AS capability_name
+        FROM activity_template_items ati
+        LEFT JOIN capabilities c ON c.id = ati.required_capability_id
+        ORDER BY ati.template_id, ati.step_number
+        """
+    ).fetchall()
+    items_by_template: dict[int, list] = {}
+    for row in item_rows:
+        items_by_template.setdefault(row["template_id"], []).append(dict(row))
+    for template in templates:
+        template["items"] = items_by_template.get(template["id"], [])
+
     return {
         "users": users,
         "resources": resources,
@@ -105,7 +130,19 @@ def _load_admin_context(db) -> dict:
         "mappings": mappings,
         "technician_resources": technician_resources,
         "exclusion_groups": exclusion_groups,
+        "templates": templates,
     }
+
+
+def _resequence_template_items(db, template_id) -> None:
+    """Renumber a template's items 1..N in their current relative order (after a delete)."""
+    rows = db.execute(
+        "SELECT id FROM activity_template_items WHERE template_id = ? ORDER BY step_number", (template_id,)
+    ).fetchall()
+    for step_number, row in enumerate(rows, start=1):
+        db.execute(
+            "UPDATE activity_template_items SET step_number = ? WHERE id = ?", (step_number, row["id"])
+        )
 
 
 def _render_admin(db):
@@ -360,6 +397,126 @@ def admin_manage():
             )
             db.commit()
             flash("Resource removed from exclusion group.", "info")
+
+        elif action == "create_template":
+            name = request.form.get("name", "").strip()
+            notes = request.form.get("notes", "").strip()
+
+            if not name:
+                flash("Template name is required.", "error")
+            elif db.execute("SELECT 1 FROM activity_templates WHERE name = ?", (name,)).fetchone():
+                flash(f"Template {name} already exists.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO activity_templates (name, notes) VALUES (?, ?)",
+                    (name, notes),
+                )
+                db.commit()
+                flash(f"Template '{name}' created.", "info")
+
+        elif action == "update_template":
+            template_id = request.form.get("template_id", "").strip()
+            name = request.form.get("name", "").strip()
+            notes = request.form.get("notes", "").strip()
+
+            if not (template_id and name):
+                flash("Template name is required.", "error")
+            elif db.execute(
+                "SELECT 1 FROM activity_templates WHERE name = ? AND id != ?", (name, template_id)
+            ).fetchone():
+                flash(f"Template {name} already exists.", "error")
+            else:
+                db.execute(
+                    "UPDATE activity_templates SET name = ?, notes = ? WHERE id = ?",
+                    (name, notes, template_id),
+                )
+                db.commit()
+                flash(f"Template '{name}' updated.", "info")
+
+        elif action == "delete_template":
+            template_id = request.form.get("template_id", "").strip()
+            db.execute("DELETE FROM activity_templates WHERE id = ?", (template_id,))
+            db.commit()
+            flash("Template deleted.", "info")
+
+        elif action == "add_template_item":
+            template_id = request.form.get("template_id", "").strip()
+            activity_name = request.form.get("activity_name", "").strip()
+            required_capability_id = request.form.get("required_capability_id", "").strip() or None
+
+            if not (template_id and activity_name):
+                flash("Template and activity name are required.", "error")
+            else:
+                next_step = db.execute(
+                    "SELECT COALESCE(MAX(step_number), 0) + 1 AS n FROM activity_template_items WHERE template_id = ?",
+                    (template_id,),
+                ).fetchone()["n"]
+                db.execute(
+                    """
+                    INSERT INTO activity_template_items (template_id, step_number, activity_name, required_capability_id)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (template_id, next_step, activity_name, required_capability_id),
+                )
+                db.commit()
+                flash(f"Activity '{activity_name}' added to template.", "info")
+
+        elif action == "update_template_item":
+            item_id = request.form.get("item_id", "").strip()
+            activity_name = request.form.get("activity_name", "").strip()
+            required_capability_id = request.form.get("required_capability_id", "").strip() or None
+
+            if not (item_id and activity_name):
+                flash("Activity name is required.", "error")
+            else:
+                db.execute(
+                    "UPDATE activity_template_items SET activity_name = ?, required_capability_id = ? WHERE id = ?",
+                    (activity_name, required_capability_id, item_id),
+                )
+                db.commit()
+                flash(f"Activity '{activity_name}' updated.", "info")
+
+        elif action == "delete_template_item":
+            item_id = request.form.get("item_id", "").strip()
+            row = db.execute("SELECT template_id FROM activity_template_items WHERE id = ?", (item_id,)).fetchone()
+            db.execute("DELETE FROM activity_template_items WHERE id = ?", (item_id,))
+            if row:
+                _resequence_template_items(db, row["template_id"])
+            db.commit()
+            flash("Activity removed from template.", "info")
+
+        elif action == "move_template_item":
+            item_id = request.form.get("item_id", "").strip()
+            direction = request.form.get("direction", "").strip()
+            item = db.execute(
+                "SELECT id, template_id, step_number FROM activity_template_items WHERE id = ?", (item_id,)
+            ).fetchone()
+
+            if item is None or direction not in ("up", "down"):
+                flash("Cannot move that activity.", "error")
+            else:
+                neighbor = db.execute(
+                    f"""
+                    SELECT id, step_number FROM activity_template_items
+                    WHERE template_id = ? AND step_number {'<' if direction == 'up' else '>'} ?
+                    ORDER BY step_number {'DESC' if direction == 'up' else 'ASC'}
+                    LIMIT 1
+                    """,
+                    (item["template_id"], item["step_number"]),
+                ).fetchone()
+                if neighbor is None:
+                    flash("Already at that end of the template.", "info")
+                else:
+                    db.execute(
+                        "UPDATE activity_template_items SET step_number = ? WHERE id = ?",
+                        (neighbor["step_number"], item["id"]),
+                    )
+                    db.execute(
+                        "UPDATE activity_template_items SET step_number = ? WHERE id = ?",
+                        (item["step_number"], neighbor["id"]),
+                    )
+                    db.commit()
+                    flash("Activity reordered.", "info")
 
         return redirect(url_for("admin.admin_manage"))
 

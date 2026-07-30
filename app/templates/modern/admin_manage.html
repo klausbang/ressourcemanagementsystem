@@ -9,16 +9,24 @@
   #tab-capabilities:checked ~ .tabs-body #panel-capabilities,
   #tab-resources:checked ~ .tabs-body #panel-resources,
   #tab-mappings:checked ~ .tabs-body #panel-mappings,
-  #tab-exclusion:checked ~ .tabs-body #panel-exclusion { display: block; }
+  #tab-exclusion:checked ~ .tabs-body #panel-exclusion,
+  #tab-templates:checked ~ .tabs-body #panel-templates { display: block; }
 
   #tab-users:checked ~ .tab-list label[for="tab-users"],
   #tab-capabilities:checked ~ .tab-list label[for="tab-capabilities"],
   #tab-resources:checked ~ .tab-list label[for="tab-resources"],
   #tab-mappings:checked ~ .tab-list label[for="tab-mappings"],
-  #tab-exclusion:checked ~ .tab-list label[for="tab-exclusion"] {
+  #tab-exclusion:checked ~ .tab-list label[for="tab-exclusion"],
+  #tab-templates:checked ~ .tab-list label[for="tab-templates"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
+
+  .template-item-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--color-border); }
+  .template-item-row:last-child { border-bottom: none; }
+  .template-item-step { color: var(--color-text-muted); font-size: 0.8rem; min-width: 24px; }
+  .template-item-move { display: flex; flex-direction: column; gap: 2px; }
+  .template-item-move button { padding: 0 4px; font-size: 0.7rem; line-height: 1.4; }
 
   .group-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; background: var(--color-surface); }
   .group-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -38,6 +46,7 @@
   <div class="stat-tile"><div class="stat-value">{{ resources|length }}</div><div class="stat-label">Resources</div></div>
   <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
   <div class="stat-tile"><div class="stat-value">{{ exclusion_groups|length }}</div><div class="stat-label">Exclusion groups</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
 </div>
 
 <div class="tabs">
@@ -46,6 +55,7 @@
   <input type="radio" name="admin-tabs" id="tab-resources" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-exclusion" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-templates" class="tab-input">
 
   <div class="tab-list" role="tablist">
     <label for="tab-users" class="tab-label">👤 Users</label>
@@ -53,6 +63,7 @@
     <label for="tab-resources" class="tab-label">🔧 Resources</label>
     <label for="tab-mappings" class="tab-label">🔗 Capability assignments</label>
     <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups</label>
+    <label for="tab-templates" class="tab-label">📋 Activity templates</label>
   </div>
 
   <div class="tabs-body">
@@ -435,6 +446,106 @@
       <form id="group-delete-{{ g['id'] }}" method="post" hidden>
         <input type="hidden" name="action" value="delete_exclusion_group">
         <input type="hidden" name="group_id" value="{{ g['id'] }}">
+      </form>
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-templates">
+      <div class="callout">
+        <strong>What this is:</strong> a reusable, ordered list of standard activities (e.g. Kick-off through EUT return) that a planner can apply to an EUT to bulk-create its test activities in one step, on the Planner's Ordered tests tab. The applied activities can then be freely reordered, added to, or removed per project.
+      </div>
+
+      <div class="card">
+        <div class="card-title">Create an activity template</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_template">
+          <div class="field">
+            <label for="new-template-name">Name</label>
+            <input type="text" id="new-template-name" name="name" placeholder="e.g. Standard EMC Test Sequence" required>
+          </div>
+          <div class="field">
+            <label for="new-template-notes">Notes</label>
+            <input type="text" id="new-template-notes" name="notes">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Create template</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing templates</h2></div>
+      {% if templates %}
+      {% for t in templates %}
+      <div class="group-card {{ 'dup-row' if t['_dup'] }}">
+        <div class="group-card-head">
+          <div>
+            <div class="group-card-title">
+              {% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+              <input type="text" name="name" value="{{ t['name'] }}" form="template-save-{{ t['id'] }}" style="font-weight:700;">
+            </div>
+            <input type="text" name="notes" value="{{ t['notes'] or '' }}" form="template-save-{{ t['id'] }}" placeholder="Notes" style="margin-top:6px; width:100%;">
+          </div>
+          <div class="inline-form">
+            <button type="submit" form="template-save-{{ t['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+            <button type="submit" form="template-delete-{{ t['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete template '{{ t['name'] }}'? This also deletes its {{ t['items']|length }} activities.">Delete</button>
+          </div>
+        </div>
+
+        {% if t['items'] %}
+        {% for item in t['items'] %}
+        <div class="template-item-row">
+          <span class="template-item-step">{{ item['step_number'] }}.</span>
+          <input type="text" name="activity_name" value="{{ item['activity_name'] }}" form="item-save-{{ item['id'] }}" style="flex:1;">
+          <select name="required_capability_id" form="item-save-{{ item['id'] }}">
+            <option value="">No specific capability</option>
+            {% for c in capabilities %}
+            <option value="{{ c['id'] }}" {% if item['required_capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+            {% endfor %}
+          </select>
+          <div class="template-item-move">
+            <form method="post"><input type="hidden" name="action" value="move_template_item"><input type="hidden" name="item_id" value="{{ item['id'] }}"><input type="hidden" name="direction" value="up"><button type="submit" title="Move up">▲</button></form>
+            <form method="post"><input type="hidden" name="action" value="move_template_item"><input type="hidden" name="item_id" value="{{ item['id'] }}"><input type="hidden" name="direction" value="down"><button type="submit" title="Move down">▼</button></form>
+          </div>
+          <button type="submit" form="item-save-{{ item['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="action" value="delete_template_item">
+            <input type="hidden" name="item_id" value="{{ item['id'] }}">
+            <button type="submit" class="btn btn-danger btn-sm" data-confirm="Remove '{{ item['activity_name'] }}' from this template?">✕</button>
+          </form>
+        </div>
+        <form id="item-save-{{ item['id'] }}" method="post" hidden>
+          <input type="hidden" name="action" value="update_template_item">
+          <input type="hidden" name="item_id" value="{{ item['id'] }}">
+        </form>
+        {% endfor %}
+        {% else %}
+        <p class="section-help" style="margin-top:0;">No activities in this template yet.</p>
+        {% endif %}
+
+        <form method="post" class="inline-form" style="margin-top:10px;">
+          <input type="hidden" name="action" value="add_template_item">
+          <input type="hidden" name="template_id" value="{{ t['id'] }}">
+          <input type="text" name="activity_name" placeholder="Activity name, e.g. Burst" required>
+          <select name="required_capability_id">
+            <option value="">No specific capability</option>
+            {% for c in capabilities %}
+            <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-secondary btn-sm">➕ Add activity</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><span class="icon">📋</span>No activity templates yet.</div>
+      {% endif %}
+
+      {% for t in templates %}
+      <form id="template-save-{{ t['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_template">
+        <input type="hidden" name="template_id" value="{{ t['id'] }}">
+      </form>
+      <form id="template-delete-{{ t['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_template">
+        <input type="hidden" name="template_id" value="{{ t['id'] }}">
       </form>
       {% endfor %}
     </section>

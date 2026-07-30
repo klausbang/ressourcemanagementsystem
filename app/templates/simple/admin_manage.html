@@ -289,4 +289,91 @@
   </form>
   {% endfor %}
 </section>
+
+<section>
+  <h3>Activity Templates</h3>
+  <p><em>A reusable, ordered list of standard activities (e.g. Kick-off through EUT return) that a planner can apply to an EUT to bulk-create its test activities in one step. Applied activities can then be freely reordered, added to, or removed per project.</em></p>
+  <form method="post">
+    <input type="hidden" name="action" value="create_template">
+    <label>Name <input type="text" name="name" placeholder="e.g. Standard EMC Test Sequence" required></label>
+    <label>Notes <input type="text" name="notes"></label>
+    <button type="submit">Create Template</button>
+  </form>
+
+  {% for t in templates %}
+  <h4>{{ t['name'] }}{% if t['_dup'] %} (duplicate name/notes){% endif %}</h4>
+  <form method="post" style="margin-bottom:6px;">
+    <input type="hidden" name="action" value="update_template">
+    <input type="hidden" name="template_id" value="{{ t['id'] }}">
+    <label>Name <input type="text" name="name" value="{{ t['name'] }}"></label>
+    <label>Notes <input type="text" name="notes" value="{{ t['notes'] or '' }}"></label>
+    <button type="submit">Save</button>
+    <button type="submit" form="template-delete-{{ t['id'] }}">Delete Template</button>
+  </form>
+  <form id="template-delete-{{ t['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_template">
+    <input type="hidden" name="template_id" value="{{ t['id'] }}">
+  </form>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Activity</th>
+        <th>Required Capability</th>
+        <th>Reorder</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in t['items'] %}
+      <tr>
+        <td>{{ item['step_number'] }}</td>
+        <td><input type="text" name="activity_name" value="{{ item['activity_name'] }}" form="item-save-{{ item['id'] }}"></td>
+        <td>
+          <select name="required_capability_id" form="item-save-{{ item['id'] }}">
+            <option value="">None</option>
+            {% for c in capabilities %}
+            <option value="{{ c['id'] }}" {% if item['required_capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <form method="post" style="display:inline"><input type="hidden" name="action" value="move_template_item"><input type="hidden" name="item_id" value="{{ item['id'] }}"><input type="hidden" name="direction" value="up"><button type="submit">Up</button></form>
+          <form method="post" style="display:inline"><input type="hidden" name="action" value="move_template_item"><input type="hidden" name="item_id" value="{{ item['id'] }}"><input type="hidden" name="direction" value="down"><button type="submit">Down</button></form>
+        </td>
+        <td>
+          <button type="submit" form="item-save-{{ item['id'] }}">Save</button>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="action" value="delete_template_item">
+            <input type="hidden" name="item_id" value="{{ item['id'] }}">
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      <form id="item-save-{{ item['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_template_item">
+        <input type="hidden" name="item_id" value="{{ item['id'] }}">
+      </form>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post">
+    <input type="hidden" name="action" value="add_template_item">
+    <input type="hidden" name="template_id" value="{{ t['id'] }}">
+    <label>Activity Name <input type="text" name="activity_name" placeholder="e.g. Burst" required></label>
+    <label>Required Capability
+      <select name="required_capability_id">
+        <option value="">None</option>
+        {% for c in capabilities %}
+        <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Add Activity</button>
+  </form>
+  {% else %}
+  <p><em>No activity templates yet.</em></p>
+  {% endfor %}
+</section>
 {% endblock %}

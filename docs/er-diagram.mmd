@@ -32,6 +32,8 @@ erDiagram
     test_reports ||--o{ report_steps : "report_id"
     exclusion_groups ||--o{ exclusion_group_resources : "group_id"
     resources ||--o{ exclusion_group_resources : "resource_id"
+    activity_templates ||--o{ activity_template_items : "template_id"
+    capabilities ||--o{ activity_template_items : "required_capability_id"
 
     users {
         int id PK
@@ -92,6 +94,22 @@ erDiagram
         int eut_id FK "optional; which EUT this activity belongs to"
         string test_name
         int required_capability_id FK
+        int sequence "display/reorder position, scoped per (order_id, eut_id)"
+    }
+
+    activity_templates {
+        int id PK
+        string name UK
+        string notes
+    }
+
+    activity_template_items {
+        int id PK
+        int template_id FK
+        int step_number "the template's own ordering"
+        string activity_name
+        int required_capability_id FK "optional"
+        string notes
     }
 
     allocations {
