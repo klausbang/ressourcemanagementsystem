@@ -34,6 +34,7 @@ erDiagram
     resources ||--o{ exclusion_group_resources : "resource_id"
     activity_templates ||--o{ activity_template_items : "template_id"
     capabilities ||--o{ activity_template_items : "required_capability_id"
+    customer_orders ||--o{ milestones : "order_id"
 
     users {
         int id PK
@@ -66,6 +67,7 @@ erDiagram
         int id PK
         string name UK
         string description
+        string discipline "optional, e.g. EMC|Environmental|Calibration"
     }
 
     resource_capabilities {
@@ -78,6 +80,16 @@ erDiagram
         string order_code UK
         string customer_name
         string product_name
+        string weekly_note "manual; the only free-text project status field"
+        bool waiting_for_customer "manual; the only externally-caused hold flag"
+    }
+
+    milestones {
+        int id PK
+        int order_id FK
+        string title
+        string target_date "optional"
+        string notes
     }
 
     euts {

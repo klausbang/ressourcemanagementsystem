@@ -1,0 +1,71 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>Project Dashboard</h2>
+<p><em>Project and discipline status are generated from the underlying test activities and work orders, not typed in a second time. Only the weekly note and "waiting for customer" flag are manual.</em></p>
+
+<h3>Active Projects</h3>
+{% if active_projects %}
+{% for p in active_projects %}
+<fieldset style="margin-bottom:14px;">
+  <legend>{{ p.order_code }} - {{ p.customer_name }} ({{ p.product_name }}) &mdash; <strong>{{ p.display_status }}</strong>{% if p.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}</legend>
+
+  <p>
+    Disciplines:
+    {% for name, status in p.discipline_status.items() %}{{ name }}: {{ status }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+  <p>{{ p.unscheduled_count }} activities not yet actioned by a technician; {{ p.missing_procedure_count }} work orders missing a test procedure.</p>
+
+  <form method="post">
+    <input type="hidden" name="action" value="update_project_status">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <label>Weekly note <input type="text" name="weekly_note" value="{{ p.weekly_note or '' }}" size="50"></label>
+    <label><input type="checkbox" name="waiting_for_customer" value="1" {% if p.waiting_for_customer %}checked{% endif %}> Waiting for customer</label>
+    <button type="submit">Save</button>
+  </form>
+
+  <p>Milestones:</p>
+  <ul>
+    {% for m in p.milestones %}
+    <li>
+      {{ m.title }}{% if m.target_date %} - {{ m.target_date }}{% endif %}
+      <form method="post" style="display:inline">
+        <input type="hidden" name="action" value="delete_milestone">
+        <input type="hidden" name="milestone_id" value="{{ m.id }}">
+        <button type="submit">Remove</button>
+      </form>
+    </li>
+    {% else %}
+    <li><em>None yet.</em></li>
+    {% endfor %}
+  </ul>
+  <form method="post">
+    <input type="hidden" name="action" value="create_milestone">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Target date <input type="date" name="target_date"></label>
+    <button type="submit">Add Milestone</button>
+  </form>
+</fieldset>
+{% endfor %}
+{% else %}
+<p><em>No active projects.</em></p>
+{% endif %}
+
+<h3>Completed Projects</h3>
+{% if completed_projects %}
+<table border="1" cellpadding="6">
+  <thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Activities</th></tr></thead>
+  <tbody>
+    {% for p in completed_projects %}
+    <tr><td>{{ p.order_code }}</td><td>{{ p.customer_name }}</td><td>{{ p.product_name }}</td><td>{{ p.total_activities }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><em>Read-only history &mdash; a project moves here automatically once every one of its activities is completed.</em></p>
+{% else %}
+<p><em>No completed projects yet.</em></p>
+{% endif %}
+{% endblock %}

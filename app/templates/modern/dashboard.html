@@ -1,0 +1,109 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Planner</div>
+  <h1>Project dashboard</h1>
+  <p class="lead">Project and discipline status are generated from the underlying test activities and work orders — not typed in a second time. Only the weekly note and "waiting for customer" flag are manual, since nothing else in the system knows either of those.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-tile"><div class="stat-value">{{ active_projects|length }}</div><div class="stat-label">Active projects</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ completed_projects|length }}</div><div class="stat-label">Completed projects</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ active_projects|selectattr('has_conflict')|list|length }}</div><div class="stat-label">Projects with a live conflict</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ active_projects|sum(attribute='unscheduled_count') }}</div><div class="stat-label">Activities not yet actioned</div></div>
+</div>
+
+<div class="section-head"><h2>Active projects</h2></div>
+{% if active_projects %}
+{% for p in active_projects %}
+<div class="test-card">
+  <div class="test-card-head">
+    <div>
+      <div class="test-card-title">{{ p.order_code }} &middot; {{ p.customer_name }} ({{ p.product_name }})</div>
+      <div class="test-card-meta">{{ p.total_activities }} activities</div>
+    </div>
+    <div>
+      {% if p.display_status == 'Completed' %}<span class="badge badge-available">{{ p.display_status }}</span>
+      {% elif p.display_status == 'In Progress' %}<span class="badge badge-type">{{ p.display_status }}</span>
+      {% elif p.display_status == 'Reporting' %}<span class="badge badge-status-other">{{ p.display_status }}</span>
+      {% elif p.display_status == 'Waiting for Customer' %}<span class="badge badge-danger">{{ p.display_status }}</span>
+      {% else %}<span class="badge">{{ p.display_status }}</span>
+      {% endif %}
+      {% if p.has_conflict %}<span class="badge badge-danger" title="At least one currently in-progress activity conflicts with another">🚫 Conflict</span>{% endif %}
+    </div>
+  </div>
+
+  {% if p.discipline_status %}
+  <div class="chip-list" style="margin-bottom:10px;">
+    {% for name, status in p.discipline_status.items() %}
+    <span class="chip">{{ name }}: {{ status }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="section-help" style="margin:0 0 10px;">
+    {{ p.unscheduled_count }} activit{{ 'y' if p.unscheduled_count == 1 else 'ies' }} not yet actioned by a technician
+    &middot; {{ p.missing_procedure_count }} work order{{ '' if p.missing_procedure_count == 1 else 's' }} still missing a test procedure
+  </p>
+
+  <form method="post" class="form-grid" style="margin-bottom:10px;">
+    <input type="hidden" name="action" value="update_project_status">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <div class="field" style="flex:1 1 100%;">
+      <label for="note-{{ p.order_id }}">Weekly note</label>
+      <input type="text" id="note-{{ p.order_id }}" name="weekly_note" value="{{ p.weekly_note or '' }}" placeholder="e.g. Customer confirmed slip to next week">
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="waiting_for_customer" value="1" {% if p.waiting_for_customer %}checked{% endif %}> Waiting for customer</label>
+    </div>
+    <div class="field"><button type="submit" class="btn btn-secondary btn-sm">Save</button></div>
+  </form>
+
+  {% if p.milestones %}
+  <ul class="chip-list" style="margin-bottom:10px;">
+    {% for m in p.milestones %}
+    <li class="chip">
+      📅 {{ m.title }}{% if m.target_date %} &mdash; {{ m.target_date }}{% endif %}
+      <form method="post">
+        <input type="hidden" name="action" value="delete_milestone">
+        <input type="hidden" name="milestone_id" value="{{ m.id }}">
+        <button type="submit" title="Remove milestone" data-confirm="Remove milestone '{{ m.title }}'?">✕</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="create_milestone">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <input type="text" name="title" placeholder="Milestone, e.g. Report due" required>
+    <input type="date" name="target_date">
+    <button type="submit" class="btn btn-secondary btn-sm">➕ Add milestone</button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state"><span class="icon">📊</span>No active projects.</div>
+{% endif %}
+
+<div class="section-head" style="margin-top:24px;"><h2>Completed projects</h2></div>
+{% if completed_projects %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Activities</th></tr></thead>
+    <tbody>
+      {% for p in completed_projects %}
+      <tr><td>{{ p.order_code }}</td><td>{{ p.customer_name }}</td><td>{{ p.product_name }}</td><td>{{ p.total_activities }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="section-help">Read-only history — a project moves here automatically once every one of its activities is completed.</p>
+{% else %}
+<div class="empty-state"><span class="icon">✅</span>No completed projects yet.</div>
+{% endif %}
+{% endblock %}

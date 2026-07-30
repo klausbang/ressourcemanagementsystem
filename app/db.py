@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS capabilities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    description TEXT
+    description TEXT,
+    discipline TEXT
 );
 
 CREATE TABLE IF NOT EXISTS resources (
@@ -54,7 +55,18 @@ CREATE TABLE IF NOT EXISTS customer_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_code TEXT NOT NULL UNIQUE,
     customer_name TEXT NOT NULL,
-    product_name TEXT NOT NULL
+    product_name TEXT NOT NULL,
+    weekly_note TEXT,
+    waiting_for_customer INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    target_date TEXT,
+    notes TEXT,
+    FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS euts (
@@ -346,6 +358,36 @@ def _migrate_ordered_tests_sequence(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def _migrate_capabilities_table(db: sqlite3.Connection) -> None:
+    """Upgrade a capabilities table created before the optional discipline column existed."""
+    if not _table_exists(db, "capabilities"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(capabilities)").fetchall()}
+    if "discipline" in columns:
+        return
+
+    # A plain ADD COLUMN is enough here: discipline is nullable with no CHECK/FK/default,
+    # so SQLite can add it in place without a table rebuild.
+    db.execute("ALTER TABLE capabilities ADD COLUMN discipline TEXT")
+    db.commit()
+
+
+def _migrate_customer_orders_table(db: sqlite3.Connection) -> None:
+    """Upgrade a customer_orders table created before the weekly_note/waiting_for_customer columns existed."""
+    if not _table_exists(db, "customer_orders"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(customer_orders)").fetchall()}
+    # Both new columns have only constant defaults (NULL / 0) and no FK/CHECK,
+    # so a plain ADD COLUMN is enough for either, without a table rebuild.
+    if "weekly_note" not in columns:
+        db.execute("ALTER TABLE customer_orders ADD COLUMN weekly_note TEXT")
+    if "waiting_for_customer" not in columns:
+        db.execute("ALTER TABLE customer_orders ADD COLUMN waiting_for_customer INTEGER NOT NULL DEFAULT 0")
+    db.commit()
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
@@ -353,6 +395,8 @@ def init_db() -> None:
     _migrate_ordered_tests_table(db)
     _migrate_resources_table(db)
     _migrate_ordered_tests_sequence(db)
+    _migrate_capabilities_table(db)
+    _migrate_customer_orders_table(db)
     db.commit()
 
 
@@ -364,13 +408,30 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('technician.demo', 'technician')")
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('technician2.demo', 'technician')")
 
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Multimeter Calibration", "Ability to calibrate multimeters"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Vibration Test", "Ability to run vibration tests"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Humidity Test", "Ability to run humidity tests"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("CE", "Conducted Emissions"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("CI", "Conducted Immunity"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("RE", "Radiated Emissions"))
-    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("RI", "Radiated Immunity"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("Multimeter Calibration", "Ability to calibrate multimeters", "Calibration"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("Vibration Test", "Ability to run vibration tests", "Environmental"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("Humidity Test", "Ability to run humidity tests", "Environmental"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("CE", "Conducted Emissions", "EMC"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("CI", "Conducted Immunity", "EMC"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("RE", "Radiated Emissions", "EMC"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description, discipline) VALUES (?, ?, ?)", ("RI", "Radiated Immunity", "EMC"))
+
+    # Backfill: assign a discipline to capabilities that already existed on a
+    # dev database from before Phase 11 (their INSERT OR IGNORE above was a no-op).
+    _DISCIPLINE_BY_CAPABILITY = {
+        "Multimeter Calibration": "Calibration",
+        "Vibration Test": "Environmental",
+        "Humidity Test": "Environmental",
+        "CE": "EMC",
+        "CI": "EMC",
+        "RE": "EMC",
+        "RI": "EMC",
+    }
+    for capability_name, discipline in _DISCIPLINE_BY_CAPABILITY.items():
+        db.execute(
+            "UPDATE capabilities SET discipline = ? WHERE name = ? AND discipline IS NULL",
+            (discipline, capability_name),
+        )
 
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-001", "Multimeter Calibrator A", "equipment", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-020", "Vibration Tester V-9", "equipment", "available"))
@@ -385,6 +446,18 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-001", "Acme Instruments", "Multimeter"))
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-003", "Contoso Labs", "IoT Gateway"))
+
+    db.execute("""
+        UPDATE customer_orders SET weekly_note = ?
+        WHERE order_code = 'ORD-2026-002' AND weekly_note IS NULL
+    """, ("Vibration test passed on Prototype Unit A; humidity test in progress. Unit B still queued.",))
+    db.execute("""
+        UPDATE customer_orders SET waiting_for_customer = 1, weekly_note = ?
+        WHERE order_code = 'ORD-2026-003' AND weekly_note IS NULL
+    """, ("Blocked: waiting on customer to confirm which CE/CI limit class applies before we sign off the report.",))
+
+    _seed_milestone(db, "ORD-2026-002", "Draft report to customer", "2026-08-10")
+    _seed_milestone(db, "ORD-2026-003", "Final report due", "2026-08-05")
 
     _seed_eut(db, "ORD-2026-002", "Prototype Unit A", "SN-88213-004")
     _seed_eut(db, "ORD-2026-002", "Prototype Unit B", "SN-88213-005")
@@ -629,6 +702,7 @@ def init_demo_seed() -> None:
     )
 
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-004", "Helios Devices", "Smart Thermostat"))
+    _seed_milestone(db, "ORD-2026-004", "EUT delivery expected", "2026-08-01")
     _seed_eut(db, "ORD-2026-004", "Rev A", "SN-71100-001")
     _seed_eut(db, "ORD-2026-004", "Rev B", "SN-71100-002")
 
@@ -821,6 +895,19 @@ def _seed_exclusion_group(db: sqlite3.Connection, name: str, notes: str, resourc
             """,
             (group_id, code),
         )
+
+
+def _seed_milestone(db: sqlite3.Connection, order_code: str, title: str, target_date: str) -> None:
+    db.execute(
+        """
+        INSERT INTO milestones (order_id, title, target_date)
+        SELECT o.id, ?, ?
+        FROM customer_orders o
+        WHERE o.order_code = ?
+          AND NOT EXISTS (SELECT 1 FROM milestones m WHERE m.order_id = o.id AND m.title = ?)
+        """,
+        (title, target_date, order_code, title),
+    )
 
 
 def _seed_eut(db: sqlite3.Connection, order_code: str, name: str, serial_number: str) -> None:

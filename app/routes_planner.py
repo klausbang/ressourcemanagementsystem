@@ -5,6 +5,7 @@ from flask import Blueprint, flash, redirect, request, session, url_for
 
 from .db import get_db, init_db
 from .routes_common import render_ui, require_role
+from .scheduling import find_all_running_conflicts
 from .table_utils import rows_with_meta
 
 bp = Blueprint("planner", __name__, url_prefix="/planner")
@@ -646,3 +647,203 @@ def planner_orders():
             return redirect(url_for("planner.planner_orders"))
 
     return _render_planner_orders(db)
+
+
+# ---------------------------------------------------------------------------
+# Phase 11: project/discipline dashboard.
+#
+# Project and discipline status are *derived* from underlying test activity /
+# work order status (BR-001 Single Source of Truth), not separately entered -
+# unlike the customer's current Sprint.xls, where the same fact gets typed in
+# by hand a second time. The only genuinely manual fields are weekly_note and
+# waiting_for_customer, since neither has any other source in the system.
+# ---------------------------------------------------------------------------
+
+REPORT_DISCIPLINE = "Report"
+DEFAULT_DISCIPLINE = "Project Management"
+
+
+def _activity_discipline(test_name: str, capability_discipline: str | None) -> str:
+    if capability_discipline:
+        return capability_discipline
+    if "report" in test_name.lower():
+        return REPORT_DISCIPLINE
+    return DEFAULT_DISCIPLINE
+
+
+def _rollup_status(total: int, completed: int, active: int) -> str:
+    if total == 0:
+        return "Planned"
+    if completed == total:
+        return "Completed"
+    if active > 0 or completed > 0:
+        return "In Progress"
+    return "Planned"
+
+
+def _load_dashboard_context(db) -> dict:
+    rows = db.execute(
+        """
+        SELECT
+            o.id AS order_id, o.order_code, o.customer_name, o.product_name,
+            o.weekly_note, o.waiting_for_customer,
+            ot.id AS ordered_test_id, ot.test_name,
+            c.discipline AS capability_discipline,
+            wo.id AS work_order_id, wo.procedure_id, wo.status AS wo_status
+        FROM customer_orders o
+        LEFT JOIN ordered_tests ot ON ot.order_id = o.id
+        LEFT JOIN capabilities c ON c.id = ot.required_capability_id
+        LEFT JOIN work_orders wo ON wo.ordered_test_id = ot.id
+        ORDER BY o.order_code
+        """
+    ).fetchall()
+
+    projects: dict[int, dict] = {}
+    for row in rows:
+        proj = projects.setdefault(
+            row["order_id"],
+            {
+                "order_id": row["order_id"],
+                "order_code": row["order_code"],
+                "customer_name": row["customer_name"],
+                "product_name": row["product_name"],
+                "weekly_note": row["weekly_note"],
+                "waiting_for_customer": bool(row["waiting_for_customer"]),
+                "activities": [],
+                "unscheduled_count": 0,
+                "missing_procedure_count": 0,
+            },
+        )
+        if row["ordered_test_id"] is None:
+            continue
+        discipline = _activity_discipline(row["test_name"], row["capability_discipline"])
+        proj["activities"].append({"discipline": discipline, "status": row["wo_status"]})
+        if row["work_order_id"] is None:
+            proj["unscheduled_count"] += 1
+        elif row["procedure_id"] is None:
+            proj["missing_procedure_count"] += 1
+
+    conflicted_order_ids = set()
+    for a, b in find_all_running_conflicts(db):
+        conflicted_order_ids.add(a["order_id"])
+        conflicted_order_ids.add(b["order_id"])
+
+    milestone_rows = db.execute(
+        """
+        SELECT m.id, m.order_id, m.title, m.target_date, m.notes, o.order_code
+        FROM milestones m
+        JOIN customer_orders o ON o.id = m.order_id
+        ORDER BY m.target_date IS NULL, m.target_date
+        """
+    ).fetchall()
+    milestones_by_order: dict[int, list] = {}
+    for row in milestone_rows:
+        milestones_by_order.setdefault(row["order_id"], []).append(dict(row))
+
+    result_projects = []
+    for order_id, proj in projects.items():
+        activities = proj.pop("activities")
+        total = len(activities)
+        completed = sum(1 for a in activities if a["status"] == "completed")
+        active = sum(1 for a in activities if a["status"] in ("in_progress", "on_hold"))
+
+        report_total = sum(1 for a in activities if a["discipline"] == REPORT_DISCIPLINE)
+        report_completed = sum(
+            1 for a in activities if a["discipline"] == REPORT_DISCIPLINE and a["status"] == "completed"
+        )
+        non_report_total = total - report_total
+        non_report_completed = completed - report_completed
+
+        if total == 0:
+            computed_status = "Planned"
+        elif completed == total:
+            computed_status = "Completed"
+        elif active > 0:
+            computed_status = "In Progress"
+        elif (
+            non_report_total > 0
+            and non_report_completed == non_report_total
+            and report_total > 0
+            and report_completed < report_total
+        ):
+            computed_status = "Reporting"
+        elif completed > 0:
+            computed_status = "In Progress"
+        else:
+            computed_status = "Planned"
+
+        disciplines: dict[str, dict] = {}
+        for a in activities:
+            d = disciplines.setdefault(a["discipline"], {"total": 0, "completed": 0, "active": 0})
+            d["total"] += 1
+            if a["status"] == "completed":
+                d["completed"] += 1
+            elif a["status"] in ("in_progress", "on_hold"):
+                d["active"] += 1
+
+        proj["computed_status"] = computed_status
+        proj["display_status"] = "Waiting for Customer" if proj["waiting_for_customer"] else computed_status
+        proj["discipline_status"] = {
+            name: _rollup_status(d["total"], d["completed"], d["active"]) for name, d in disciplines.items()
+        }
+        proj["total_activities"] = total
+        proj["has_conflict"] = order_id in conflicted_order_ids
+        proj["milestones"] = milestones_by_order.get(order_id, [])
+        result_projects.append(proj)
+
+    result_projects.sort(key=lambda p: p["order_code"])
+    active_projects = [p for p in result_projects if p["computed_status"] != "Completed"]
+    completed_projects = [p for p in result_projects if p["computed_status"] == "Completed"]
+
+    return {"active_projects": active_projects, "completed_projects": completed_projects}
+
+
+@bp.route("/dashboard", methods=["GET", "POST"])
+@require_role("planner")
+def dashboard():
+    init_db()
+    db = get_db()
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+
+        if action == "update_project_status":
+            order_id = request.form.get("order_id", "").strip()
+            weekly_note = request.form.get("weekly_note", "").strip() or None
+            waiting_for_customer = 1 if request.form.get("waiting_for_customer") else 0
+            db.execute(
+                "UPDATE customer_orders SET weekly_note = ?, waiting_for_customer = ? WHERE id = ?",
+                (weekly_note, waiting_for_customer, order_id),
+            )
+            db.commit()
+            flash("Project status updated.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "create_milestone":
+            order_id = request.form.get("order_id", "").strip()
+            title = request.form.get("title", "").strip()
+            target_date = request.form.get("target_date", "").strip() or None
+            notes = request.form.get("notes", "").strip() or None
+
+            if not (order_id and title):
+                flash("Order and milestone title are required.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO milestones (order_id, title, target_date, notes) VALUES (?, ?, ?, ?)",
+                    (order_id, title, target_date, notes),
+                )
+                db.commit()
+                flash(f"Milestone '{title}' added.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "delete_milestone":
+            milestone_id = request.form.get("milestone_id", "").strip()
+            db.execute("DELETE FROM milestones WHERE id = ?", (milestone_id,))
+            db.commit()
+            flash("Milestone deleted.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+    context = _load_dashboard_context(db)
+    orders = db.execute("SELECT id, order_code FROM customer_orders ORDER BY order_code").fetchall()
+    context["orders"] = orders
+    return render_ui("dashboard.html", **context)

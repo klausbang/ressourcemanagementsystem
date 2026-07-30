@@ -34,6 +34,9 @@
         <li>activity_templates (Phase 10; admin-defined reusable standard activity sequences, e.g. "Standard EMC Test Sequence")</li>
         <li>activity_template_items (Phase 10; the ordered activities within a template, each with an optional required capability)</li>
         <li>ordered_tests.sequence (Phase 10; optional display/reorder position, scoped per order/EUT, added to the existing ordered_tests entity)</li>
+        <li>capabilities.discipline (Phase 11; optional status-reporting grouping, e.g. CE/CI/RE/RI &rarr; "EMC", added to the existing capabilities entity)</li>
+        <li>customer_orders.weekly_note and customer_orders.waiting_for_customer (Phase 11; the only two manually-entered project-status fields, added to the existing customer_orders entity)</li>
+        <li>milestones (Phase 11; a project-level date to watch for, e.g. "Draft report to customer")</li>
       </ul>
     </section>
 
@@ -44,6 +47,7 @@
         <li>GET /catalog : resource catalog with filters (requires a signed-in admin, planner, or technician); implemented but currently unlinked from navigation in both interfaces, reachable only by direct URL</li>
         <li>Admin scope (single POST-dispatch route, action field per operation): full CRUD on users, capabilities, and resources (including a resource's optional <code>site</code>); assign/remove capability-to-resource mapping; link a technician user to their resource; full CRUD on exclusion groups and their facility-resource membership (Phase 9); full CRUD on activity templates and their items, including reordering an item up/down within its template (Phase 10)</li>
         <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders, EUTs (Phase 8), and ordered tests (optionally tagged to an EUT); assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently; a day-view Schedule/Gantt tab (Modern UI) that flags any two visible activities sharing a resource or exclusion group whose actual/inferred time windows overlap (Phase 9); apply an activity template to an order/EUT, bulk-creating its ordered tests in the template's order, and reorder any existing ordered test up/down within its order/EUT scope (Phase 10)</li>
+        <li>GET/POST /planner/dashboard (Phase 11, planner role): lists active projects with a derived status (see below), per-discipline status breakdown, unscheduled/missing-procedure counts, a live-conflict flag, and milestones, plus a read-only completed-projects table; actions to save a project's weekly note/waiting-for-customer flag, and to create/delete a milestone</li>
         <li>Technician scope (<code>routes_technician.py</code>, single POST-dispatch route): dashboard of tests allocated to the technician's linked resource; create a work order per assigned test; set/change its test procedure; move it through planned/in_progress/on_hold/completed (start/resume are conflict-checked, see below); edit notes</li>
         <li>Test report scope (<code>routes_reports.py</code>): create a report from a work order (snapshots that procedure's check-items); fill in and save a draft report; submit for review; approve/reject a submitted report (any technician other than the author, or a planner); reopen a rejected report; list reports pending the current user's review and full report history</li>
         <li>Basic login/logout for role-aware actions; login switches a technician's session to the Modern UI automatically</li>
@@ -65,6 +69,7 @@
         <li>Role checks for admin/planner/technician actions; the resource catalog itself requires any signed-in role (it is no longer visible to anonymous visitors)</li>
         <li>(Phase 9) Starting or resuming a work order is blocked, with a message naming the conflicting work order/activity, if another work order sharing a resource or exclusion group is already <code>in_progress</code> (<code>app/scheduling.py:find_running_conflict</code>) &mdash; not a database constraint, since it depends on live status across multiple ordered tests</li>
         <li>(Phase 10) Applying a template requires the target order to exist and, if an EUT is given, that it belongs to that order; each created ordered test's <code>sequence</code> continues on from the highest existing value in that order/EUT scope. Moving an ordered test or a template item up/down is a same-scope swap of two rows' sequence/step_number values, with no effect at either end of the list. Deleting a template item renumbers the remaining items 1..N so gaps don't accumulate; deleting a template cascades to its items but never touches ordered_tests already created from it</li>
+        <li>(Phase 11) A project's and a discipline's status are computed, not stored, from the aggregate status of the project's/discipline's ordered_tests' work_orders (<code>app/routes_planner.py:_load_dashboard_context</code>): Completed once every activity's work order is completed; In Progress once any activity is or has been worked; Reporting once every non-Report activity is completed but at least one Report-discipline activity isn't; otherwise Planned. The <code>waiting_for_customer</code> flag, when set, overrides the displayed status to "Waiting for Customer" regardless of the computed value</li>
       </ul>
     </section>
 
@@ -76,6 +81,7 @@
         <li>resource_catalog.html</li>
         <li>admin_manage.html</li>
         <li>planner_orders.html</li>
+        <li>dashboard.html (Phase 11)</li>
         <li>login.html</li>
         <li>help.html</li>
         <li>_macros.html (per-mode, non-page: sortable column header links, badges)</li>

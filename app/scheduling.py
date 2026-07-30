@@ -72,3 +72,49 @@ def conflict_message(conflict: dict) -> str:
         f"{conflict['work_order_code']} ({conflict['order_code']} / {conflict['test_name']}), "
         f"which is still in progress."
     )
+
+
+def find_all_running_conflicts(db: sqlite3.Connection) -> list[tuple[dict, dict]]:
+    """Every pair of currently in_progress work orders that conflict (same resource or
+    exclusion group), system-wide - not scoped to one day like the planner's Gantt view.
+    Used by the project dashboard (FR-VIS-2) to flag a project as currently in conflict."""
+
+    rows = db.execute(
+        """
+        SELECT wo.id AS work_order_id, wo.work_order_code, wo.ordered_test_id,
+               ot.order_id, o.order_code, ot.test_name
+        FROM work_orders wo
+        JOIN ordered_tests ot ON ot.id = wo.ordered_test_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        WHERE wo.status = 'in_progress'
+        """
+    ).fetchall()
+    if len(rows) < 2:
+        return []
+
+    resources_by_test: dict[int, set] = {}
+    for row in db.execute("SELECT ordered_test_id, resource_id FROM allocations").fetchall():
+        resources_by_test.setdefault(row["ordered_test_id"], set()).add(row["resource_id"])
+
+    groups_by_resource: dict[int, set] = {}
+    for row in db.execute("SELECT group_id, resource_id FROM exclusion_group_resources").fetchall():
+        groups_by_resource.setdefault(row["resource_id"], set()).add(row["group_id"])
+
+    def _conflicts(res_ids_a: set, res_ids_b: set) -> bool:
+        if res_ids_a & res_ids_b:
+            return True
+        groups_a = set().union(*(groups_by_resource.get(rid, set()) for rid in res_ids_a)) if res_ids_a else set()
+        groups_b = set().union(*(groups_by_resource.get(rid, set()) for rid in res_ids_b)) if res_ids_b else set()
+        return bool(groups_a & groups_b)
+
+    conflicts = []
+    for i in range(len(rows)):
+        for j in range(i + 1, len(rows)):
+            a, b = rows[i], rows[j]
+            if a["ordered_test_id"] == b["ordered_test_id"]:
+                continue
+            a_ids = resources_by_test.get(a["ordered_test_id"], set())
+            b_ids = resources_by_test.get(b["ordered_test_id"], set())
+            if _conflicts(a_ids, b_ids):
+                conflicts.append((dict(a), dict(b)))
+    return conflicts

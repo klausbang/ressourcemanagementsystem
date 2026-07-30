@@ -103,8 +103,8 @@ Project (customer_orders)
       <ul>
         <li><strong>FR-PRJ-1</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on customer orders (order code, customer name, product name).</li>
         <li><strong>FR-PRJ-2</strong> [Must, Planned - Phase 8]: A project shall be able to hold one or more EUTs (see 8.2), each with its own test activities.</li>
-        <li><strong>FR-PRJ-3</strong> [Should, Planned - Phase 11]: A project shall carry an overall status (e.g. Active, Waiting for customer, Planned, In progress, Reporting, Completed) and a free-text weekly note, replacing the equivalent Sprint.xls columns.</li>
-        <li><strong>FR-PRJ-4</strong> [Could, Planned - Phase 11]: Completed projects shall remain visible in a read-only project history view.</li>
+        <li><strong>FR-PRJ-3</strong> [Should, Delivered - Phase 11]: A project shall carry an overall status (Planned, In Progress, Reporting, Completed, or Waiting for Customer) and a free-text weekly note, replacing the equivalent Sprint.xls columns. Of these, only the weekly note and the "waiting for customer" flag are stored/manual &mdash; the status itself is derived (see FR-STA-2), since a second manually-typed copy of already-known information is exactly the duplication BR-001 exists to remove.</li>
+        <li><strong>FR-PRJ-4</strong> [Could, Delivered - Phase 11]: Completed projects shall remain visible in a read-only project history view.</li>
       </ul>
 
       <h3>8.2 Test Plan and EUTs (FR-TP)</h3>
@@ -151,7 +151,8 @@ Project (customer_orders)
       <p><strong>BR-001</strong> (continued): A test's status must be recorded once and reflected everywhere, closing the loop the customer described (testplan &rarr; Projects.xls &rarr; Sprint.xls, updated by hand up to four times per event).</p>
       <ul>
         <li><strong>FR-STA-1</strong> [Must, Delivered - Phase 7]: The system shall move a work order through the lifecycle planned &rarr; in_progress &rarr; (on_hold/resumed) &rarr; completed, recording a pass/fail/n-a result and notes on completion.</li>
-        <li><strong>FR-STA-2</strong> [Should, Planned - Phase 11]: A project's and a discipline's status (see Glossary) shall be derived from the status of their underlying test activities/work orders, not entered separately.</li>
+        <li><strong>FR-STA-2</strong> [Should, Delivered - Phase 11]: A project's and a discipline's status (see Glossary) shall be derived from the status of their underlying test activities/work orders, not entered separately.</li>
+        <li><strong>Design note (FR-STA-2 derivation and disciplines):</strong> a project's status is Completed once every activity's work order is completed; In Progress once any activity is (or has been) worked; Reporting once every non-Report activity is completed but at least one Report activity (test_name containing "report") isn't yet; otherwise Planned. A discipline groups activities via their required capability's admin-set <code>discipline</code> field (e.g. CE/CI/RE/RI &rarr; "EMC"); activities with no capability default to "Report" (by name) or "Project Management" (everything else, e.g. Kick-off/Testplan/EUT delivery/return) &mdash; a stopgap pending the customer confirming the real discipline taxonomy (see <a href="ai-questions.html">AI Questions</a>).</li>
       </ul>
 
       <h3>8.7 Planning and Scheduling (FR-PLN)</h3>
@@ -173,8 +174,8 @@ Project (customer_orders)
       <h3>8.9 Visualization and Dashboard (FR-VIS)</h3>
       <p><strong>BR-004</strong> (continued): The laboratory wants the at-a-glance overview Sprint.xls gives today, generated instead of hand-updated.</p>
       <ul>
-        <li><strong>FR-VIS-1</strong> [Should, Planned - Phase 11]: The system shall provide a dashboard listing active projects with overall status, per-discipline status, and upcoming milestones.</li>
-        <li><strong>FR-VIS-2</strong> [Should, Planned - Phase 11]: The dashboard shall surface resource conflicts (8.4) and activities missing an EUT, a scheduled date, or a procedure.</li>
+        <li><strong>FR-VIS-1</strong> [Should, Delivered - Phase 11]: The system shall provide a dashboard listing active projects with overall status, per-discipline status, and upcoming milestones, plus a read-only completed-project history view (FR-PRJ-4).</li>
+        <li><strong>FR-VIS-2</strong> [Should, Delivered - Phase 11]: The dashboard shall surface, per project: whether any of its currently in-progress activities has a live resource/exclusion-group conflict (8.4) with another project's activity, how many activities have no work order yet, and how many work orders are missing a test procedure.</li>
         <li><strong>FR-VIS-3</strong> [Must, Delivered - Phase 7 (WIP)]: See FR-PLN-2 (production schedule chart).</li>
       </ul>
 
@@ -222,6 +223,7 @@ Project (customer_orders)
         <li>Store test reports (one per work order) with unit-under-test identification, snapshotted report steps, overall result, notes, and technician/reviewer sign-off fields.</li>
         <li>From Phase 9 (delivered): mutual-exclusion groups and their facility-resource membership, and a site field on resources.</li>
         <li>From Phase 10 (delivered): activity templates and their ordered items (activity name + optional required capability), and an optional sequence number on each test activity, scoped per order/EUT, so activities can be freely reordered.</li>
+        <li>From Phase 11 (delivered): an optional discipline field on capabilities; a weekly note and a waiting-for-customer flag on each project (the only two manually-entered project-status fields); milestones per project (title, optional target date, optional notes).</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -261,7 +263,7 @@ Project (customer_orders)
           <tr><td>8</td><td>EUT as a first-class entity; public landing page; role-based home routing</td><td>FR-PRJ-2, FR-TP-1..3, FR-USE-4, FR-USE-5</td><td>Delivered</td></tr>
           <tr><td>9</td><td>Lab/equipment mutual-exclusion constraints</td><td>FR-RES-5, FR-CON-1..2, FR-PLN-3</td><td>Delivered</td></tr>
           <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Delivered</td></tr>
-          <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Planned</td></tr>
+          <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Delivered</td></tr>
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Planned</td></tr>
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Planned</td></tr>
           <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
@@ -278,6 +280,8 @@ Project (customer_orders)
         <li>Assumed (Phase 9): the confirmed exclusion-group examples are "CON chamber: CE/CI" and "SAC chamber: RE/RI"; is this the complete list, or are there other shared facilities/equipment we haven't heard about yet?</li>
         <li>Open: should FR-CON-2's block also apply at creation-time scheduling (same-day, coarse) rather than only at the in-progress transition, once the team has an opinion on how often two conflicting activities get scheduled for the same day without anyone noticing before start time?</li>
         <li>Assumed (Phase 10): one template ("Standard EMC Test Sequence") covers the customer's example workflow; is more than one standard sequence needed in practice (e.g. per product category or per site), and if so should a template itself record which EUT/product types it's meant for?</li>
+        <li>Assumed (Phase 11): the discipline groupings seeded so far (Calibration, Environmental, EMC) and the two name-based fallback buckets (Report, Project Management) are a stopgap, not the confirmed taxonomy &mdash; see the matching open question in <a href="ai-questions.html">AI Questions</a>.</li>
+        <li>Open (Phase 11): is "Waiting for Customer" the only manually-flagged project state needed, or are there other externally-caused holds (e.g. "waiting on a spare part", "lab closed") that deserve their own flag rather than being folded into the free-text weekly note?</li>
       </ul>
     </section>
   </main>
