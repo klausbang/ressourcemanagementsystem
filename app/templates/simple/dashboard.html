@@ -6,6 +6,12 @@
 <h2>Project Dashboard</h2>
 <p><em>Project and discipline status are generated from the underlying test activities and work orders, not typed in a second time. Only the weekly note and "waiting for customer" flag are manual.</em></p>
 
+{% if upcoming_absences %}
+<p><strong>Staff availability (next 14 days):</strong>
+{% for a in upcoming_absences %}{{ a.resource_code }} - {{ a.resource_name }}: {{ a.start_date }} to {{ a.end_date }}{% if a.reason %} ({{ a.reason }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}
+(manage on the Admin page)</p>
+{% endif %}
+
 <h3>Active Projects</h3>
 {% if active_projects %}
 {% for p in active_projects %}
@@ -47,6 +53,30 @@
     <label>Title <input type="text" name="title" required></label>
     <label>Target date <input type="date" name="target_date"></label>
     <button type="submit">Add Milestone</button>
+  </form>
+
+  <p>Customer visits:</p>
+  <ul>
+    {% for v in p.visits %}
+    <li>
+      {{ v.start_date }}{% if v.end_date and v.end_date != v.start_date %} to {{ v.end_date }}{% endif %}{% if v.notes %} - {{ v.notes }}{% endif %}
+      <form method="post" style="display:inline">
+        <input type="hidden" name="action" value="delete_visit">
+        <input type="hidden" name="visit_id" value="{{ v.id }}">
+        <button type="submit">Remove</button>
+      </form>
+    </li>
+    {% else %}
+    <li><em>None yet.</em></li>
+    {% endfor %}
+  </ul>
+  <form method="post">
+    <input type="hidden" name="action" value="create_visit">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <label>Start date <input type="date" name="start_date" required></label>
+    <label>End date <input type="date" name="end_date"></label>
+    <label>Notes <input type="text" name="notes"></label>
+    <button type="submit">Add Visit</button>
   </form>
 </fieldset>
 {% endfor %}

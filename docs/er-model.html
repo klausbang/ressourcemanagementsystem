@@ -14,7 +14,7 @@
   <main>
     <section>
       <h2>1. Scope</h2>
-      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), the technician work order and test report workflow added in Phase 7, the EUT (Unit Under Test) entity added in Phase 8, the lab/equipment mutual-exclusion constraints added in Phase 9, the standard activity template added in Phase 10, the project/discipline dashboard added in Phase 11, plus future migration planning.</p>
+      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), the technician work order and test report workflow added in Phase 7, the EUT (Unit Under Test) entity added in Phase 8, the lab/equipment mutual-exclusion constraints added in Phase 9, the standard activity template added in Phase 10, the project/discipline dashboard added in Phase 11, the staff/customer calendar added in Phase 12, plus future migration planning.</p>
     </section>
 
     <section>
@@ -68,6 +68,8 @@
         <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
         <li>customer_orders: order header per customer request; a <code>weekly_note</code> and <code>waiting_for_customer</code> flag (Phase 11) are its only manually-entered status fields &mdash; overall project status itself is derived, not stored (see Section 5).</li>
         <li>milestones: a project-level date to watch for (e.g. "Draft report to customer", "EUT delivery expected") (Phase 11), shown on the dashboard.</li>
+        <li>staff_absences: a technician resource's vacation/absence date range with an optional reason (Phase 12), admin-managed, surfaced on the schedule (for the viewed day) and dashboard (next 14 days).</li>
+        <li>customer_visits: a project's customer on-site date range with optional notes (Phase 12), planner-managed, surfaced the same way.</li>
         <li>euts: one or more Equipment/Unit Under Test records per customer order (Phase 8) &mdash; a project can involve several physical units, each tracked separately.</li>
         <li>ordered_tests: one or more tests (test activities) requested under each customer order, optionally tagged to the EUT (<code>eut_id</code>) they belong to; an optional <code>sequence</code> field (Phase 10) gives its display/reorder position, scoped per (order_id, eut_id).</li>
         <li>allocations: planner assignment of a resource to an ordered test; one ordered test can have several allocations (e.g. equipment, facility, and technician assigned together).</li>
@@ -99,7 +101,8 @@
         <li>Each test_report references two distinct users: the authoring technician (<code>technician_user_id</code>) and, once reviewed, the approving/rejecting reviewer (<code>reviewer_user_id</code>) &mdash; enforced in application logic to never be the same person.</li>
         <li>resources and exclusion_groups are linked many-to-many through exclusion_group_resources; a resource can belong to zero, one, or more than one exclusion group.</li>
         <li>One activity_template has many activity_template_items; one capability can be linked to many activity_template_items as an optional required capability. Applying a template creates independent ordered_tests rows (with their own <code>required_capability_id</code> copied at that moment) &mdash; there is no ongoing link back to the template afterward, so editing a template does not retroactively change activities already created from it.</li>
-        <li>One customer_order has zero or many milestones.</li>
+        <li>One customer_order has zero or many milestones, and zero or many customer_visits.</li>
+        <li>One resource (a technician) has zero or many staff_absences.</li>
         <li>A project's and a discipline's status are not stored columns &mdash; they are computed at read time from the aggregate status of the project's/discipline's ordered_tests' work_orders (app/routes_planner.py:_load_dashboard_context), per BR-001 Single Source of Truth. A discipline groups ordered_tests via their required capability's <code>discipline</code> field, or, for activities with no capability, a name-based fallback ("Report" if the activity name contains "report", else "Project Management").</li>
       </ul>
     </section>
@@ -115,7 +118,7 @@
         <li>Application logic (not a database constraint) enforces the review workflow: only the report's own technician can edit or submit a draft; only a <em>different</em> technician or a planner can approve/reject a submitted report; rejecting requires a comment.</li>
         <li>Deleting an exclusion_group cascades to its exclusion_group_resources rows (<code>ON DELETE CASCADE</code>); the member resources themselves are untouched.</li>
         <li>Mutual-exclusion conflict checking (app/scheduling.py) is application logic, not a database constraint: starting/resuming a work order is blocked if another work order sharing a resource or exclusion group is already in_progress; a separate system-wide variant of the same check (<code>find_all_running_conflicts</code>) flags a project on the dashboard if any of its in-progress activities is currently in such a conflict.</li>
-        <li>Deleting a customer_order cascades to its milestones (<code>ON DELETE CASCADE</code>), same as its ordered_tests and euts.</li>
+        <li>Deleting a customer_order cascades to its milestones and customer_visits (<code>ON DELETE CASCADE</code>), same as its ordered_tests and euts; deleting a resource cascades to its staff_absences.</li>
         <li>Deleting an activity_template cascades to its activity_template_items (<code>ON DELETE CASCADE</code>); ordered_tests previously created by applying it are untouched, since applying a template only copies values once.</li>
         <li>Reordering (moving an ordered_test up/down, or an activity_template_item up/down) is a same-scope swap of two rows' sequence/step_number values in application logic, not a database constraint.</li>
       </ul>

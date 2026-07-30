@@ -33,6 +33,7 @@
     <li>Manage user accounts and roles on the Users tab.</li>
     <li>If two facility resources are really the same shared physical chamber (e.g. two setups in one room), put them in the same <strong>exclusion group</strong> on the Exclusion groups tab — the schedule will then flag two activities in that group if their times overlap, and starting one while the other is running is blocked.</li>
     <li>Maintain reusable <strong>activity templates</strong> (e.g. "Standard EMC Test Sequence") on the Activity templates tab — an ordered list of standard activities, each optionally requiring a capability, that a planner can apply to an order/EUT to bulk-create its test activities in one step.</li>
+    <li>Record a technician's vacation/absence dates on the Staff absences tab — the planner's Schedule tab and dashboard will flag it automatically.</li>
   </ol>
 </div>
 
@@ -43,7 +44,8 @@
     <li>If the order involves more than one physical unit, add each as an <strong>EUT</strong> (Equipment/Unit Under Test) on the Customer orders tab &mdash; this is optional and can be left out for a simple, single-unit order.</li>
     <li>Add one or more <strong>ordered tests</strong> to that order on the Ordered tests tab, each optionally requiring a capability and optionally tagged to the EUT it belongs to — or, on the same tab, <strong>apply an activity template</strong> (e.g. "Standard EMC Test Sequence") to bulk-create a whole standard sequence in one step, then use the ▲/▼ buttons to reorder, or add/remove activities per project as needed.</li>
     <li>On the Resource assignment tab, assign resources to each test. A test can have <strong>several</strong> resources at once — e.g. equipment, a facility, and a technician together. Only resources with the test's required capability are offered, and the same resource can't be assigned twice to one test.</li>
-    <li>Check the <strong>Dashboard</strong> for an overview of every active project: its status and per-discipline status (generated from the underlying activities, not typed in separately), any live resource conflicts, activities still missing a work order or a test procedure, and upcoming milestones. The weekly note and "waiting for customer" flag are the only things you set by hand there.</li>
+    <li>Check the <strong>Dashboard</strong> for an overview of every active project: its status and per-discipline status (generated from the underlying activities, not typed in separately), any live resource conflicts, activities still missing a work order or a test procedure, upcoming milestones, and customer on-site visits. The weekly note, "waiting for customer" flag, and customer visits are the only things you set by hand there.</li>
+    <li>Record a <strong>customer on-site visit</strong> against a project directly on the Dashboard — it shows up there and, for the day itself, as a banner on the Schedule tab alongside any technician absence.</li>
   </ol>
 </div>
 

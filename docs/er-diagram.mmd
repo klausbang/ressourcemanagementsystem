@@ -35,6 +35,8 @@ erDiagram
     activity_templates ||--o{ activity_template_items : "template_id"
     capabilities ||--o{ activity_template_items : "required_capability_id"
     customer_orders ||--o{ milestones : "order_id"
+    resources ||--o{ staff_absences : "resource_id"
+    customer_orders ||--o{ customer_visits : "order_id"
 
     users {
         int id PK
@@ -90,6 +92,22 @@ erDiagram
         string title
         string target_date "optional"
         string notes
+    }
+
+    staff_absences {
+        int id PK
+        int resource_id FK "the technician resource, not the user login"
+        string start_date
+        string end_date
+        string reason "optional"
+    }
+
+    customer_visits {
+        int id PK
+        int order_id FK
+        string start_date
+        string end_date
+        string notes "optional"
     }
 
     euts {

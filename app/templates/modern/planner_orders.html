@@ -405,6 +405,17 @@
         <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_next) }}">Next day &rarr;</a>
       </div>
 
+      {% if absences_today or visits_today %}
+      <div class="callout" style="border-left-color: var(--color-danger, #dc2626);">
+        {% for a in absences_today %}
+        <div>🌴 <strong>{{ a.resource_code }} - {{ a.resource_name }}</strong> is away today{% if a.reason %} ({{ a.reason }}){% endif %}.</div>
+        {% endfor %}
+        {% for v in visits_today %}
+        <div>🧑‍💼 <strong>{{ v.order_code }} - {{ v.customer_name }}</strong> is on-site today{% if v.notes %} ({{ v.notes }}){% endif %}.</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       <div class="gantt-legend">
         <span class="legend-item"><span class="legend-swatch status-planned"></span>Planned</span>
         <span class="legend-item"><span class="legend-swatch status-in_progress"></span>In progress</span>

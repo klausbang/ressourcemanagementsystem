@@ -16,6 +16,16 @@
   <div class="stat-tile"><div class="stat-value">{{ active_projects|sum(attribute='unscheduled_count') }}</div><div class="stat-label">Activities not yet actioned</div></div>
 </div>
 
+{% if upcoming_absences %}
+<div class="callout" style="border-left-color: var(--color-danger, #dc2626);">
+  <strong>Staff availability (next 14 days):</strong>
+  {% for a in upcoming_absences %}
+  🌴 {{ a.resource_code }} - {{ a.resource_name }}: {{ a.start_date }}&ndash;{{ a.end_date }}{% if a.reason %} ({{ a.reason }}){% endif %}{% if not loop.last %} &middot; {% endif %}
+  {% endfor %}
+  <span class="section-help" style="margin:4px 0 0;">Manage absences on Admin &rarr; Staff absences.</span>
+</div>
+{% endif %}
+
 <div class="section-head"><h2>Active projects</h2></div>
 {% if active_projects %}
 {% for p in active_projects %}
@@ -77,12 +87,38 @@
   </ul>
   {% endif %}
 
-  <form method="post" class="inline-form">
+  <form method="post" class="inline-form" style="margin-bottom:10px;">
     <input type="hidden" name="action" value="create_milestone">
     <input type="hidden" name="order_id" value="{{ p.order_id }}">
     <input type="text" name="title" placeholder="Milestone, e.g. Report due" required>
     <input type="date" name="target_date">
     <button type="submit" class="btn btn-secondary btn-sm">➕ Add milestone</button>
+  </form>
+
+  {% if p.visits %}
+  <ul class="chip-list" style="margin-bottom:10px;">
+    {% for v in p.visits %}
+    <li class="chip">
+      🧑‍💼 Customer on-site {{ v.start_date }}{% if v.end_date and v.end_date != v.start_date %}&ndash;{{ v.end_date }}{% endif %}{% if v.notes %} ({{ v.notes }}){% endif %}
+      <form method="post">
+        <input type="hidden" name="action" value="delete_visit">
+        <input type="hidden" name="visit_id" value="{{ v.id }}">
+        <button type="submit" title="Remove visit" data-confirm="Remove this customer visit?">✕</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="create_visit">
+    <input type="hidden" name="order_id" value="{{ p.order_id }}">
+    <label class="section-help" style="margin:0;">Customer on-site:</label>
+    <input type="date" name="start_date" required>
+    <span class="section-help" style="margin:0;">to</span>
+    <input type="date" name="end_date">
+    <input type="text" name="notes" placeholder="Notes (optional)">
+    <button type="submit" class="btn btn-secondary btn-sm">➕ Add visit</button>
   </form>
 </div>
 {% endfor %}

@@ -10,14 +10,16 @@
   #tab-resources:checked ~ .tabs-body #panel-resources,
   #tab-mappings:checked ~ .tabs-body #panel-mappings,
   #tab-exclusion:checked ~ .tabs-body #panel-exclusion,
-  #tab-templates:checked ~ .tabs-body #panel-templates { display: block; }
+  #tab-templates:checked ~ .tabs-body #panel-templates,
+  #tab-absences:checked ~ .tabs-body #panel-absences { display: block; }
 
   #tab-users:checked ~ .tab-list label[for="tab-users"],
   #tab-capabilities:checked ~ .tab-list label[for="tab-capabilities"],
   #tab-resources:checked ~ .tab-list label[for="tab-resources"],
   #tab-mappings:checked ~ .tab-list label[for="tab-mappings"],
   #tab-exclusion:checked ~ .tab-list label[for="tab-exclusion"],
-  #tab-templates:checked ~ .tab-list label[for="tab-templates"] {
+  #tab-templates:checked ~ .tab-list label[for="tab-templates"],
+  #tab-absences:checked ~ .tab-list label[for="tab-absences"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
@@ -47,6 +49,7 @@
   <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
   <div class="stat-tile"><div class="stat-value">{{ exclusion_groups|length }}</div><div class="stat-label">Exclusion groups</div></div>
   <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ absences|length }}</div><div class="stat-label">Staff absences</div></div>
 </div>
 
 <div class="tabs">
@@ -56,6 +59,7 @@
   <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-exclusion" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-templates" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-absences" class="tab-input">
 
   <div class="tab-list" role="tablist">
     <label for="tab-users" class="tab-label">👤 Users</label>
@@ -63,6 +67,7 @@
     <label for="tab-resources" class="tab-label">🔧 Resources</label>
     <label for="tab-mappings" class="tab-label">🔗 Capability assignments</label>
     <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups</label>
+    <label for="tab-absences" class="tab-label">🌴 Staff absences</label>
     <label for="tab-templates" class="tab-label">📋 Activity templates</label>
   </div>
 
@@ -548,6 +553,75 @@
         <input type="hidden" name="template_id" value="{{ t['id'] }}">
       </form>
       {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="panel-absences">
+      <div class="callout">
+        <strong>What this is:</strong> record a technician's vacation/absence dates so the planner's Schedule tab and dashboard can flag it — a planner scheduling a test on a day a technician is away should see that before it becomes a surprise.
+      </div>
+
+      <div class="card">
+        <div class="card-title">Record a staff absence</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_absence">
+          <div class="field">
+            <label for="new-absence-resource">Technician</label>
+            <select id="new-absence-resource" name="resource_id" required>
+              <option value="">Select a technician</option>
+              {% for r in technician_resources %}
+              <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="new-absence-start">Start date</label>
+            <input type="date" id="new-absence-start" name="start_date" required>
+          </div>
+          <div class="field">
+            <label for="new-absence-end">End date</label>
+            <input type="date" id="new-absence-end" name="end_date" required>
+          </div>
+          <div class="field">
+            <label for="new-absence-reason">Reason</label>
+            <input type="text" id="new-absence-reason" name="reason" placeholder="e.g. Vacation">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Record absence</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Recorded absences</h2></div>
+      {% if absences %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Technician', 'resource_code', 'absences', 'admin.admin_manage') }}
+            {{ macros.sort_th('Start', 'start_date', 'absences', 'admin.admin_manage') }}
+            {{ macros.sort_th('End', 'end_date', 'absences', 'admin.admin_manage') }}
+            {{ macros.sort_th('Reason', 'reason', 'absences', 'admin.admin_manage') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for a in absences %}
+            <tr class="{{ 'dup-row' if a['_dup'] }}">
+              <td>{{ a['resource_code'] }} - {{ a['resource_name'] }}{% if a['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+              <td>{{ a['start_date'] }}</td>
+              <td>{{ a['end_date'] }}</td>
+              <td>{{ a['reason'] or '—' }}</td>
+              <td>
+                <form method="post">
+                  <input type="hidden" name="action" value="delete_absence">
+                  <input type="hidden" name="absence_id" value="{{ a['id'] }}">
+                  <button type="submit" class="btn btn-danger btn-sm" data-confirm="Delete this absence record?">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🌴</span>No absences recorded yet.</div>
+      {% endif %}
     </section>
   </div>
 </div>

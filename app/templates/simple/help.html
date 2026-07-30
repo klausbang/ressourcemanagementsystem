@@ -22,6 +22,7 @@
   <li>Manage user accounts and their role (admin or planner).</li>
   <li>If two facility resources are really the same shared physical chamber, put them in the same exclusion group so the system can flag or block overlapping activities.</li>
   <li>Maintain reusable activity templates (e.g. "Standard EMC Test Sequence") &mdash; an ordered list of standard activities that a planner can apply to an order/EUT to bulk-create its test activities in one step.</li>
+  <li>Record a technician's vacation/absence dates &mdash; the planner's Schedule tab and dashboard will flag it automatically.</li>
 </ol>
 
 <h3>Planner Workflow</h3>
@@ -30,7 +31,7 @@
   <li>If the order involves more than one physical unit, add each as an EUT (Equipment/Unit Under Test) &mdash; this is optional and can be left out for a simple, single-unit order.</li>
   <li>Add one or more ordered tests to that order, each optionally requiring a capability and optionally tagged to the EUT it belongs to &mdash; or apply an activity template to bulk-create a whole standard sequence in one step, then reorder or add/remove activities per project as needed.</li>
   <li>Assign resources to each ordered test. A test can have <strong>several</strong> resources assigned at once (e.g. equipment, facility, and a technician together) &mdash; only resources with the test's required capability are offered, and the same resource cannot be assigned twice to the same test.</li>
-  <li>Check the Dashboard for an overview of every active project: its status and per-discipline status (generated from the underlying activities, not typed in separately), any live resource conflicts, activities still missing a work order or a test procedure, and upcoming milestones. The weekly note and "waiting for customer" flag are the only things set by hand there.</li>
+  <li>Check the Dashboard for an overview of every active project: its status and per-discipline status (generated from the underlying activities, not typed in separately), any live resource conflicts, activities still missing a work order or a test procedure, upcoming milestones, and customer on-site visits. The weekly note, "waiting for customer" flag, and customer visits are the only things set by hand there.</li>
 </ol>
 
 <h3>Table Features</h3>

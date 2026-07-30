@@ -28,6 +28,9 @@ EXCLUSION_GROUP_DUP_KEYS = ["name", "notes"]
 TEMPLATE_SORTABLE_KEYS = {"name", "notes"}
 TEMPLATE_DUP_KEYS = ["name", "notes"]
 
+ABSENCE_SORTABLE_KEYS = {"resource_code", "resource_name", "start_date", "end_date", "reason"}
+ABSENCE_DUP_KEYS = ["resource_code", "start_date", "end_date"]
+
 
 def _load_admin_context(db) -> dict:
     users = rows_with_meta(
@@ -123,6 +126,22 @@ def _load_admin_context(db) -> dict:
     for template in templates:
         template["items"] = items_by_template.get(template["id"], [])
 
+    absences = rows_with_meta(
+        db.execute(
+            """
+            SELECT a.id, a.resource_id, r.code AS resource_code, r.name AS resource_name,
+                   a.start_date, a.end_date, a.reason
+            FROM staff_absences a
+            JOIN resources r ON r.id = a.resource_id
+            ORDER BY a.start_date
+            """
+        ).fetchall(),
+        dup_keys=ABSENCE_DUP_KEYS,
+        sort_key=request.args.get("absences_sort"),
+        sort_dir=request.args.get("absences_dir", "asc"),
+        sortable_keys=ABSENCE_SORTABLE_KEYS,
+    )
+
     return {
         "users": users,
         "resources": resources,
@@ -131,6 +150,7 @@ def _load_admin_context(db) -> dict:
         "technician_resources": technician_resources,
         "exclusion_groups": exclusion_groups,
         "templates": templates,
+        "absences": absences,
     }
 
 
@@ -517,6 +537,30 @@ def admin_manage():
                     )
                     db.commit()
                     flash("Activity reordered.", "info")
+
+        elif action == "create_absence":
+            resource_id = request.form.get("resource_id", "").strip()
+            start_date = request.form.get("start_date", "").strip()
+            end_date = request.form.get("end_date", "").strip()
+            reason = request.form.get("reason", "").strip() or None
+
+            if not (resource_id and start_date and end_date):
+                flash("Technician, start date, and end date are required.", "error")
+            elif end_date < start_date:
+                flash("End date cannot be before start date.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO staff_absences (resource_id, start_date, end_date, reason) VALUES (?, ?, ?, ?)",
+                    (resource_id, start_date, end_date, reason),
+                )
+                db.commit()
+                flash("Absence recorded.", "info")
+
+        elif action == "delete_absence":
+            absence_id = request.form.get("absence_id", "").strip()
+            db.execute("DELETE FROM staff_absences WHERE id = ?", (absence_id,))
+            db.commit()
+            flash("Absence deleted.", "info")
 
         return redirect(url_for("admin.admin_manage"))
 

@@ -69,6 +69,24 @@ CREATE TABLE IF NOT EXISTS milestones (
     FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS staff_absences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    reason TEXT,
+    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS customer_visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    notes TEXT,
+    FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS euts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,
@@ -458,6 +476,9 @@ def init_demo_seed() -> None:
 
     _seed_milestone(db, "ORD-2026-002", "Draft report to customer", "2026-08-10")
     _seed_milestone(db, "ORD-2026-003", "Final report due", "2026-08-05")
+
+    _seed_staff_absence(db, "TECH-102", "2026-08-04", "2026-08-06", "Summer vacation")
+    _seed_customer_visit(db, "ORD-2026-003", "2026-08-03", "2026-08-03", "Customer on-site to observe CE/CI testing.")
 
     _seed_eut(db, "ORD-2026-002", "Prototype Unit A", "SN-88213-004")
     _seed_eut(db, "ORD-2026-002", "Prototype Unit B", "SN-88213-005")
@@ -907,6 +928,42 @@ def _seed_milestone(db: sqlite3.Connection, order_code: str, title: str, target_
           AND NOT EXISTS (SELECT 1 FROM milestones m WHERE m.order_id = o.id AND m.title = ?)
         """,
         (title, target_date, order_code, title),
+    )
+
+
+def _seed_staff_absence(
+    db: sqlite3.Connection, resource_code: str, start_date: str, end_date: str, reason: str
+) -> None:
+    db.execute(
+        """
+        INSERT INTO staff_absences (resource_id, start_date, end_date, reason)
+        SELECT r.id, ?, ?, ?
+        FROM resources r
+        WHERE r.code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM staff_absences a
+              WHERE a.resource_id = r.id AND a.start_date = ? AND a.end_date = ?
+          )
+        """,
+        (start_date, end_date, reason, resource_code, start_date, end_date),
+    )
+
+
+def _seed_customer_visit(
+    db: sqlite3.Connection, order_code: str, start_date: str, end_date: str, notes: str
+) -> None:
+    db.execute(
+        """
+        INSERT INTO customer_visits (order_id, start_date, end_date, notes)
+        SELECT o.id, ?, ?, ?
+        FROM customer_orders o
+        WHERE o.order_code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM customer_visits v
+              WHERE v.order_id = o.id AND v.start_date = ? AND v.end_date = ?
+          )
+        """,
+        (start_date, end_date, notes, order_code, start_date, end_date),
     )
 
 

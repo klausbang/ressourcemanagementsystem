@@ -180,6 +180,34 @@ def _load_schedule_context(db) -> dict:
                 conflicts.append(b)
         a["conflicts_with"] = conflicts
 
+    view_day_iso = view_day.isoformat()
+    absences_today = [
+        dict(row)
+        for row in db.execute(
+            """
+            SELECT r.code AS resource_code, r.name AS resource_name, a.reason
+            FROM staff_absences a
+            JOIN resources r ON r.id = a.resource_id
+            WHERE a.start_date <= ? AND a.end_date >= ?
+            ORDER BY r.code
+            """,
+            (view_day_iso, view_day_iso),
+        ).fetchall()
+    ]
+    visits_today = [
+        dict(row)
+        for row in db.execute(
+            """
+            SELECT o.order_code, o.customer_name, v.notes
+            FROM customer_visits v
+            JOIN customer_orders o ON o.id = v.order_id
+            WHERE v.start_date <= ? AND v.end_date >= ?
+            ORDER BY o.order_code
+            """,
+            (view_day_iso, view_day_iso),
+        ).fetchall()
+    ]
+
     return {
         "view_day": view_day,
         "window_slot_count": SCHEDULE_WINDOW_HOURS,
@@ -190,6 +218,8 @@ def _load_schedule_context(db) -> dict:
         "sched_next": (view_day + timedelta(days=1)).isoformat(),
         "sched_today": date.today().isoformat(),
         "is_schedule_tab": bool(request.args.get("sched_start")),
+        "absences_today": absences_today,
+        "visits_today": visits_today,
     }
 
 
@@ -740,6 +770,35 @@ def _load_dashboard_context(db) -> dict:
     for row in milestone_rows:
         milestones_by_order.setdefault(row["order_id"], []).append(dict(row))
 
+    visit_rows = db.execute(
+        """
+        SELECT v.id, v.order_id, v.start_date, v.end_date, v.notes, o.order_code
+        FROM customer_visits v
+        JOIN customer_orders o ON o.id = v.order_id
+        ORDER BY v.start_date
+        """
+    ).fetchall()
+    visits_by_order: dict[int, list] = {}
+    for row in visit_rows:
+        visits_by_order.setdefault(row["order_id"], []).append(dict(row))
+
+    today = date.today().isoformat()
+    horizon = (date.today() + timedelta(days=14)).isoformat()
+    upcoming_absences = [
+        dict(row)
+        for row in db.execute(
+            """
+            SELECT a.id, r.code AS resource_code, r.name AS resource_name,
+                   a.start_date, a.end_date, a.reason
+            FROM staff_absences a
+            JOIN resources r ON r.id = a.resource_id
+            WHERE a.end_date >= ? AND a.start_date <= ?
+            ORDER BY a.start_date
+            """,
+            (today, horizon),
+        ).fetchall()
+    ]
+
     result_projects = []
     for order_id, proj in projects.items():
         activities = proj.pop("activities")
@@ -789,13 +848,18 @@ def _load_dashboard_context(db) -> dict:
         proj["total_activities"] = total
         proj["has_conflict"] = order_id in conflicted_order_ids
         proj["milestones"] = milestones_by_order.get(order_id, [])
+        proj["visits"] = visits_by_order.get(order_id, [])
         result_projects.append(proj)
 
     result_projects.sort(key=lambda p: p["order_code"])
     active_projects = [p for p in result_projects if p["computed_status"] != "Completed"]
     completed_projects = [p for p in result_projects if p["computed_status"] == "Completed"]
 
-    return {"active_projects": active_projects, "completed_projects": completed_projects}
+    return {
+        "active_projects": active_projects,
+        "completed_projects": completed_projects,
+        "upcoming_absences": upcoming_absences,
+    }
 
 
 @bp.route("/dashboard", methods=["GET", "POST"])
@@ -841,6 +905,32 @@ def dashboard():
             db.execute("DELETE FROM milestones WHERE id = ?", (milestone_id,))
             db.commit()
             flash("Milestone deleted.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "create_visit":
+            order_id = request.form.get("order_id", "").strip()
+            start_date = request.form.get("start_date", "").strip()
+            end_date = request.form.get("end_date", "").strip() or start_date
+            notes = request.form.get("notes", "").strip() or None
+
+            if not (order_id and start_date):
+                flash("Order and start date are required.", "error")
+            elif end_date < start_date:
+                flash("End date cannot be before start date.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO customer_visits (order_id, start_date, end_date, notes) VALUES (?, ?, ?, ?)",
+                    (order_id, start_date, end_date, notes),
+                )
+                db.commit()
+                flash("Customer visit recorded.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "delete_visit":
+            visit_id = request.form.get("visit_id", "").strip()
+            db.execute("DELETE FROM customer_visits WHERE id = ?", (visit_id,))
+            db.commit()
+            flash("Customer visit deleted.", "info")
             return redirect(url_for("planner.dashboard"))
 
     context = _load_dashboard_context(db)
