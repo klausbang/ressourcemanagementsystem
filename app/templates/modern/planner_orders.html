@@ -7,11 +7,13 @@
 <style>
   #tab-orders:checked ~ .tabs-body #panel-orders,
   #tab-tests:checked ~ .tabs-body #panel-tests,
-  #tab-assign:checked ~ .tabs-body #panel-assign { display: block; }
+  #tab-assign:checked ~ .tabs-body #panel-assign,
+  #tab-schedule:checked ~ .tabs-body #panel-schedule { display: block; }
 
   #tab-orders:checked ~ .tab-list label[for="tab-orders"],
   #tab-tests:checked ~ .tab-list label[for="tab-tests"],
-  #tab-assign:checked ~ .tab-list label[for="tab-assign"] {
+  #tab-assign:checked ~ .tab-list label[for="tab-assign"],
+  #tab-schedule:checked ~ .tab-list label[for="tab-schedule"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
@@ -35,14 +37,16 @@
 </div>
 
 <div class="tabs">
-  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" checked>
+  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" {{ 'checked' if not is_schedule_tab }}>
   <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input">
   <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input">
+  <input type="radio" name="planner-tabs" id="tab-schedule" class="tab-input" {{ 'checked' if is_schedule_tab }}>
 
   <div class="tab-list" role="tablist">
     <label for="tab-orders" class="tab-label">🗂️ Customer orders</label>
     <label for="tab-tests" class="tab-label">🧪 Ordered tests</label>
     <label for="tab-assign" class="tab-label">🔧 Resource assignment</label>
+    <label for="tab-schedule" class="tab-label">📅 Schedule</label>
   </div>
 
   <div class="tabs-body">
@@ -255,6 +259,95 @@
       {% endfor %}
       {% else %}
       <div class="empty-state"><span class="icon">🔧</span>No ordered tests to assign resources to yet.</div>
+      {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-schedule">
+      <div class="callout">
+        <strong>Reading the chart:</strong> each column is a one-hour slot for the selected day. A bar spans a work order's actual start (or scheduled date, defaulted to 08:00 if no time is recorded yet) through its completion time. In-progress and on-hold work orders without a completion time are drawn running up to the current hour. Tests with no work order yet can't be placed on the chart — they're listed below instead.
+      </div>
+
+      <div class="gantt-toolbar">
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_prev) }}">&larr; Previous day</a>
+        <span class="gantt-range">{{ view_day.strftime('%A, %b %d, %Y') }}</span>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today) }}">Today</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_next) }}">Next day &rarr;</a>
+      </div>
+
+      <div class="gantt-legend">
+        <span class="legend-item"><span class="legend-swatch status-planned"></span>Planned</span>
+        <span class="legend-item"><span class="legend-swatch status-in_progress"></span>In progress</span>
+        <span class="legend-item"><span class="legend-swatch status-on_hold"></span>On hold</span>
+        <span class="legend-item"><span class="legend-swatch status-completed"></span>Completed</span>
+      </div>
+
+      {% if schedule_rows %}
+      <div class="table-wrap gantt-wrap">
+        <table class="modern-table gantt-table">
+          <thead>
+            <tr>
+              <th class="gantt-label-col">Test</th>
+              {% for h in schedule_hours %}
+              <th class="gantt-hour-col {{ 'current' if h.is_current }}" title="{{ h.label }}:00">
+                <div class="gantt-hnum">{{ h.label }}</div>
+              </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in schedule_rows %}
+            <tr>
+              <td class="gantt-label-col">
+                <div class="test-card-title" style="font-size:0.85rem;">{{ item.order_code }} &middot; {{ item.test_name }}</div>
+                <div class="test-card-meta">{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}</div>
+              </td>
+              {% for i in range(item.col_offset) %}<td></td>{% endfor %}
+              <td colspan="{{ item.col_span }}" class="gantt-bar status-{{ item.wo_status }}"
+                  title="{{ item.work_order_code }} - {{ item.wo_status }}{% if item.result %} ({{ item.result }}){% endif %}">
+                {{ item.work_order_code }}{% if item.clipped_before %} &laquo;{% endif %}{% if item.clipped_after %} &raquo;{% endif %}
+              </td>
+              {% for i in range(window_slot_count - item.col_offset - item.col_span) %}<td></td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">📅</span>No work orders fall on this day. Use the navigation above to look at a different day.</div>
+      {% endif %}
+
+      <div class="section-head" style="margin-top:24px;"><h2>Not yet scheduled</h2></div>
+      {% if unscheduled_tests %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            <th>Order</th>
+            <th>Test</th>
+            <th>Capability</th>
+            <th>Allocated resources</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>
+            {% for item in unscheduled_tests %}
+            <tr>
+              <td>{{ item.order_code }} &middot; {{ item.customer_name }}</td>
+              <td>{{ item.test_name }}</td>
+              <td>{{ item.capability_name or '—' }}</td>
+              <td>
+                {% if item.assigned_resources %}
+                {% for r in item.assigned_resources %}<span class="badge badge-type">{{ r.code }}</span>{% endfor %}
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if item.work_order_id %}No dates recorded yet on {{ item.work_order_code }}{% else %}No work order yet{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">✅</span>Every ordered test either has a scheduled work order or is shown on the chart above.</div>
       {% endif %}
     </section>
   </div>

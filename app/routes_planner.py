@@ -1,3 +1,6 @@
+import math
+from datetime import date, datetime, time, timedelta
+
 from flask import Blueprint, flash, redirect, request, session, url_for
 
 from .db import get_db, init_db
@@ -14,6 +17,144 @@ TEST_DUP_KEYS = ["order_code", "test_name", "capability_name"]
 
 ALLOC_SORTABLE_KEYS = {"order_code", "customer_name", "test_name", "capability_name", "allocated_summary"}
 ALLOC_DUP_KEYS = ["order_code", "customer_name", "test_name", "capability_name", "allocated_summary"]
+
+SCHEDULE_WINDOW_HOURS = 24
+SCHEDULE_DEFAULT_HOUR = 8  # assumed start-of-shift time when only a scheduled_date (no time) is known
+
+
+def _parse_date_only(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value.split(" ")[0], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value.strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _schedule_view_day() -> date:
+    """The day being viewed, from the ?sched_start=YYYY-MM-DD query param."""
+    return _parse_date_only(request.args.get("sched_start")) or date.today()
+
+
+def _load_schedule_context(db) -> dict:
+    view_day = _schedule_view_day()
+    window_start = datetime.combine(view_day, time.min)
+    window_end = window_start + timedelta(hours=SCHEDULE_WINDOW_HOURS)
+    now = datetime.now()
+
+    hours = []
+    for i in range(SCHEDULE_WINDOW_HOURS):
+        slot_start = window_start + timedelta(hours=i)
+        hours.append(
+            {
+                "hour": slot_start.hour,
+                "label": f"{slot_start.hour:02d}",
+                "is_current": view_day == now.date() and slot_start.hour == now.hour,
+            }
+        )
+
+    raw = db.execute(
+        """
+        SELECT
+            ot.id AS ordered_test_id,
+            o.order_code, o.customer_name, o.product_name,
+            ot.test_name,
+            c.name AS capability_name,
+            wo.id AS work_order_id, wo.work_order_code, wo.status AS wo_status,
+            wo.scheduled_date, wo.started_at, wo.completed_at, wo.result,
+            tech.username AS technician_username
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN capabilities c ON c.id = ot.required_capability_id
+        LEFT JOIN work_orders wo ON wo.ordered_test_id = ot.id
+        LEFT JOIN users tech ON tech.id = wo.technician_user_id
+        ORDER BY o.order_code, ot.id
+        """
+    ).fetchall()
+
+    allocation_rows = db.execute(
+        """
+        SELECT a.ordered_test_id, r.code, r.name, r.resource_type
+        FROM allocations a
+        JOIN resources r ON r.id = a.resource_id
+        ORDER BY a.ordered_test_id, r.code
+        """
+    ).fetchall()
+    resources_by_test: dict[int, list] = {}
+    for row in allocation_rows:
+        resources_by_test.setdefault(row["ordered_test_id"], []).append(dict(row))
+
+    visible_rows = []
+    unscheduled = []
+
+    for row in raw:
+        item = dict(row)
+        item["assigned_resources"] = resources_by_test.get(item["ordered_test_id"], [])
+
+        if not item["work_order_id"]:
+            unscheduled.append(item)
+            continue
+
+        bar_start = _parse_datetime(item["started_at"])
+        if bar_start is None:
+            sd = _parse_date_only(item["scheduled_date"])
+            if sd:
+                bar_start = datetime.combine(sd, time(SCHEDULE_DEFAULT_HOUR, 0))
+
+        if bar_start is None:
+            unscheduled.append(item)
+            continue
+
+        bar_end = _parse_datetime(item["completed_at"])
+        if bar_end is None:
+            if item["wo_status"] in ("in_progress", "on_hold"):
+                bar_end = now
+            else:
+                bar_end = bar_start + timedelta(hours=1)
+        if bar_end <= bar_start:
+            bar_end = bar_start + timedelta(hours=1)
+
+        if bar_end <= window_start or bar_start >= window_end:
+            continue  # entirely outside the visible day; reachable via prev/next
+
+        clipped_start = max(bar_start, window_start)
+        clipped_end = min(bar_end, window_end)
+
+        start_offset = int((clipped_start - window_start).total_seconds() // 3600)
+        end_offset = math.ceil((clipped_end - window_start).total_seconds() / 3600)
+        start_offset = max(0, min(start_offset, SCHEDULE_WINDOW_HOURS - 1))
+        end_offset = max(start_offset + 1, min(end_offset, SCHEDULE_WINDOW_HOURS))
+
+        item["col_offset"] = start_offset
+        item["col_span"] = end_offset - start_offset
+        item["clipped_before"] = clipped_start > bar_start
+        item["clipped_after"] = clipped_end < bar_end
+        visible_rows.append(item)
+
+    visible_rows.sort(key=lambda r: (r["col_offset"], r["order_code"]))
+
+    return {
+        "view_day": view_day,
+        "window_slot_count": SCHEDULE_WINDOW_HOURS,
+        "schedule_hours": hours,
+        "schedule_rows": visible_rows,
+        "unscheduled_tests": unscheduled,
+        "sched_prev": (view_day - timedelta(days=1)).isoformat(),
+        "sched_next": (view_day + timedelta(days=1)).isoformat(),
+        "sched_today": date.today().isoformat(),
+        "is_schedule_tab": bool(request.args.get("sched_start")),
+    }
 
 
 def _load_planner_context(db) -> dict:
@@ -110,13 +251,15 @@ def _load_planner_context(db) -> dict:
 
     capabilities = db.execute("SELECT id, name FROM capabilities ORDER BY name").fetchall()
 
-    return {
+    context = {
         "tests": tests,
         "ordered_tests_rows": ordered_tests_rows,
         "by_capability": by_capability,
         "orders": orders,
         "capabilities": capabilities,
     }
+    context.update(_load_schedule_context(db))
+    return context
 
 
 def _render_planner_orders(db, order_form_values=None, order_form_errors=None):
