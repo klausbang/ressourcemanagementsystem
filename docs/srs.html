@@ -124,17 +124,18 @@ Project (customer_orders)
         <li><strong>FR-RES-2</strong> [Must, Delivered - Phase 3]: The system shall allow administrators full CRUD on user accounts, capabilities, and resources, and to assign/unassign capabilities on a resource.</li>
         <li><strong>FR-RES-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners to assign multiple resources to the same test activity (e.g. equipment, facility, procedure, and technician together), provided each has the activity's required capability, and to unassign any one independently.</li>
         <li><strong>FR-RES-4</strong> [Must, Delivered - Phase 3]: The system shall prevent the same resource being assigned twice to the same test activity, and prevent deletion of a capability/resource/user still referenced elsewhere, reporting a clear reason.</li>
-        <li><strong>FR-RES-5</strong> [Should, Planned - Phase 9]: A facility/equipment resource shall be able to record which site (TLC or TLS) it is currently at, since some equipment is shared and physically moves between the two labs.</li>
+        <li><strong>FR-RES-5</strong> [Should, Delivered - Phase 9]: A facility/equipment resource shall be able to record which site (TLC or TLS) it is at.</li>
       </ul>
 
       <h3>8.4 Constraints (FR-CON)</h3>
       <p><strong>BR-003</strong> (continued): Some resources physically cannot serve two activities at once, and this must be enforced by the system rather than relied on from memory. This is the chapter the customer's consultant flagged as likely to become one of the most important.</p>
       <ul>
-        <li><strong>FR-CON-1</strong> [Must, Planned - Phase 9]: The system shall let an administrator define mutual-exclusion groups of facility resources (e.g. "CON chamber: CE/CI" and "SAC chamber: RE/RI") such that two activities in the same group cannot be scheduled with overlapping time windows.</li>
-        <li><strong>FR-CON-2</strong> [Must, Planned - Phase 9]: When a planner schedules or reschedules an activity into a time window that conflicts with another activity in the same exclusion group (or the same specific piece of equipment/facility, exclusion group or not), the system shall block the change and explain which activity it conflicts with, rather than silently double-booking.</li>
-        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 9]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
+        <li><strong>FR-CON-1</strong> [Must, Delivered - Phase 9]: The system shall let an administrator define mutual-exclusion groups of facility resources (e.g. "CON chamber: CE/CI" and "SAC chamber: RE/RI") such that two activities in the same group are treated as sharing one physical resource for conflict purposes.</li>
+        <li><strong>FR-CON-2</strong> [Must, Delivered - Phase 9]: The system shall block starting or resuming a work order if doing so would run it at the same time as another work order that is already in progress and shares a resource or exclusion group with it, and shall explain which work order/activity it conflicts with.</li>
+        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 14]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
         <li><strong>FR-CON-4</strong> [Could, Planned - Phase 14]: The system shall let a facility reservation span multiple consecutive days (e.g. a multi-day climate-chamber soak) as a single booking rather than one row per day.</li>
-        <li><strong>AC-FR-CON-2.1:</strong> Given RE is scheduled in the SAC chamber from 09:00-12:00, when a planner attempts to schedule RI in the SAC chamber from 10:00-11:00 the same day, then the system rejects the booking and states the conflicting activity and time.</li>
+        <li><strong>AC-FR-CON-2.1:</strong> Given RE's work order is in_progress in the SAC chamber, when a technician attempts to start or resume RI's work order (a different facility resource in the same "SAC Chamber (TLS)" exclusion group), then the system rejects the action and states which work order/activity it conflicts with.</li>
+        <li><strong>Design note (scope of FR-CON-2):</strong> a work order's scheduled_date carries no time-of-day, so the block is applied at the point precision actually exists &mdash; the transition into "in progress" &mdash; rather than at creation-time scheduling, which would only support coarse same-day checks. The planner's Schedule/Gantt view (FR-PLN-3) additionally flags overlaps that arise after the fact (e.g. a test overrunning into the next one's actual start), as a passive check the hard block at start-time can't catch.</li>
       </ul>
 
       <h3>8.5 Calendar (FR-CAL)</h3>
@@ -157,7 +158,7 @@ Project (customer_orders)
       <ul>
         <li><strong>FR-PLN-1</strong> [Must, Delivered - Phase 3]: Every test activity shall be plannable by assigning it resources (equipment, facility, procedure, technician).</li>
         <li><strong>FR-PLN-2</strong> [Should, Delivered - Phase 7 (WIP)]: The system shall provide a day-view production schedule showing each work order as a time-blocked bar against the resources/technician assigned to it, navigable by day.</li>
-        <li><strong>FR-PLN-3</strong> [Should, Planned - Phase 9]: The schedule view shall display constraint conflicts (see 8.4) inline rather than requiring a separate check.</li>
+        <li><strong>FR-PLN-3</strong> [Should, Delivered - Phase 9]: The schedule view shall display constraint conflicts (see 8.4) inline rather than requiring a separate check.</li>
         <li><strong>Design note:</strong> the customer's spreadsheet plans in 2-hour blocks because that suits Excel's grid. RMS stores actual start/end timestamps internally (minute resolution) and only uses fixed blocks for the visual grid, so finer-grained scheduling is possible later without a data model change.</li>
       </ul>
 
@@ -218,7 +219,7 @@ Project (customer_orders)
         <li>Store test procedures and their ordered check-items (description + expected value).</li>
         <li>Store work orders (one per test activity) with lifecycle status, schedule/execution timestamps, and result.</li>
         <li>Store test reports (one per work order) with unit-under-test identification, snapshotted report steps, overall result, notes, and technician/reviewer sign-off fields.</li>
-        <li>From Phase 9: mutual-exclusion group membership for facility resources, and a site field on facility/equipment resources.</li>
+        <li>From Phase 9 (delivered): mutual-exclusion groups and their facility-resource membership, and a site field on resources.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -256,12 +257,12 @@ Project (customer_orders)
           <tr><td>3-4</td><td>Resource/capability setup, order allocation</td><td>FR-PRJ-1, FR-RES-1..4, FR-PLN-1, FR-RSC-1</td><td>Delivered</td></tr>
           <tr><td>7</td><td>Technician workflow, test reports, schedule view</td><td>FR-STA-1, FR-PLN-2, FR-RPT-1..5, FR-USE-2..3</td><td>Delivered</td></tr>
           <tr><td>8</td><td>EUT as a first-class entity; public landing page; role-based home routing</td><td>FR-PRJ-2, FR-TP-1..3, FR-USE-4, FR-USE-5</td><td>Delivered</td></tr>
-          <tr><td>9</td><td>Lab/equipment mutual-exclusion constraints</td><td>FR-RES-5, FR-CON-1..3, FR-PLN-3</td><td>Planned</td></tr>
+          <tr><td>9</td><td>Lab/equipment mutual-exclusion constraints</td><td>FR-RES-5, FR-CON-1..2, FR-PLN-3</td><td>Delivered</td></tr>
           <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Planned</td></tr>
           <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Planned</td></tr>
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Planned</td></tr>
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Planned</td></tr>
-          <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
+          <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
         </tbody>
       </table>
     </section>
@@ -272,6 +273,8 @@ Project (customer_orders)
         <li>Assumed: a test activity's optional EUT reference does not become mandatory in Phase 8, so existing single-EUT projects keep working without data migration of existing rows. Revisit once multi-EUT usage is confirmed as the common case. See also <a href="ai-questions.html">AI Questions and Priorities</a> for the running list of business-rule questions (conflict handling detail, capacity limits, priority rules) raised during Phase 1 and still open.</li>
         <li>Open: should the project (not the EUT) remain the primary planning unit for very small single-EUT orders? See Section 2's design note.</li>
         <li>Open: is a spreadsheet/PDF export (FR-INT-1) actually needed, or does customer-facing reporting stay inside RMS?</li>
+        <li>Assumed (Phase 9): the confirmed exclusion-group examples are "CON chamber: CE/CI" and "SAC chamber: RE/RI"; is this the complete list, or are there other shared facilities/equipment we haven't heard about yet?</li>
+        <li>Open: should FR-CON-2's block also apply at creation-time scheduling (same-day, coarse) rather than only at the in-progress transition, once the team has an opinion on how often two conflicting activities get scheduled for the same day without anyone noticing before start time?</li>
       </ul>
     </section>
   </main>

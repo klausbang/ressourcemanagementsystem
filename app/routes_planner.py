@@ -88,7 +88,7 @@ def _load_schedule_context(db) -> dict:
 
     allocation_rows = db.execute(
         """
-        SELECT a.ordered_test_id, r.code, r.name, r.resource_type
+        SELECT a.ordered_test_id, r.id AS resource_id, r.code, r.name, r.resource_type
         FROM allocations a
         JOIN resources r ON r.id = a.resource_id
         ORDER BY a.ordered_test_id, r.code
@@ -97,6 +97,17 @@ def _load_schedule_context(db) -> dict:
     resources_by_test: dict[int, list] = {}
     for row in allocation_rows:
         resources_by_test.setdefault(row["ordered_test_id"], []).append(dict(row))
+
+    groups_by_resource: dict[int, set] = {}
+    for row in db.execute("SELECT group_id, resource_id FROM exclusion_group_resources").fetchall():
+        groups_by_resource.setdefault(row["resource_id"], set()).add(row["group_id"])
+
+    def _resources_conflict(res_ids_a: set, res_ids_b: set) -> bool:
+        if res_ids_a & res_ids_b:
+            return True
+        groups_a = set().union(*(groups_by_resource.get(rid, set()) for rid in res_ids_a)) if res_ids_a else set()
+        groups_b = set().union(*(groups_by_resource.get(rid, set()) for rid in res_ids_b)) if res_ids_b else set()
+        return bool(groups_a & groups_b)
 
     visible_rows = []
     unscheduled = []
@@ -143,9 +154,30 @@ def _load_schedule_context(db) -> dict:
         item["col_span"] = end_offset - start_offset
         item["clipped_before"] = clipped_start > bar_start
         item["clipped_after"] = clipped_end < bar_end
+        item["_bar_start"] = bar_start
+        item["_bar_end"] = bar_end
         visible_rows.append(item)
 
     visible_rows.sort(key=lambda r: (r["col_offset"], r["order_code"]))
+
+    # Flag lab/equipment mutual-exclusion conflicts (Phase 9): two different ordered
+    # tests, both visible today, whose resources collide (same resource, or two
+    # resources in the same admin-defined exclusion group) and whose actual/inferred
+    # time windows overlap. This is a passive safety net on top of the hard block at
+    # work-order start/resume time (app/scheduling.py) - it also catches conflicts
+    # that only appear later, e.g. a test overrunning into the next one's slot.
+    for a in visible_rows:
+        a_res_ids = {r["resource_id"] for r in a["assigned_resources"]}
+        conflicts = []
+        for b in visible_rows:
+            if b["ordered_test_id"] == a["ordered_test_id"]:
+                continue
+            b_res_ids = {r["resource_id"] for r in b["assigned_resources"]}
+            if not _resources_conflict(a_res_ids, b_res_ids):
+                continue
+            if a["_bar_start"] < b["_bar_end"] and b["_bar_start"] < a["_bar_end"]:
+                conflicts.append(b)
+        a["conflicts_with"] = conflicts
 
     return {
         "view_day": view_day,

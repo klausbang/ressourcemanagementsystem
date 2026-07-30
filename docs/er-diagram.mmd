@@ -30,6 +30,8 @@ erDiagram
     users ||--o{ test_reports : "technician_user_id"
     users ||--o{ test_reports : "reviewer_user_id"
     test_reports ||--o{ report_steps : "report_id"
+    exclusion_groups ||--o{ exclusion_group_resources : "group_id"
+    resources ||--o{ exclusion_group_resources : "resource_id"
 
     users {
         int id PK
@@ -44,6 +46,18 @@ erDiagram
         string name
         string resource_type
         string status "default available"
+        string site "optional, e.g. TLC|TLS"
+    }
+
+    exclusion_groups {
+        int id PK
+        string name UK
+        string notes
+    }
+
+    exclusion_group_resources {
+        int group_id PK "also FK -> exclusion_groups.id"
+        int resource_id PK "also FK -> resources.id"
     }
 
     capabilities {

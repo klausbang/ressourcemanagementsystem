@@ -24,7 +24,22 @@ CREATE TABLE IF NOT EXISTS resources (
     code TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     resource_type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'available'
+    status TEXT NOT NULL DEFAULT 'available',
+    site TEXT
+);
+
+CREATE TABLE IF NOT EXISTS exclusion_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS exclusion_group_resources (
+    group_id INTEGER NOT NULL,
+    resource_id INTEGER NOT NULL,
+    PRIMARY KEY (group_id, resource_id),
+    FOREIGN KEY (group_id) REFERENCES exclusion_groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS resource_capabilities (
@@ -273,11 +288,27 @@ def _migrate_ordered_tests_table(db: sqlite3.Connection) -> None:
         db.execute("PRAGMA foreign_keys = ON")
 
 
+def _migrate_resources_table(db: sqlite3.Connection) -> None:
+    """Upgrade a resources table created before the optional site column existed."""
+    if not _table_exists(db, "resources"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(resources)").fetchall()}
+    if "site" in columns:
+        return
+
+    # A plain ADD COLUMN is enough here: site is nullable with no CHECK/FK/default,
+    # so SQLite can add it in place without a table rebuild.
+    db.execute("ALTER TABLE resources ADD COLUMN site TEXT")
+    db.commit()
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
     db.executescript(SCHEMA_SQL)
     _migrate_ordered_tests_table(db)
+    _migrate_resources_table(db)
     db.commit()
 
 
@@ -292,15 +323,24 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Multimeter Calibration", "Ability to calibrate multimeters"))
     db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Vibration Test", "Ability to run vibration tests"))
     db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("Humidity Test", "Ability to run humidity tests"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("CE", "Conducted Emissions"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("CI", "Conducted Immunity"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("RE", "Radiated Emissions"))
+    db.execute("INSERT OR IGNORE INTO capabilities (name, description) VALUES (?, ?)", ("RI", "Radiated Immunity"))
 
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-001", "Multimeter Calibrator A", "equipment", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-020", "Vibration Tester V-9", "equipment", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("FAC-004", "Humidity Chamber Room B", "facility", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-102", "Maya Jensen", "technician", "available"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-103", "Sam Ibrahim", "technician", "available"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-010", "CON Chamber - CE Setup", "facility", "available", "TLC"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-011", "CON Chamber - CI Setup", "facility", "available", "TLC"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-012", "SAC Chamber - RE Setup", "facility", "available", "TLS"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-013", "SAC Chamber - RI Setup", "facility", "available", "TLS"))
 
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-001", "Acme Instruments", "Multimeter"))
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
+    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-003", "Contoso Labs", "IoT Gateway"))
 
     _seed_eut(db, "ORD-2026-002", "Prototype Unit A", "SN-88213-004")
     _seed_eut(db, "ORD-2026-002", "Prototype Unit B", "SN-88213-005")
@@ -373,6 +413,30 @@ def init_demo_seed() -> None:
     """, ("Vibration Test", "Vibration Test", "ORD-2026-002", "Vibration Test"))
 
     db.execute("""
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
+        SELECT o.id, ?, c.id
+        FROM customer_orders o
+        JOIN capabilities c ON c.name = ?
+        WHERE o.order_code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("CE", "CE", "ORD-2026-003", "CE"))
+
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
+        SELECT o.id, ?, c.id
+        FROM customer_orders o
+        JOIN capabilities c ON c.name = ?
+        WHERE o.order_code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("CI", "CI", "ORD-2026-003", "CI"))
+
+    db.execute("""
         INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
         SELECT r.id, c.id
         FROM resources r
@@ -400,7 +464,39 @@ def init_demo_seed() -> None:
         INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
         SELECT r.id, c.id
         FROM resources r
-        JOIN capabilities c ON c.name IN ('Vibration Test', 'Humidity Test')
+        JOIN capabilities c ON c.name = ?
+        WHERE r.code = ?
+    """, ("CE", "FAC-010"))
+
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id
+        FROM resources r
+        JOIN capabilities c ON c.name = ?
+        WHERE r.code = ?
+    """, ("CI", "FAC-011"))
+
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id
+        FROM resources r
+        JOIN capabilities c ON c.name = ?
+        WHERE r.code = ?
+    """, ("RE", "FAC-012"))
+
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id
+        FROM resources r
+        JOIN capabilities c ON c.name = ?
+        WHERE r.code = ?
+    """, ("RI", "FAC-013"))
+
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id
+        FROM resources r
+        JOIN capabilities c ON c.name IN ('Vibration Test', 'Humidity Test', 'CE', 'CI')
         WHERE r.code = 'TECH-102'
     """)
 
@@ -408,8 +504,49 @@ def init_demo_seed() -> None:
         INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
         SELECT r.id, c.id
         FROM resources r
-        JOIN capabilities c ON c.name IN ('Multimeter Calibration', 'Vibration Test', 'Humidity Test')
+        JOIN capabilities c ON c.name IN ('Multimeter Calibration', 'Vibration Test', 'Humidity Test', 'CE', 'CI', 'RE', 'RI')
         WHERE r.code = 'TECH-103'
+    """)
+
+    _seed_exclusion_group(db, "CON Chamber (TLC)", "Shared conducted-emissions/immunity test chamber; only one setup can run at a time.", ["FAC-010", "FAC-011"])
+    _seed_exclusion_group(db, "SAC Chamber (TLS)", "Shared radiated-emissions/immunity semi-anechoic chamber; only one setup can run at a time.", ["FAC-012", "FAC-013"])
+
+    _seed_allocation(db, "ORD-2026-003", "CE", "FAC-010")
+    _seed_allocation(db, "ORD-2026-003", "CE", "TECH-103")
+    _seed_allocation(db, "ORD-2026-003", "CI", "FAC-011")
+    _seed_allocation(db, "ORD-2026-003", "CI", "TECH-103")
+
+    # Deliberately overlapping work orders in the same exclusion group (CON Chamber),
+    # seeded directly rather than through the app's own conflict-checked routes, to
+    # demonstrate the inline conflict flag on the planner's Schedule tab: a schedule
+    # can still drift into conflict after the fact (e.g. a test overruns), not just
+    # at the moment a technician schedules it.
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, notes)
+        SELECT
+            'WO-0005', ot.id, u.id, 'in_progress',
+            '2026-08-03', '2026-08-03 09:00', NULL, 'CE scan running long.'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'technician2.demo'
+        WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'CE'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """)
+
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, notes)
+        SELECT
+            'WO-0006', ot.id, u.id, 'in_progress',
+            '2026-08-03', '2026-08-03 09:30', NULL, 'CI setup started before checking the CON chamber was free.'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'technician2.demo'
+        WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'CI'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
     """)
 
     db.execute("""
@@ -563,6 +700,19 @@ def init_demo_seed() -> None:
     """)
 
     db.commit()
+
+
+def _seed_exclusion_group(db: sqlite3.Connection, name: str, notes: str, resource_codes: list[str]) -> None:
+    db.execute("INSERT OR IGNORE INTO exclusion_groups (name, notes) VALUES (?, ?)", (name, notes))
+    group_id = db.execute("SELECT id FROM exclusion_groups WHERE name = ?", (name,)).fetchone()["id"]
+    for code in resource_codes:
+        db.execute(
+            """
+            INSERT OR IGNORE INTO exclusion_group_resources (group_id, resource_id)
+            SELECT ?, r.id FROM resources r WHERE r.code = ?
+            """,
+            (group_id, code),
+        )
 
 
 def _seed_eut(db: sqlite3.Connection, order_code: str, name: str, serial_number: str) -> None:

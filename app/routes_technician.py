@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 
 from .db import get_db, init_db
 from .routes_common import require_role
+from .scheduling import conflict_message, find_running_conflict
 from .table_utils import rows_with_meta
 
 bp = Blueprint("technician", __name__, url_prefix="/technician")
@@ -186,12 +187,17 @@ def technician_dashboard():
 
         if action == "start_work_order":
             work_order_id = request.form.get("work_order_id", "").strip()
-            db.execute(
-                "UPDATE work_orders SET status = 'in_progress', started_at = ? WHERE id = ?",
-                (_now(), work_order_id),
-            )
-            db.commit()
-            flash("Work order started.", "info")
+            wo = db.execute("SELECT ordered_test_id FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
+            conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
+            if conflict:
+                flash(conflict_message(conflict), "error")
+            else:
+                db.execute(
+                    "UPDATE work_orders SET status = 'in_progress', started_at = ? WHERE id = ?",
+                    (_now(), work_order_id),
+                )
+                db.commit()
+                flash("Work order started.", "info")
             return redirect(url_for("technician.technician_dashboard"))
 
         if action == "hold_work_order":
@@ -203,9 +209,14 @@ def technician_dashboard():
 
         if action == "resume_work_order":
             work_order_id = request.form.get("work_order_id", "").strip()
-            db.execute("UPDATE work_orders SET status = 'in_progress' WHERE id = ?", (work_order_id,))
-            db.commit()
-            flash("Work order resumed.", "info")
+            wo = db.execute("SELECT ordered_test_id FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
+            conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
+            if conflict:
+                flash(conflict_message(conflict), "error")
+            else:
+                db.execute("UPDATE work_orders SET status = 'in_progress' WHERE id = ?", (work_order_id,))
+                db.commit()
+                flash("Work order resumed.", "info")
             return redirect(url_for("technician.technician_dashboard"))
 
         if action == "complete_work_order":

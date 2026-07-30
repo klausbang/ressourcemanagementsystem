@@ -110,6 +110,7 @@
     <label>Name <input type="text" name="name" required></label>
     <label>Type <input type="text" name="resource_type" placeholder="equipment/facility/technician" required></label>
     <label>Status <input type="text" name="status" placeholder="available"></label>
+    <label>Site <input type="text" name="site" placeholder="TLC / TLS"></label>
     <button type="submit">Save Resource</button>
   </form>
 
@@ -120,6 +121,7 @@
         {{ macros.sort_th('Name', 'name', 'resources', 'admin.admin_manage') }}
         {{ macros.sort_th('Type', 'resource_type', 'resources', 'admin.admin_manage') }}
         {{ macros.sort_th('Status', 'status', 'resources', 'admin.admin_manage') }}
+        {{ macros.sort_th('Site', 'site', 'resources', 'admin.admin_manage') }}
         <th>Actions</th>
       </tr>
     </thead>
@@ -130,6 +132,7 @@
         <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
         <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
         <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td><input type="text" name="site" value="{{ r['site'] or '' }}" form="resource-save-{{ r['id'] }}"></td>
         <td>
           <button type="submit" form="resource-save-{{ r['id'] }}">Save</button>
           <button type="submit" form="resource-delete-{{ r['id'] }}">Delete</button>
@@ -203,5 +206,87 @@
       {% endfor %}
     </tbody>
   </table>
+</section>
+
+<section>
+  <h3>Exclusion Groups</h3>
+  <p><em>Some facilities (e.g. a shared test chamber) can only run one activity at a time even though two different tests each have their own resource entry for it. Put those facility resources in the same exclusion group, and the schedule will flag two activities in the same group if their times overlap.</em></p>
+  <form method="post">
+    <input type="hidden" name="action" value="create_exclusion_group">
+    <label>Name <input type="text" name="name" placeholder="e.g. CON Chamber (TLC)" required></label>
+    <label>Notes <input type="text" name="notes"></label>
+    <button type="submit">Create Group</button>
+  </form>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        {{ macros.sort_th('Name', 'name', 'exclusion_groups', 'admin.admin_manage') }}
+        {{ macros.sort_th('Notes', 'notes', 'exclusion_groups', 'admin.admin_manage') }}
+        <th>Members</th>
+        <th>Add Member</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in exclusion_groups %}
+      <tr class="{{ 'dup-row' if g['_dup'] }}">
+        <td><input type="text" name="name" value="{{ g['name'] }}" form="group-save-{{ g['id'] }}"></td>
+        <td><input type="text" name="notes" value="{{ g['notes'] or '' }}" form="group-save-{{ g['id'] }}"></td>
+        <td>
+          {% if g['members'] %}
+          <ul>
+            {% for m in g['members'] %}
+            <li>
+              {{ m['code'] }} - {{ m['name'] }}{% if m['site'] %} ({{ m['site'] }}){% endif %}
+              <form method="post" style="display:inline">
+                <input type="hidden" name="action" value="remove_exclusion_resource">
+                <input type="hidden" name="group_id" value="{{ g['id'] }}">
+                <input type="hidden" name="resource_id" value="{{ m['resource_id'] }}">
+                <button type="submit">Remove</button>
+              </form>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          {% if g['available_facilities'] %}
+          <form method="post">
+            <input type="hidden" name="action" value="assign_exclusion_resource">
+            <input type="hidden" name="group_id" value="{{ g['id'] }}">
+            <select name="resource_id" required>
+              <option value="">Select</option>
+              {% for r in g['available_facilities'] %}
+              <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Add</button>
+          </form>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>
+          <button type="submit" form="group-save-{{ g['id'] }}">Save</button>
+          <button type="submit" form="group-delete-{{ g['id'] }}">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% for g in exclusion_groups %}
+  <form id="group-save-{{ g['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="update_exclusion_group">
+    <input type="hidden" name="group_id" value="{{ g['id'] }}">
+  </form>
+  <form id="group-delete-{{ g['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_exclusion_group">
+    <input type="hidden" name="group_id" value="{{ g['id'] }}">
+  </form>
+  {% endfor %}
 </section>
 {% endblock %}

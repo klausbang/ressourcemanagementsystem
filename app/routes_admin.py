@@ -16,11 +16,14 @@ USER_DUP_KEYS = ["username", "role"]
 CAPABILITY_SORTABLE_KEYS = {"name", "description"}
 CAPABILITY_DUP_KEYS = ["name", "description"]
 
-RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status"}
-RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status"]
+RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "site"}
+RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "site"]
 
 MAPPING_SORTABLE_KEYS = {"code", "resource_name", "capability_name"}
 MAPPING_DUP_KEYS = ["code", "resource_name", "capability_name"]
+
+EXCLUSION_GROUP_SORTABLE_KEYS = {"name", "notes"}
+EXCLUSION_GROUP_DUP_KEYS = ["name", "notes"]
 
 
 def _load_admin_context(db) -> dict:
@@ -42,7 +45,7 @@ def _load_admin_context(db) -> dict:
         "SELECT id, code, name FROM resources WHERE resource_type = 'technician' ORDER BY code"
     ).fetchall()
     resources = rows_with_meta(
-        db.execute("SELECT id, code, name, resource_type, status FROM resources ORDER BY code").fetchall(),
+        db.execute("SELECT id, code, name, resource_type, status, site FROM resources ORDER BY code").fetchall(),
         dup_keys=RESOURCE_DUP_KEYS,
         sort_key=request.args.get("resources_sort"),
         sort_dir=request.args.get("resources_dir", "asc"),
@@ -70,12 +73,38 @@ def _load_admin_context(db) -> dict:
         sort_dir=request.args.get("mappings_dir", "asc"),
         sortable_keys=MAPPING_SORTABLE_KEYS,
     )
+    exclusion_groups = rows_with_meta(
+        db.execute("SELECT id, name, notes FROM exclusion_groups ORDER BY name").fetchall(),
+        dup_keys=EXCLUSION_GROUP_DUP_KEYS,
+        sort_key=request.args.get("exclusion_groups_sort"),
+        sort_dir=request.args.get("exclusion_groups_dir", "asc"),
+        sortable_keys=EXCLUSION_GROUP_SORTABLE_KEYS,
+    )
+    member_rows = db.execute(
+        """
+        SELECT egr.group_id, r.id AS resource_id, r.code, r.name, r.site
+        FROM exclusion_group_resources egr
+        JOIN resources r ON r.id = egr.resource_id
+        ORDER BY egr.group_id, r.code
+        """
+    ).fetchall()
+    members_by_group: dict[int, list] = {}
+    for row in member_rows:
+        members_by_group.setdefault(row["group_id"], []).append(dict(row))
+    for group in exclusion_groups:
+        group["members"] = members_by_group.get(group["id"], [])
+        member_ids = {m["resource_id"] for m in group["members"]}
+        group["available_facilities"] = [
+            r for r in resources if r["resource_type"] == "facility" and r["id"] not in member_ids
+        ]
+
     return {
         "users": users,
         "resources": resources,
         "capabilities": capabilities,
         "mappings": mappings,
         "technician_resources": technician_resources,
+        "exclusion_groups": exclusion_groups,
     }
 
 
@@ -195,6 +224,7 @@ def admin_manage():
             name = request.form.get("name", "").strip()
             resource_type = request.form.get("resource_type", "").strip()
             status = request.form.get("status", "").strip() or "available"
+            site = request.form.get("site", "").strip() or None
 
             if not (code and name and resource_type):
                 flash("Resource code, name, and type are required.", "error")
@@ -202,8 +232,8 @@ def admin_manage():
                 flash(f"Resource code {code} already exists.", "error")
             else:
                 db.execute(
-                    "INSERT INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)",
-                    (code, name, resource_type, status),
+                    "INSERT INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)",
+                    (code, name, resource_type, status, site),
                 )
                 db.commit()
                 flash("Resource saved.", "info")
@@ -214,6 +244,7 @@ def admin_manage():
             name = request.form.get("name", "").strip()
             resource_type = request.form.get("resource_type", "").strip()
             status = request.form.get("status", "").strip()
+            site = request.form.get("site", "").strip() or None
 
             if not (resource_id and code and name and resource_type and status):
                 flash("Resource code, name, type, and status are required.", "error")
@@ -223,8 +254,8 @@ def admin_manage():
                 flash(f"Resource code {code} already exists.", "error")
             else:
                 db.execute(
-                    "UPDATE resources SET code = ?, name = ?, resource_type = ?, status = ? WHERE id = ?",
-                    (code, name, resource_type, status, resource_id),
+                    "UPDATE resources SET code = ?, name = ?, resource_type = ?, status = ?, site = ? WHERE id = ?",
+                    (code, name, resource_type, status, site, resource_id),
                 )
                 db.commit()
                 flash("Resource updated.", "info")
@@ -263,6 +294,72 @@ def admin_manage():
             )
             db.commit()
             flash("Capability unassigned from resource.", "info")
+
+        elif action == "create_exclusion_group":
+            name = request.form.get("name", "").strip()
+            notes = request.form.get("notes", "").strip()
+
+            if not name:
+                flash("Exclusion group name is required.", "error")
+            elif db.execute("SELECT 1 FROM exclusion_groups WHERE name = ?", (name,)).fetchone():
+                flash(f"Exclusion group {name} already exists.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO exclusion_groups (name, notes) VALUES (?, ?)",
+                    (name, notes),
+                )
+                db.commit()
+                flash(f"Exclusion group '{name}' created.", "info")
+
+        elif action == "update_exclusion_group":
+            group_id = request.form.get("group_id", "").strip()
+            name = request.form.get("name", "").strip()
+            notes = request.form.get("notes", "").strip()
+
+            if not (group_id and name):
+                flash("Exclusion group name is required.", "error")
+            elif db.execute(
+                "SELECT 1 FROM exclusion_groups WHERE name = ? AND id != ?", (name, group_id)
+            ).fetchone():
+                flash(f"Exclusion group {name} already exists.", "error")
+            else:
+                db.execute(
+                    "UPDATE exclusion_groups SET name = ?, notes = ? WHERE id = ?",
+                    (name, notes, group_id),
+                )
+                db.commit()
+                flash(f"Exclusion group '{name}' updated.", "info")
+
+        elif action == "delete_exclusion_group":
+            group_id = request.form.get("group_id", "").strip()
+            db.execute("DELETE FROM exclusion_groups WHERE id = ?", (group_id,))
+            db.commit()
+            flash("Exclusion group deleted.", "info")
+
+        elif action == "assign_exclusion_resource":
+            group_id = request.form.get("group_id", "").strip()
+            resource_id = request.form.get("resource_id", "").strip()
+
+            if not (group_id and resource_id):
+                flash("Exclusion group and resource are required.", "error")
+            else:
+                db.execute(
+                    "INSERT OR IGNORE INTO exclusion_group_resources (group_id, resource_id) VALUES (?, ?)",
+                    (group_id, resource_id),
+                )
+                db.commit()
+                flash("Resource added to exclusion group.", "info")
+
+        elif action == "remove_exclusion_resource":
+            group_id = request.form.get("group_id", "").strip()
+            resource_id = request.form.get("resource_id", "").strip()
+
+            db.execute(
+                "DELETE FROM exclusion_group_resources WHERE group_id = ? AND resource_id = ?",
+                (group_id, resource_id),
+            )
+            db.commit()
+            flash("Resource removed from exclusion group.", "info")
 
         return redirect(url_for("admin.admin_manage"))
 

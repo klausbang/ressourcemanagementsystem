@@ -8,15 +8,22 @@
   #tab-users:checked ~ .tabs-body #panel-users,
   #tab-capabilities:checked ~ .tabs-body #panel-capabilities,
   #tab-resources:checked ~ .tabs-body #panel-resources,
-  #tab-mappings:checked ~ .tabs-body #panel-mappings { display: block; }
+  #tab-mappings:checked ~ .tabs-body #panel-mappings,
+  #tab-exclusion:checked ~ .tabs-body #panel-exclusion { display: block; }
 
   #tab-users:checked ~ .tab-list label[for="tab-users"],
   #tab-capabilities:checked ~ .tab-list label[for="tab-capabilities"],
   #tab-resources:checked ~ .tab-list label[for="tab-resources"],
-  #tab-mappings:checked ~ .tab-list label[for="tab-mappings"] {
+  #tab-mappings:checked ~ .tab-list label[for="tab-mappings"],
+  #tab-exclusion:checked ~ .tab-list label[for="tab-exclusion"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
+
+  .group-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; background: var(--color-surface); }
+  .group-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .group-card-title { font-weight: 700; }
+  .group-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
 </style>
 
 <div class="page-header">
@@ -30,6 +37,7 @@
   <div class="stat-tile"><div class="stat-value">{{ capabilities|length }}</div><div class="stat-label">Capabilities</div></div>
   <div class="stat-tile"><div class="stat-value">{{ resources|length }}</div><div class="stat-label">Resources</div></div>
   <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ exclusion_groups|length }}</div><div class="stat-label">Exclusion groups</div></div>
 </div>
 
 <div class="tabs">
@@ -37,12 +45,14 @@
   <input type="radio" name="admin-tabs" id="tab-capabilities" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-resources" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-exclusion" class="tab-input">
 
   <div class="tab-list" role="tablist">
     <label for="tab-users" class="tab-label">👤 Users</label>
     <label for="tab-capabilities" class="tab-label">🎓 Capabilities</label>
     <label for="tab-resources" class="tab-label">🔧 Resources</label>
     <label for="tab-mappings" class="tab-label">🔗 Capability assignments</label>
+    <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups</label>
   </div>
 
   <div class="tabs-body">
@@ -219,6 +229,11 @@
             <label for="new-res-status">Status</label>
             <input type="text" id="new-res-status" name="status" placeholder="available">
           </div>
+          <div class="field">
+            <label for="new-res-site">Site</label>
+            <input type="text" id="new-res-site" name="site" placeholder="TLC / TLS">
+            <div class="hint">Only meaningful for equipment/facility resources that live at one of the two lab sites.</div>
+          </div>
           <div class="field"><button type="submit" class="btn btn-primary">Save resource</button></div>
         </form>
       </div>
@@ -232,6 +247,7 @@
             {{ macros.sort_th('Name', 'name', 'resources', 'admin.admin_manage') }}
             {{ macros.sort_th('Type', 'resource_type', 'resources', 'admin.admin_manage') }}
             {{ macros.sort_th('Status', 'status', 'resources', 'admin.admin_manage') }}
+            {{ macros.sort_th('Site', 'site', 'resources', 'admin.admin_manage') }}
             <th>Actions</th>
           </tr></thead>
           <tbody>
@@ -244,6 +260,7 @@
               <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
               <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
               <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
+              <td><input type="text" name="site" value="{{ r['site'] or '' }}" form="resource-save-{{ r['id'] }}" placeholder="TLC / TLS"></td>
               <td class="inline-form">
                 <button type="submit" form="resource-save-{{ r['id'] }}" class="btn btn-secondary btn-sm">Save</button>
                 <button type="submit" form="resource-delete-{{ r['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete resource '{{ r['code'] }}'?">Delete</button>
@@ -330,6 +347,96 @@
       {% else %}
       <div class="empty-state"><span class="icon">🔗</span>No capability assignments yet.</div>
       {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-exclusion">
+      <div class="callout">
+        <strong>What this is:</strong> some facilities (e.g. a shared test chamber) can only run one activity at a time even though two different tests each have their own resource entry for it. Put those facility resources in the same exclusion group, and the schedule will flag two activities in the same group if their times overlap.
+      </div>
+
+      <div class="card">
+        <div class="card-title">Create an exclusion group</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_exclusion_group">
+          <div class="field">
+            <label for="new-group-name">Name</label>
+            <input type="text" id="new-group-name" name="name" placeholder="e.g. CON Chamber (TLC)" required>
+          </div>
+          <div class="field">
+            <label for="new-group-notes">Notes</label>
+            <input type="text" id="new-group-notes" name="notes">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Create group</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing exclusion groups</h2></div>
+      {% if exclusion_groups %}
+      {% for g in exclusion_groups %}
+      <div class="group-card {{ 'dup-row' if g['_dup'] }}">
+        <div class="group-card-head">
+          <div>
+            <div class="group-card-title">
+              {% if g['_dup'] %}{{ macros.dup_flag() }}{% endif %}
+              <input type="text" name="name" value="{{ g['name'] }}" form="group-save-{{ g['id'] }}" style="font-weight:700;">
+            </div>
+            <input type="text" name="notes" value="{{ g['notes'] or '' }}" form="group-save-{{ g['id'] }}" placeholder="Notes" style="margin-top:6px; width:100%;">
+          </div>
+          <div class="inline-form">
+            <button type="submit" form="group-save-{{ g['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+            <button type="submit" form="group-delete-{{ g['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete exclusion group '{{ g['name'] }}'?">Delete</button>
+          </div>
+        </div>
+
+        {% if g['members'] %}
+        <ul class="chip-list">
+          {% for m in g['members'] %}
+          <li class="chip">
+            {{ m['code'] }} - {{ m['name'] }}{% if m['site'] %} <span class="badge badge-type">{{ m['site'] }}</span>{% endif %}
+            <form method="post">
+              <input type="hidden" name="action" value="remove_exclusion_resource">
+              <input type="hidden" name="group_id" value="{{ g['id'] }}">
+              <input type="hidden" name="resource_id" value="{{ m['resource_id'] }}">
+              <button type="submit" title="Remove {{ m['code'] }} from this group" data-confirm="Remove {{ m['code'] }} from '{{ g['name'] }}'?">✕</button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="section-help" style="margin-top:0;">No facility resources in this group yet.</p>
+        {% endif %}
+
+        {% if g['available_facilities'] %}
+        <form method="post" class="inline-form" style="margin-top:10px;">
+          <input type="hidden" name="action" value="assign_exclusion_resource">
+          <input type="hidden" name="group_id" value="{{ g['id'] }}">
+          <select name="resource_id" required>
+            <option value="">Add a facility resource…</option>
+            {% for r in g['available_facilities'] %}
+            <option value="{{ r['id'] }}">{{ r['code'] }} - {{ r['name'] }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-secondary btn-sm">➕ Add</button>
+        </form>
+        {% else %}
+        <p class="section-help">Every facility resource is already in this group, or none exist yet.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><span class="icon">🚫</span>No exclusion groups yet.</div>
+      {% endif %}
+
+      {% for g in exclusion_groups %}
+      <form id="group-save-{{ g['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_exclusion_group">
+        <input type="hidden" name="group_id" value="{{ g['id'] }}">
+      </form>
+      <form id="group-delete-{{ g['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_exclusion_group">
+        <input type="hidden" name="group_id" value="{{ g['id'] }}">
+      </form>
+      {% endfor %}
     </section>
   </div>
 </div>

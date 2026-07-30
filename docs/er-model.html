@@ -14,7 +14,7 @@
   <main>
     <section>
       <h2>1. Scope</h2>
-      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), the technician work order and test report workflow added in Phase 7, the EUT (Unit Under Test) entity added in Phase 8, plus future migration planning.</p>
+      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), the technician work order and test report workflow added in Phase 7, the EUT (Unit Under Test) entity added in Phase 8, the lab/equipment mutual-exclusion constraints added in Phase 9, plus future migration planning.</p>
     </section>
 
     <section>
@@ -63,7 +63,7 @@
       <h2>4. Core Entities</h2>
       <ul>
         <li>users: login identity and role (admin/planner/technician). A technician user optionally links to one resource row (<code>linked_resource_id</code>) &mdash; this is how the system finds "my assigned tests" for that technician.</li>
-        <li>resources: procedures, equipment, facilities, technicians, and related resource records.</li>
+        <li>resources: procedures, equipment, facilities, technicians, and related resource records; an optional <code>site</code> field (Phase 9) records which lab site (e.g. TLC/TLS) an equipment/facility resource is currently at.</li>
         <li>capabilities: named test capabilities.</li>
         <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
         <li>customer_orders: order header per customer request.</li>
@@ -75,6 +75,8 @@
         <li>work_orders: the technician's job record for one ordered_test (at most one per test) &mdash; who's doing it, which procedure, and its planned/in_progress/on_hold/completed lifecycle.</li>
         <li>test_reports: the formal, fillable-and-printable test report generated from a work_order once a procedure is attached; carries the equipment-under-test identification, an overall result, and the technician-then-reviewer sign-off workflow (draft &rarr; submitted &rarr; approved/rejected).</li>
         <li>report_steps: a snapshot of a test_report's checklist &mdash; each row copies one procedure_checks row's description/expected value at report-creation time, then the technician fills in the actual value and pass/fail/n-a result.</li>
+        <li>exclusion_groups: an admin-defined named group (e.g. "CON Chamber (TLC)") representing one shared physical constraint (Phase 9).</li>
+        <li>exclusion_group_resources: many-to-many mapping between exclusion_groups and facility resources &mdash; the members of a group are treated as one shared resource for conflict-checking purposes, even though each has its own resource record.</li>
       </ul>
     </section>
 
@@ -92,6 +94,7 @@
         <li>Each ordered_test has at most one work_order (unique on ordered_test_id); each work_order belongs to one technician user and, once a procedure is chosen, one test_procedure.</li>
         <li>Each work_order has at most one test_report (unique on work_order_id); creating the report copies that work order's procedure_checks into new report_steps rows scoped to the report.</li>
         <li>Each test_report references two distinct users: the authoring technician (<code>technician_user_id</code>) and, once reviewed, the approving/rejecting reviewer (<code>reviewer_user_id</code>) &mdash; enforced in application logic to never be the same person.</li>
+        <li>resources and exclusion_groups are linked many-to-many through exclusion_group_resources; a resource can belong to zero, one, or more than one exclusion group.</li>
       </ul>
     </section>
 
@@ -104,6 +107,8 @@
         <li>Allocation validation in application logic ensures assigned resource has required capability for the ordered test.</li>
         <li>Work order and test report status fields are constrained by <code>CHECK</code> to their valid lifecycle values (e.g. work_orders.status IN planned/in_progress/on_hold/completed; test_reports.status IN draft/submitted/approved/rejected); the pass/fail/n-a result columns are similarly constrained or <code>NULL</code>.</li>
         <li>Application logic (not a database constraint) enforces the review workflow: only the report's own technician can edit or submit a draft; only a <em>different</em> technician or a planner can approve/reject a submitted report; rejecting requires a comment.</li>
+        <li>Deleting an exclusion_group cascades to its exclusion_group_resources rows (<code>ON DELETE CASCADE</code>); the member resources themselves are untouched.</li>
+        <li>Mutual-exclusion conflict checking (app/scheduling.py) is application logic, not a database constraint: starting/resuming a work order is blocked if another work order sharing a resource or exclusion group is already in_progress.</li>
       </ul>
     </section>
 
