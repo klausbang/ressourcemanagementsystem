@@ -14,7 +14,7 @@
   <main>
     <section>
       <h2>1. Scope</h2>
-      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), and the technician work order and test report workflow added in Phase 7, plus future migration planning.</p>
+      <p>This ER model defines the current local RMS data structure, spanning resource/capability management (Phase 3-4), the technician work order and test report workflow added in Phase 7, the EUT (Unit Under Test) entity added in Phase 8, plus future migration planning.</p>
     </section>
 
     <section>
@@ -67,7 +67,8 @@
         <li>capabilities: named test capabilities.</li>
         <li>resource_capabilities: many-to-many mapping between resources and capabilities.</li>
         <li>customer_orders: order header per customer request.</li>
-        <li>ordered_tests: one or more tests requested under each customer order.</li>
+        <li>euts: one or more Equipment/Unit Under Test records per customer order (Phase 8) &mdash; a project can involve several physical units, each tracked separately.</li>
+        <li>ordered_tests: one or more tests (test activities) requested under each customer order, optionally tagged to the EUT (<code>eut_id</code>) they belong to.</li>
         <li>allocations: planner assignment of a resource to an ordered test; one ordered test can have several allocations (e.g. equipment, facility, and technician assigned together).</li>
         <li>test_procedures: a documented test process (title, summary, prose steps, required equipment/facility, safety notes) authored against a capability; shown to technicians as reference material.</li>
         <li>procedure_checks: the structured, fillable checklist for a test_procedure &mdash; one row per check-item with its pre-authored expected value.</li>
@@ -80,7 +81,8 @@
     <section>
       <h2>5. Relationship Rules</h2>
       <ul>
-        <li>One customer_order has many ordered_tests.</li>
+        <li>One customer_order has many ordered_tests, and zero or many euts.</li>
+        <li>One eut belongs to one customer_order, and has zero or many ordered_tests; an ordered_test's <code>eut_id</code> is optional (nullable), so a test activity may belong to no specific EUT (simple, single-unit orders) or to exactly one.</li>
         <li>One capability can be linked to many ordered_tests as a required capability.</li>
         <li>resources and capabilities are linked many-to-many through resource_capabilities.</li>
         <li>Each ordered_test can have zero or many allocations, one per distinct resource, so equipment, facility, procedure, and technician resources can all be assigned to the same test; the same resource cannot be assigned twice to the same test (unique on ordered_test_id + resource_id).</li>
@@ -98,6 +100,7 @@
       <ul>
         <li>Unique keys on username, resource code, capability name, order code, work_order_code, and report_code.</li>
         <li>Foreign keys enforce referential integrity between mapping/transactional tables and master tables.</li>
+        <li>Deleting an eut sets any of its ordered_tests' <code>eut_id</code> to NULL rather than deleting the test activities themselves (<code>ON DELETE SET NULL</code>) &mdash; a test activity's schedule/allocations/work order/report are not tied to the EUT record's lifetime.</li>
         <li>Allocation validation in application logic ensures assigned resource has required capability for the ordered test.</li>
         <li>Work order and test report status fields are constrained by <code>CHECK</code> to their valid lifecycle values (e.g. work_orders.status IN planned/in_progress/on_hold/completed; test_reports.status IN draft/submitted/approved/rejected); the pass/fail/n-a result columns are similarly constrained or <code>NULL</code>.</li>
         <li>Application logic (not a database constraint) enforces the review workflow: only the report's own technician can edit or submit a draft; only a <em>different</em> technician or a planner can approve/reject a submitted report; rejecting requires a comment.</li>

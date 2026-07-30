@@ -42,12 +42,23 @@ CREATE TABLE IF NOT EXISTS customer_orders (
     product_name TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS euts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    serial_number TEXT,
+    notes TEXT,
+    FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS ordered_tests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,
+    eut_id INTEGER,
     test_name TEXT NOT NULL,
     required_capability_id INTEGER,
     FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL,
     FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
 );
 
@@ -203,10 +214,70 @@ def _migrate_users_table(db: sqlite3.Connection) -> None:
         db.execute("PRAGMA foreign_keys = ON")
 
 
+def _migrate_ordered_tests_table(db: sqlite3.Connection) -> None:
+    """Upgrade an ordered_tests table created before the optional eut_id column existed.
+
+    Needs a full table rebuild (not a plain ADD COLUMN) because eut_id must carry an
+    ON DELETE SET NULL action, and SQLite cannot attach a delete action to a column
+    added later via ALTER TABLE ADD COLUMN.
+    """
+    if not _table_exists(db, "ordered_tests"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(ordered_tests)").fetchall()}
+    has_eut_id = "eut_id" in columns
+    has_correct_fk = any(
+        fk["table"] == "euts" and fk["from"] == "eut_id" and fk["on_delete"] == "SET NULL"
+        for fk in db.execute("PRAGMA foreign_key_list(ordered_tests)").fetchall()
+    )
+    if has_eut_id and has_correct_fk:
+        return
+
+    # Same rename-the-replacement approach as _migrate_users_table, for the same reason:
+    # other tables' FK text (allocations/work_orders/test_reports -> "ordered_tests") must
+    # keep resolving correctly once the replacement is renamed into place.
+    db.execute("PRAGMA foreign_keys = OFF")
+    try:
+        db.execute(
+            """
+            CREATE TABLE ordered_tests_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                eut_id INTEGER,
+                test_name TEXT NOT NULL,
+                required_capability_id INTEGER,
+                FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
+                FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL,
+                FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
+            )
+            """
+        )
+        if has_eut_id:
+            db.execute(
+                """
+                INSERT INTO ordered_tests_new (id, order_id, eut_id, test_name, required_capability_id)
+                SELECT id, order_id, eut_id, test_name, required_capability_id FROM ordered_tests
+                """
+            )
+        else:
+            db.execute(
+                """
+                INSERT INTO ordered_tests_new (id, order_id, test_name, required_capability_id)
+                SELECT id, order_id, test_name, required_capability_id FROM ordered_tests
+                """
+            )
+        db.execute("DROP TABLE ordered_tests")
+        db.execute("ALTER TABLE ordered_tests_new RENAME TO ordered_tests")
+        db.commit()
+    finally:
+        db.execute("PRAGMA foreign_keys = ON")
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
     db.executescript(SCHEMA_SQL)
+    _migrate_ordered_tests_table(db)
     db.commit()
 
 
@@ -231,6 +302,9 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-001", "Acme Instruments", "Multimeter"))
     db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
 
+    _seed_eut(db, "ORD-2026-002", "Prototype Unit A", "SN-88213-004")
+    _seed_eut(db, "ORD-2026-002", "Prototype Unit B", "SN-88213-005")
+
     db.execute("""
         INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
         SELECT o.id, ?, c.id
@@ -244,10 +318,11 @@ def init_demo_seed() -> None:
     """, ("Multimeter Calibration", "Multimeter Calibration", "ORD-2026-001", "Multimeter Calibration"))
 
     db.execute("""
-        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
-        SELECT o.id, ?, c.id
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id)
+        SELECT o.id, e.id, ?, c.id
         FROM customer_orders o
         JOIN capabilities c ON c.name = ?
+        LEFT JOIN euts e ON e.order_id = o.id AND e.name = 'Prototype Unit A'
         WHERE o.order_code = ?
           AND NOT EXISTS (
               SELECT 1 FROM ordered_tests ot
@@ -256,16 +331,46 @@ def init_demo_seed() -> None:
     """, ("Vibration Test", "Vibration Test", "ORD-2026-002", "Vibration Test"))
 
     db.execute("""
-        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
-        SELECT o.id, ?, c.id
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id)
+        SELECT o.id, e.id, ?, c.id
         FROM customer_orders o
         JOIN capabilities c ON c.name = ?
+        LEFT JOIN euts e ON e.order_id = o.id AND e.name = 'Prototype Unit A'
         WHERE o.order_code = ?
           AND NOT EXISTS (
               SELECT 1 FROM ordered_tests ot
               WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
           )
     """, ("Humidity Test", "Humidity Test", "ORD-2026-002", "Humidity Test"))
+
+    # Backfill: on a dev database that already had ORD-2026-002's Vibration/Humidity Test
+    # rows from before Phase 8 (EUTs didn't exist yet, so the two INSERTs above were
+    # skipped by their own NOT EXISTS guard), link those pre-existing rows to Prototype
+    # Unit A now that it exists, instead of leaving them EUT-less.
+    db.execute("""
+        UPDATE ordered_tests
+        SET eut_id = (
+            SELECT e.id FROM euts e
+            JOIN customer_orders o ON o.id = e.order_id
+            WHERE o.order_code = 'ORD-2026-002' AND e.name = 'Prototype Unit A'
+        )
+        WHERE eut_id IS NULL
+          AND test_name IN ('Vibration Test', 'Humidity Test')
+          AND order_id = (SELECT id FROM customer_orders WHERE order_code = 'ORD-2026-002')
+    """)
+
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id)
+        SELECT o.id, e.id, ?, c.id
+        FROM customer_orders o
+        JOIN capabilities c ON c.name = ?
+        LEFT JOIN euts e ON e.order_id = o.id AND e.name = 'Prototype Unit B'
+        WHERE o.order_code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.eut_id = e.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("Vibration Test", "Vibration Test", "ORD-2026-002", "Vibration Test"))
 
     db.execute("""
         INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
@@ -408,10 +513,10 @@ def init_demo_seed() -> None:
         ("Post-test functional check", "Matches pre-test baseline, unit passes self-test"),
     ])
 
-    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "EQ-020")
-    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "TECH-102")
-    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "FAC-004")
-    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "TECH-102")
+    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "EQ-020", eut_name="Prototype Unit A")
+    _seed_allocation(db, "ORD-2026-002", "Vibration Test", "TECH-102", eut_name="Prototype Unit A")
+    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "FAC-004", eut_name="Prototype Unit A")
+    _seed_allocation(db, "ORD-2026-002", "Humidity Test", "TECH-102", eut_name="Prototype Unit A")
 
     db.execute("""
         INSERT INTO work_orders
@@ -423,6 +528,7 @@ def init_demo_seed() -> None:
             'Unit passed the random vibration profile per Test Method 514.7. No anomalies observed on functional monitoring; no visible damage on post-test inspection.'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
+        JOIN euts e ON e.id = ot.eut_id AND e.name = 'Prototype Unit A'
         JOIN users u ON u.username = 'technician.demo'
         JOIN test_procedures p ON p.title = 'Random Vibration Test Procedure (Test Method 514.7)'
         WHERE o.order_code = 'ORD-2026-002' AND ot.test_name = 'Vibration Test'
@@ -457,6 +563,19 @@ def init_demo_seed() -> None:
     """)
 
     db.commit()
+
+
+def _seed_eut(db: sqlite3.Connection, order_code: str, name: str, serial_number: str) -> None:
+    db.execute(
+        """
+        INSERT INTO euts (order_id, name, serial_number)
+        SELECT o.id, ?, ?
+        FROM customer_orders o
+        WHERE o.order_code = ?
+          AND NOT EXISTS (SELECT 1 FROM euts e WHERE e.order_id = o.id AND e.name = ?)
+        """,
+        (name, serial_number, order_code, name),
+    )
 
 
 def _seed_procedure(
@@ -497,16 +616,22 @@ def _seed_procedure_checks(db: sqlite3.Connection, procedure_title: str, checks:
         )
 
 
-def _seed_allocation(db: sqlite3.Connection, order_code: str, test_name: str, resource_code: str) -> None:
+def _seed_allocation(
+    db: sqlite3.Connection, order_code: str, test_name: str, resource_code: str, eut_name: str | None = None
+) -> None:
+    """Seed one allocation. When an order has more than one ordered_test with the same
+    test_name (e.g. the same test repeated per EUT), pass eut_name to target the right one."""
     db.execute(
         """
         INSERT OR IGNORE INTO allocations (ordered_test_id, resource_id, planner_user_id, notes)
         SELECT ot.id, r.id, u.id, 'Seeded demo allocation'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN euts e ON e.id = ot.eut_id
         JOIN resources r ON r.code = ?
         JOIN users u ON u.username = 'planner.demo'
         WHERE o.order_code = ? AND ot.test_name = ?
+          AND (? IS NULL OR e.name = ?)
         """,
-        (resource_code, order_code, test_name),
+        (resource_code, order_code, test_name, eut_name, eut_name),
     )

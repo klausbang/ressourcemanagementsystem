@@ -12,11 +12,14 @@ bp = Blueprint("planner", __name__, url_prefix="/planner")
 ORDER_SORTABLE_KEYS = {"order_code", "customer_name", "product_name"}
 ORDER_DUP_KEYS = ["order_code", "customer_name", "product_name"]
 
-TEST_SORTABLE_KEYS = {"order_code", "test_name", "capability_name"}
-TEST_DUP_KEYS = ["order_code", "test_name", "capability_name"]
+EUT_SORTABLE_KEYS = {"order_code", "name", "serial_number"}
+EUT_DUP_KEYS = ["order_code", "name", "serial_number"]
 
-ALLOC_SORTABLE_KEYS = {"order_code", "customer_name", "test_name", "capability_name", "allocated_summary"}
-ALLOC_DUP_KEYS = ["order_code", "customer_name", "test_name", "capability_name", "allocated_summary"]
+TEST_SORTABLE_KEYS = {"order_code", "eut_name", "test_name", "capability_name"}
+TEST_DUP_KEYS = ["order_code", "eut_name", "test_name", "capability_name"]
+
+ALLOC_SORTABLE_KEYS = {"order_code", "customer_name", "eut_name", "test_name", "capability_name", "allocated_summary"}
+ALLOC_DUP_KEYS = ["order_code", "customer_name", "eut_name", "test_name", "capability_name", "allocated_summary"]
 
 SCHEDULE_WINDOW_HOURS = 24
 SCHEDULE_DEFAULT_HOUR = 8  # assumed start-of-shift time when only a scheduled_date (no time) is known
@@ -158,17 +161,39 @@ def _load_schedule_context(db) -> dict:
 
 
 def _load_planner_context(db) -> dict:
+    raw_euts = db.execute(
+        """
+        SELECT
+            e.id, e.order_id, e.name, e.serial_number, e.notes,
+            o.order_code
+        FROM euts e
+        JOIN customer_orders o ON o.id = e.order_id
+        ORDER BY o.order_code, e.name
+        """
+    ).fetchall()
+
+    euts_rows = rows_with_meta(
+        raw_euts,
+        dup_keys=EUT_DUP_KEYS,
+        sort_key=request.args.get("euts_sort"),
+        sort_dir=request.args.get("euts_dir", "asc"),
+        sortable_keys=EUT_SORTABLE_KEYS,
+    )
+
     raw_tests = db.execute(
         """
         SELECT
             ot.id AS ordered_test_id,
             o.order_code,
             o.customer_name,
+            ot.eut_id,
+            e.name AS eut_name,
             ot.test_name,
             c.id AS capability_id,
             c.name AS capability_name
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN euts e ON e.id = ot.eut_id
         LEFT JOIN capabilities c ON c.id = ot.required_capability_id
         ORDER BY o.order_code, ot.id
         """
@@ -256,16 +281,19 @@ def _load_planner_context(db) -> dict:
         "ordered_tests_rows": ordered_tests_rows,
         "by_capability": by_capability,
         "orders": orders,
+        "euts": euts_rows,
         "capabilities": capabilities,
     }
     context.update(_load_schedule_context(db))
     return context
 
 
-def _render_planner_orders(db, order_form_values=None, order_form_errors=None):
+def _render_planner_orders(db, order_form_values=None, order_form_errors=None, eut_form_values=None, eut_form_errors=None):
     context = _load_planner_context(db)
     context["order_form_values"] = order_form_values or {}
     context["order_form_errors"] = order_form_errors or {}
+    context["eut_form_values"] = eut_form_values or {}
+    context["eut_form_errors"] = eut_form_errors or {}
     return render_ui("planner_orders.html", **context)
 
 
@@ -341,8 +369,61 @@ def planner_orders():
             flash("Order deleted, along with its ordered tests and allocations.", "info")
             return redirect(url_for("planner.planner_orders"))
 
+        if action == "create_eut":
+            order_id = request.form.get("order_id", "").strip()
+            name = request.form.get("name", "").strip()
+            serial_number = request.form.get("serial_number", "").strip() or None
+
+            eut_form_errors = {}
+            if not order_id:
+                eut_form_errors["order_id"] = "Order is required."
+            elif db.execute("SELECT 1 FROM customer_orders WHERE id = ?", (order_id,)).fetchone() is None:
+                eut_form_errors["order_id"] = "Selected order does not exist."
+            if not name:
+                eut_form_errors["name"] = "EUT name is required."
+
+            if eut_form_errors:
+                return _render_planner_orders(
+                    db,
+                    eut_form_values={"order_id": order_id, "name": name, "serial_number": serial_number or ""},
+                    eut_form_errors=eut_form_errors,
+                )
+
+            db.execute(
+                "INSERT INTO euts (order_id, name, serial_number) VALUES (?, ?, ?)",
+                (order_id, name, serial_number),
+            )
+            db.commit()
+            flash(f"EUT '{name}' added.", "info")
+            return redirect(url_for("planner.planner_orders"))
+
+        if action == "update_eut":
+            eut_id = request.form.get("eut_id", "").strip()
+            name = request.form.get("name", "").strip()
+            serial_number = request.form.get("serial_number", "").strip() or None
+
+            if not (eut_id and name):
+                flash("EUT name is required.", "error")
+            else:
+                db.execute(
+                    "UPDATE euts SET name = ?, serial_number = ? WHERE id = ?",
+                    (name, serial_number, eut_id),
+                )
+                db.commit()
+                flash(f"EUT '{name}' updated.", "info")
+
+            return redirect(url_for("planner.planner_orders"))
+
+        if action == "delete_eut":
+            eut_id = request.form.get("eut_id", "").strip()
+            db.execute("DELETE FROM euts WHERE id = ?", (eut_id,))
+            db.commit()
+            flash("EUT deleted. Its test activities remain, now unlinked from an EUT.", "info")
+            return redirect(url_for("planner.planner_orders"))
+
         if action == "add_test":
             order_id = request.form.get("order_id", "").strip()
+            eut_id = request.form.get("eut_id", "").strip() or None
             test_name = request.form.get("test_name", "").strip()
             required_capability_id = request.form.get("required_capability_id", "").strip() or None
 
@@ -350,10 +431,14 @@ def planner_orders():
                 flash("Order and test name are required.", "error")
             elif db.execute("SELECT 1 FROM customer_orders WHERE id = ?", (order_id,)).fetchone() is None:
                 flash("Selected order does not exist.", "error")
+            elif eut_id and db.execute(
+                "SELECT 1 FROM euts WHERE id = ? AND order_id = ?", (eut_id, order_id)
+            ).fetchone() is None:
+                flash("Selected EUT does not belong to this order.", "error")
             else:
                 db.execute(
-                    "INSERT INTO ordered_tests (order_id, test_name, required_capability_id) VALUES (?, ?, ?)",
-                    (order_id, test_name, required_capability_id),
+                    "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id) VALUES (?, ?, ?, ?)",
+                    (order_id, eut_id, test_name, required_capability_id),
                 )
                 db.commit()
                 flash(f"Test '{test_name}' added.", "info")
@@ -362,15 +447,24 @@ def planner_orders():
 
         if action == "update_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
+            eut_id = request.form.get("eut_id", "").strip() or None
             test_name = request.form.get("test_name", "").strip()
             required_capability_id = request.form.get("required_capability_id", "").strip() or None
 
-            if not (ordered_test_id and test_name):
+            existing = db.execute(
+                "SELECT order_id FROM ordered_tests WHERE id = ?", (ordered_test_id,)
+            ).fetchone()
+
+            if not (ordered_test_id and test_name) or existing is None:
                 flash("Test name is required.", "error")
+            elif eut_id and db.execute(
+                "SELECT 1 FROM euts WHERE id = ? AND order_id = ?", (eut_id, existing["order_id"])
+            ).fetchone() is None:
+                flash("Selected EUT does not belong to this test's order.", "error")
             else:
                 db.execute(
-                    "UPDATE ordered_tests SET test_name = ?, required_capability_id = ? WHERE id = ?",
-                    (test_name, required_capability_id, ordered_test_id),
+                    "UPDATE ordered_tests SET eut_id = ?, test_name = ?, required_capability_id = ? WHERE id = ?",
+                    (eut_id, test_name, required_capability_id, ordered_test_id),
                 )
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")

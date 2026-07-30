@@ -73,6 +73,67 @@
 </form>
 {% endfor %}
 
+<h2>Planner: Add EUT (Unit Under Test) to Order</h2>
+<p><em>A project/order can hold one or more EUTs. Test activities can optionally be tagged to the EUT they belong to.</em></p>
+<form method="post">
+  <input type="hidden" name="action" value="create_eut">
+  <label>Order
+    <select name="order_id" required>
+      <option value="">Select</option>
+      {% for o in orders %}
+      <option value="{{ o['id'] }}" {% if eut_form_values.get('order_id')|string == o['id']|string %}selected{% endif %}>{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if eut_form_errors.get('order_id') %}<div class="field-error">{{ eut_form_errors['order_id'] }}</div>{% endif %}
+  <label>EUT Name
+    <input type="text" name="name" value="{{ eut_form_values.get('name', '') }}"
+           class="{{ 'invalid' if eut_form_errors.get('name') }}" required>
+  </label>
+  {% if eut_form_errors.get('name') %}<div class="field-error">{{ eut_form_errors['name'] }}</div>{% endif %}
+  <label>Serial Number
+    <input type="text" name="serial_number" value="{{ eut_form_values.get('serial_number', '') }}">
+  </label>
+  <button type="submit">Add EUT</button>
+</form>
+
+<h3>Existing EUTs</h3>
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      {{ macros.sort_th('Order', 'order_code', 'euts', 'planner.planner_orders') }}
+      {{ macros.sort_th('Name', 'name', 'euts', 'planner.planner_orders') }}
+      {{ macros.sort_th('Serial Number', 'serial_number', 'euts', 'planner.planner_orders') }}
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in euts %}
+    <tr class="{{ 'dup-row' if e['_dup'] }}">
+      <td>{{ e['order_code'] }}</td>
+      <td><input type="text" name="name" value="{{ e['name'] }}" form="eut-save-{{ e['id'] }}"></td>
+      <td><input type="text" name="serial_number" value="{{ e['serial_number'] or '' }}" form="eut-save-{{ e['id'] }}"></td>
+      <td>
+        <button type="submit" form="eut-save-{{ e['id'] }}">Save</button>
+        <button type="submit" form="eut-delete-{{ e['id'] }}">Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><em>Deleting an EUT does not delete its test activities; they remain, unlinked from an EUT.</em></p>
+
+{% for e in euts %}
+<form id="eut-save-{{ e['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="update_eut">
+  <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+</form>
+<form id="eut-delete-{{ e['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="delete_eut">
+  <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+</form>
+{% endfor %}
+
 <h2>Planner: Add Ordered Test to Order</h2>
 <form method="post">
   <input type="hidden" name="action" value="add_test">
@@ -81,6 +142,14 @@
       <option value="">Select</option>
       {% for o in orders %}
       <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>EUT (optional)
+    <select name="eut_id">
+      <option value="">None / whole order</option>
+      {% for e in euts %}
+      <option value="{{ e['id'] }}">{{ e['order_code'] }} - {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
       {% endfor %}
     </select>
   </label>
@@ -97,12 +166,14 @@
   </label>
   <button type="submit">Add Test</button>
 </form>
+<p><em>Select the EUT this test belongs to when the order has more than one; leave unset for a single-EUT order.</em></p>
 
 <h3>Existing Ordered Tests</h3>
 <table border="1" cellpadding="6">
   <thead>
     <tr>
       {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
+      {{ macros.sort_th('EUT', 'eut_name', 'tests', 'planner.planner_orders') }}
       {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
       {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
       <th>Actions</th>
@@ -112,6 +183,14 @@
     {% for t in ordered_tests_rows %}
     <tr class="{{ 'dup-row' if t['_dup'] }}">
       <td>{{ t['order_code'] }}</td>
+      <td>
+        <select name="eut_id" form="test-save-{{ t['ordered_test_id'] }}">
+          <option value="">None / whole order</option>
+          {% for e in euts if e['order_code'] == t['order_code'] %}
+          <option value="{{ e['id'] }}" {% if t['eut_id'] == e['id'] %}selected{% endif %}>{{ e['name'] }}</option>
+          {% endfor %}
+        </select>
+      </td>
       <td><input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}"></td>
       <td>
         <select name="required_capability_id" form="test-save-{{ t['ordered_test_id'] }}">
@@ -149,6 +228,7 @@
     <tr>
       {{ macros.sort_th('Order', 'order_code', 'alloc', 'planner.planner_orders') }}
       {{ macros.sort_th('Customer', 'customer_name', 'alloc', 'planner.planner_orders') }}
+      {{ macros.sort_th('EUT', 'eut_name', 'alloc', 'planner.planner_orders') }}
       {{ macros.sort_th('Test', 'test_name', 'alloc', 'planner.planner_orders') }}
       {{ macros.sort_th('Required Capability', 'capability_name', 'alloc', 'planner.planner_orders') }}
       {{ macros.sort_th('Assigned Resources', 'allocated_summary', 'alloc', 'planner.planner_orders') }}
@@ -160,6 +240,7 @@
     <tr class="{{ 'dup-row' if t['_dup'] }}">
       <td>{{ t['order_code'] }}</td>
       <td>{{ t['customer_name'] }}</td>
+      <td>{{ t['eut_name'] or '-' }}</td>
       <td>{{ t['test_name'] }}</td>
       <td>{{ t['capability_name'] or '-' }}</td>
       <td>

@@ -1,0 +1,19 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}Welcome{% endblock %}
+
+{% block content %}
+<h2>Welcome to RMS</h2>
+<p>RMS replaces spreadsheets for test lab planning: manage resources and capabilities, allocate them to customer orders, and let technicians run and report on the tests &mdash; all from the same data.</p>
+<p><a href="{{ url_for('common.login') }}"><strong>Log in to get started</strong></a></p>
+
+<h3>Three roles, one system</h3>
+<ul>
+  <li><strong>RMS Administrator</strong>: manages resources, capabilities, and user accounts.</li>
+  <li><strong>Test Planner</strong>: manages customer orders and EUTs, plans test activities, and assigns resources to them.</li>
+  <li><strong>Test Technician</strong>: runs the tests assigned to them and fills in, submits, and reviews test reports.</li>
+</ul>
+<p><em>Log in with just a username &mdash; this is a demonstrator with no passwords. The login page lists a demo account for each role.</em></p>
+
+<p>New here? See the <a href="{{ url_for('common.help_page') }}">Help</a> page for each role's workflow once you're logged in.</p>
+{% endblock %}

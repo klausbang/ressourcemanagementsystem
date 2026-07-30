@@ -3,122 +3,275 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v2</title>
+  <title>RMS SRS v3</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v2</h1>
-    <p>Version: 0.2 | Date: 2026-07-28</p>
+    <h1>Resource Management System (RMS) - SRS v3</h1>
+    <p>Version: 0.3 | Date: 2026-07-30</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
   <main>
     <section>
       <h2>1. Purpose</h2>
-      <p>This SRS defines the requirements for the working demonstrator of a web-based RMS for a small test company, from resource/capability setup and order allocation (v1) through technician execution and test reporting (v2, this revision).</p>
+      <p>This SRS defines the requirements for RMS, a web-based planning and execution system for a test laboratory. It replaces three separate spreadsheets/documents the customer currently maintains by hand for every project &mdash; a project-pipeline sheet ("Sprint.xls"), a production/resource schedule ("Projects.xls"), and a per-EUT test plan &mdash; with one system built around a single source of truth.</p>
+      <p>Revision history:</p>
+      <ul>
+        <li><strong>v0.1 (Phase 3-4):</strong> resource/capability setup and customer order/resource allocation.</li>
+        <li><strong>v0.2 (Phase 7):</strong> Test Technician role, work orders, test procedures, and test reports with review/approval.</li>
+        <li><strong>v0.3 (this revision):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
+      </ul>
     </section>
 
     <section>
-      <h2>2. Business Context</h2>
+      <h2>2. Vision and Guiding Principles</h2>
       <ul>
-        <li>The company performs electrical and mechanical tests on customer products.</li>
-        <li>The RMS supports planning and allocation of resources to customer orders, and the technician's execution of and reporting on the tests themselves.</li>
+        <li><strong>Single Source of Truth.</strong> A test activity's status, schedule, and result exist in exactly one place. Every other view (test plan listing, production schedule, dashboard) is <em>generated</em> from that one record, not a manually-copied restatement of it. This directly targets the customer's stated problem: the same fact (e.g. "CE passed") today has to be re-entered in up to four places (testplan, Projects.xls, Sprint.xls, and sometimes twice in Projects.xls).</li>
+        <li><strong>Activity-centric planning, not project-centric.</strong> The system plans and schedules <em>test activities</em> (an EUT going through RE, ESD, a report being written, etc.), not projects as monolithic blocks. A project is a container for its EUTs, and each EUT is a container for its activities. This is what lets a single delay, failure, or hardware swap be absorbed by moving a handful of activities instead of rebuilding a spreadsheet.</li>
+        <li><strong>Design note (challenging this model):</strong> some workflows may be better served by treating the project as the primary planning unit (e.g. very small orders with a single EUT and no cross-activity dependencies). RMS keeps the project and EUT as real entities precisely so this can be revisited per project type without a data model change &mdash; see <a href="#open-questions">Section 13</a>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Glossary</h2>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Project</td><td>A customer's test engagement. Modeled by the existing <code>customer_orders</code> entity (order_code, customer_name).</td></tr>
+          <tr><td>EUT</td><td>Equipment/Unit Under Test &mdash; one physical item being tested under a project. One project can have several EUTs (e.g. two prototype phones with different serial numbers).</td></tr>
+          <tr><td>Test Activity</td><td>A single planned/executed task against an EUT: a standard test (RE, CE, ESD, ...), report writing, review, or logistics (EUT delivery/return). Modeled by the existing <code>ordered_tests</code> entity.</td></tr>
+          <tr><td>Resource</td><td>Anything that can be allocated to an activity: test equipment, a lab/facility, a technician, or a documented procedure.</td></tr>
+          <tr><td>Lab / Chamber</td><td>A facility-type Resource with physical capacity for one activity at a time (e.g. the CON chamber used for CE/CI, the SAC chamber used for RE/RI).</td></tr>
+          <tr><td>Discipline</td><td>A grouping used for status reporting (e.g. EMC, Radio, Safety, Report) &mdash; distinct from an individual test activity.</td></tr>
+          <tr><td>Site</td><td>One of the customer's two physical labs (TLC, TLS); some equipment is shared and moves between them.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Business Context</h2>
+      <ul>
+        <li>The company performs electrical, mechanical, and environmental tests on customer products across two lab sites (TLC and TLS).</li>
+        <li>Today the same information is tracked and manually re-entered across a project-pipeline sheet, a production schedule sheet, and a per-EUT test plan, which the customer has identified as fragile: a single schedule change (a test overrunning, a failure, new hardware from the customer, an absent engineer) requires editing many fields by hand across documents.</li>
         <li>Example orders include multimeter calibration and vibration/humidity tests for a mobile phone under development.</li>
       </ul>
     </section>
 
     <section>
-      <h2>3. User Roles (v2)</h2>
+      <h2>5. User Roles</h2>
       <ul>
-        <li>RMS Administrator: manages resources, capabilities, assignments of capabilities to resources, user accounts, and a technician user's link to their own technician resource.</li>
-        <li>Test Planner: assigns resources to customer orders.</li>
-        <li>Test Technician: works the tests assigned to them &mdash; runs a work order against a documented test procedure, fills in and submits the resulting test report, and reviews/approves or rejects reports submitted by other technicians.</li>
+        <li><strong>RMS Administrator:</strong> manages resources, capabilities, assignments of capabilities to resources, user accounts, and a technician user's link to their own technician resource.</li>
+        <li><strong>Test Planner:</strong> manages projects and EUTs, plans and schedules test activities, and assigns resources to them.</li>
+        <li><strong>Test Technician:</strong> works the tests assigned to them &mdash; runs a work order against a documented test procedure, fills in and submits the resulting test report, and reviews/approves or rejects reports submitted by other technicians.</li>
+      </ul>
+      <p>No new role was identified in customer discovery beyond these three; the dashboard, calendar, and history views planned below are read/edit surfaces for the Test Planner (and, for their own tests, the Test Technician), not new roles.</p>
+    </section>
+
+    <section>
+      <h2>6. Domain Model</h2>
+      <pre>
+Project (customer_orders)
+ |-- EUT (euts)                       [Planned - Phase 8]
+ |     `-- Test Activity (ordered_tests)
+ |           |-- Resources (allocations -> resources)
+ |           |-- Work Order + Result (work_orders)
+ |           |-- Test Report (test_reports -> report_steps)
+ |           `-- History (audit trail)  [Planned - Phase 13]
+ |-- Milestones                       [Planned - Phase 11]
+ `-- Status / Notes                   [Planned - Phase 11]
+      </pre>
+      <p>Design principle: every view (test plan, schedule, dashboard) is generated by querying this one model; nothing is denormalized into a second copy that must be kept in sync by hand.</p>
+    </section>
+
+    <section>
+      <h2>7. Requirement Notation</h2>
+      <ul>
+        <li><strong>BR-nnn</strong> (Business Requirement): why the system needs to do something, in the customer's terms.</li>
+        <li><strong>FR-&lt;area&gt;-n</strong> (Functional Requirement): what the system shall do, grouped by area code (PRJ, TP, RES, CON, CAL, STA, PLN, RSC, VIS, RPT, INT, USE, NTH &mdash; one per subsection of Section 8). Area-coded rather than one flat sequence, so a later phase can add FR-CON-4 without renumbering unrelated requirements.</li>
+        <li><strong>AC-&lt;FR id&gt;.n</strong> (Acceptance Criterion): how a specific functional requirement is verified. Applied to the requirements most likely to be contested by a reviewer or supplier, not exhaustively to every line.</li>
+        <li><strong>Priority:</strong> <strong>Must</strong> (blocks the phase), <strong>Should</strong> (expected, can slip one phase), <strong>Could</strong> (nice-to-have, not scheduled).</li>
+        <li><strong>Status:</strong> <em>Delivered</em> (implemented, phase noted) or <em>Planned</em> (phase noted; see PROJECT_PLAN.md for the phase's task breakdown).</li>
       </ul>
     </section>
 
     <section>
-      <h2>4. Core Functional Requirements</h2>
-      <h3>4.1 Resource and Capability Management</h3>
+      <h2>8. Functional Requirements</h2>
+
+      <h3>8.1 Projects (FR-PRJ)</h3>
+      <p><strong>BR-001:</strong> The laboratory needs one place to create and track a customer engagement instead of a row in Sprint.xls.</p>
       <ul>
-        <li>The system shall store resources in these categories: test procedures, test equipment, test facilities, test technicians, administrators, and test planners.</li>
-        <li>The system shall allow administrators full CRUD (create, read, update, delete) on user accounts, capabilities, and resources.</li>
-        <li>The system shall allow administrators to assign and unassign capabilities on a resource.</li>
-        <li>The system shall allow administrators to link a technician's user account to the technician resource that represents them, which determines which allocated tests appear on that user's technician workspace.</li>
-        <li>The system shall prevent deletion of a capability, resource, or user that is still referenced by an ordered test, allocation, or planner assignment, and shall report a clear reason instead of failing silently.</li>
+        <li><strong>FR-PRJ-1</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on customer orders (order code, customer name, product name).</li>
+        <li><strong>FR-PRJ-2</strong> [Must, Planned - Phase 8]: A project shall be able to hold one or more EUTs (see 8.2), each with its own test activities.</li>
+        <li><strong>FR-PRJ-3</strong> [Should, Planned - Phase 11]: A project shall carry an overall status (e.g. Active, Waiting for customer, Planned, In progress, Reporting, Completed) and a free-text weekly note, replacing the equivalent Sprint.xls columns.</li>
+        <li><strong>FR-PRJ-4</strong> [Could, Planned - Phase 11]: Completed projects shall remain visible in a read-only project history view.</li>
       </ul>
 
-      <h3>4.2 Customer Orders and Allocation</h3>
+      <h3>8.2 Test Plan and EUTs (FR-TP)</h3>
+      <p><strong>BR-002:</strong> The laboratory needs to plan and track tests per physical unit under test, not only per project, since a project can involve several EUTs on independent schedules.</p>
       <ul>
-        <li>The system shall allow planners full CRUD (create, read, update, delete) on customer orders and ordered tests.</li>
-        <li>The system shall allow planners to assign multiple resources to the same ordered test (e.g. equipment, facility, procedure, and technician together), and to unassign any one of them independently, provided each assigned resource has the test's required capability.</li>
-        <li>The system shall prevent the same resource from being assigned twice to the same ordered test.</li>
-        <li>Deleting a customer order shall also remove its ordered tests and all of their allocations; deleting an ordered test shall also remove all of its allocations, work order, and test report.</li>
+        <li><strong>FR-TP-1</strong> [Must, Planned - Phase 8]: The system shall let a planner record one or more EUTs per project, each with a name/description and an optional serial number.</li>
+        <li><strong>FR-TP-2</strong> [Must, Planned - Phase 8]: The system shall let a test activity optionally reference the EUT it belongs to, so activities can be filtered and reported per EUT as well as per project. Existing activities created before this requirement, or created without selecting an EUT, remain valid (the reference is optional, not mandatory), preserving current behavior for simple single-EUT projects.</li>
+        <li><strong>FR-TP-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on test activities within a project, each with a name and a required capability.</li>
+        <li><strong>FR-TP-4</strong> [Should, Planned - Phase 10]: The system shall offer a reusable, ordered standard activity template (e.g. Kick-off, Testplan, EUT delivery, RE, RI, CI, CE, Burst, Surge, Voltage Dips, Power Frequency Magnetic Field, other tests, ESD, Report writing, Report review, Report to customer, EUT return) that a planner can apply to a new EUT to bulk-create its activities in one step, then freely reorder, add to, or remove from per project.</li>
+        <li><strong>AC-FR-TP-1.1:</strong> Given a project with 0 EUTs, when a planner adds an EUT and adds a test activity under it, then the activity is visible both on that EUT's test plan and, unfiltered, on the project's full activity list, without being entered twice.</li>
       </ul>
 
-      <h3>4.3 Test Procedure Library</h3>
+      <h3>8.3 Resources (FR-RES)</h3>
+      <p><strong>BR-003:</strong> Planning must reflect what can actually be booked &mdash; people, equipment, and labs alike &mdash; not just who is free.</p>
       <ul>
-        <li>The system shall let a test procedure be authored against a capability, with a summary, prose process steps, required equipment/facility, and safety notes.</li>
-        <li>The system shall let a test procedure carry an ordered checklist of check-items, each with a pre-authored expected value (acceptance criterion), for use when generating a test report.</li>
-        <li>The system shall present the procedure library to technicians as read-only reference material.</li>
+        <li><strong>FR-RES-1</strong> [Must, Delivered - Phase 3]: The system shall store resources in these categories: test procedures, test equipment, test facilities/labs, test technicians, administrators, and test planners.</li>
+        <li><strong>FR-RES-2</strong> [Must, Delivered - Phase 3]: The system shall allow administrators full CRUD on user accounts, capabilities, and resources, and to assign/unassign capabilities on a resource.</li>
+        <li><strong>FR-RES-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners to assign multiple resources to the same test activity (e.g. equipment, facility, procedure, and technician together), provided each has the activity's required capability, and to unassign any one independently.</li>
+        <li><strong>FR-RES-4</strong> [Must, Delivered - Phase 3]: The system shall prevent the same resource being assigned twice to the same test activity, and prevent deletion of a capability/resource/user still referenced elsewhere, reporting a clear reason.</li>
+        <li><strong>FR-RES-5</strong> [Should, Planned - Phase 9]: A facility/equipment resource shall be able to record which site (TLC or TLS) it is currently at, since some equipment is shared and physically moves between the two labs.</li>
       </ul>
 
-      <h3>4.4 Work Orders</h3>
+      <h3>8.4 Constraints (FR-CON)</h3>
+      <p><strong>BR-003</strong> (continued): Some resources physically cannot serve two activities at once, and this must be enforced by the system rather than relied on from memory. This is the chapter the customer's consultant flagged as likely to become one of the most important.</p>
       <ul>
-        <li>The system shall show each technician the ordered tests where their linked resource has been allocated by a planner, together with the other resources (equipment/facility) allocated to that same test.</li>
-        <li>The system shall let a technician create at most one work order per assigned ordered test, optionally selecting a test procedure at creation or afterward.</li>
-        <li>The system shall move a work order through the lifecycle planned &rarr; in_progress &rarr; (on_hold/resumed) &rarr; completed, recording a pass/fail/n-a result and notes when completed.</li>
+        <li><strong>FR-CON-1</strong> [Must, Planned - Phase 9]: The system shall let an administrator define mutual-exclusion groups of facility resources (e.g. "CON chamber: CE/CI" and "SAC chamber: RE/RI") such that two activities in the same group cannot be scheduled with overlapping time windows.</li>
+        <li><strong>FR-CON-2</strong> [Must, Planned - Phase 9]: When a planner schedules or reschedules an activity into a time window that conflicts with another activity in the same exclusion group (or the same specific piece of equipment/facility, exclusion group or not), the system shall block the change and explain which activity it conflicts with, rather than silently double-booking.</li>
+        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 9]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
+        <li><strong>FR-CON-4</strong> [Could, Planned - Phase 14]: The system shall let a facility reservation span multiple consecutive days (e.g. a multi-day climate-chamber soak) as a single booking rather than one row per day.</li>
+        <li><strong>AC-FR-CON-2.1:</strong> Given RE is scheduled in the SAC chamber from 09:00-12:00, when a planner attempts to schedule RI in the SAC chamber from 10:00-11:00 the same day, then the system rejects the booking and states the conflicting activity and time.</li>
       </ul>
 
-      <h3>4.5 Test Reports and Review/Approval</h3>
+      <h3>8.5 Calendar (FR-CAL)</h3>
+      <p><strong>BR-004:</strong> Scheduling decisions depend on who and what is actually available, which today lives in a separate hand-maintained block of rows at the top of Projects.xls.</p>
       <ul>
-        <li>Once a work order has a test procedure assigned, the system shall let its technician generate a test report template pre-filled with: the test name; the order/customer/product; the equipment and facilities allocated to the test; the technician's name; the unit-under-test's name (defaulted from the order's product) and an editable serial number field; and one fillable row per procedure check-item, each showing its expected value with blank actual-value and pass/fail/n-a fields.</li>
-        <li>The system shall let the authoring technician fill in the unit-under-test details, each step's actual value and result, an overall result, and notes, and save the report as a draft any number of times before submitting.</li>
-        <li>The system shall require every step to have a result and an overall result to be set before a report can be submitted; submitting shall lock the report to further edits by its author and time-stamp the technician's sign-off.</li>
-        <li>The system shall let any technician other than the report's author, or a planner, approve or reject a submitted report; rejecting shall require a comment explaining what needs to change.</li>
-        <li>The system shall let the authoring technician reopen a rejected report for correction and resubmission.</li>
-        <li>The system shall present the test report as a single printable A4-format page, usable both as a blank fill-in form during the test and as the final signed record afterward.</li>
-        <li>The system shall provide a shared reports view listing reports awaiting the current user's review and the full report history, for technicians and planners.</li>
+        <li><strong>FR-CAL-1</strong> [Should, Planned - Phase 12]: The system shall let an administrator record staff absence/vacation periods per technician.</li>
+        <li><strong>FR-CAL-2</strong> [Should, Planned - Phase 12]: The system shall let a planner record customer on-site day(s) linked to a project.</li>
+        <li><strong>FR-CAL-3</strong> [Should, Planned - Phase 12]: The schedule and dashboard views shall visibly flag a technician's absence and a customer's on-site days on the affected dates.</li>
       </ul>
 
-      <h3>4.6 Access Control (Basic)</h3>
+      <h3>8.6 Status Management (FR-STA)</h3>
+      <p><strong>BR-001</strong> (continued): A test's status must be recorded once and reflected everywhere, closing the loop the customer described (testplan &rarr; Projects.xls &rarr; Sprint.xls, updated by hand up to four times per event).</p>
       <ul>
-        <li>The system shall enforce basic role checks for admin-only, planner-only, and technician-only actions, and shared technician-or-planner access to the test reports view.</li>
-        <li>The system shall enforce, in application logic, that a test report can only be edited/submitted by its own technician, and can only be reviewed by someone other than its own technician.</li>
+        <li><strong>FR-STA-1</strong> [Must, Delivered - Phase 7]: The system shall move a work order through the lifecycle planned &rarr; in_progress &rarr; (on_hold/resumed) &rarr; completed, recording a pass/fail/n-a result and notes on completion.</li>
+        <li><strong>FR-STA-2</strong> [Should, Planned - Phase 11]: A project's and a discipline's status (see Glossary) shall be derived from the status of their underlying test activities/work orders, not entered separately.</li>
+      </ul>
+
+      <h3>8.7 Planning and Scheduling (FR-PLN)</h3>
+      <p><strong>BR-003</strong> (continued): The core of "Projects.xls" is a day-by-day, resource-by-resource production schedule; RMS needs an equivalent that is generated, not hand-drawn.</p>
+      <ul>
+        <li><strong>FR-PLN-1</strong> [Must, Delivered - Phase 3]: Every test activity shall be plannable by assigning it resources (equipment, facility, procedure, technician).</li>
+        <li><strong>FR-PLN-2</strong> [Should, Delivered - Phase 7 (WIP)]: The system shall provide a day-view production schedule showing each work order as a time-blocked bar against the resources/technician assigned to it, navigable by day.</li>
+        <li><strong>FR-PLN-3</strong> [Should, Planned - Phase 9]: The schedule view shall display constraint conflicts (see 8.4) inline rather than requiring a separate check.</li>
+        <li><strong>Design note:</strong> the customer's spreadsheet plans in 2-hour blocks because that suits Excel's grid. RMS stores actual start/end timestamps internally (minute resolution) and only uses fixed blocks for the visual grid, so finer-grained scheduling is possible later without a data model change.</li>
+      </ul>
+
+      <h3>8.8 Rescheduling (FR-RSC)</h3>
+      <p><strong>BR-005:</strong> When a test overruns, fails, is interrupted, or the customer sends replacement hardware, the remaining plan must be adjustable without manually touching many unrelated fields &mdash; the customer's consultant called this "the core of the system."</p>
+      <ul>
+        <li><strong>FR-RSC-1</strong> [Must, Delivered - Phase 3/7]: Moving, reassigning, or changing the result of one test activity shall not require manually editing any other activity's stored data (each activity's schedule/resources/result are independent rows, not spreadsheet formulas referencing each other).</li>
+        <li><strong>FR-RSC-2</strong> [Could, Planned - Phase 14]: When an activity is delayed, failed, or its EUT is replaced, the system shall suggest how directly dependent downstream activities (per FR-TP-4 template ordering) could shift, for the planner to accept or ignore. Full automatic optimization/conflict auto-resolution is explicitly out of scope (Section 11) &mdash; this is assisted rescheduling, not automatic rescheduling.</li>
+      </ul>
+
+      <h3>8.9 Visualization and Dashboard (FR-VIS)</h3>
+      <p><strong>BR-004</strong> (continued): The laboratory wants the at-a-glance overview Sprint.xls gives today, generated instead of hand-updated.</p>
+      <ul>
+        <li><strong>FR-VIS-1</strong> [Should, Planned - Phase 11]: The system shall provide a dashboard listing active projects with overall status, per-discipline status, and upcoming milestones.</li>
+        <li><strong>FR-VIS-2</strong> [Should, Planned - Phase 11]: The dashboard shall surface resource conflicts (8.4) and activities missing an EUT, a scheduled date, or a procedure.</li>
+        <li><strong>FR-VIS-3</strong> [Must, Delivered - Phase 7 (WIP)]: See FR-PLN-2 (production schedule chart).</li>
+      </ul>
+
+      <h3>8.10 Reporting (FR-RPT)</h3>
+      <p><strong>BR-001</strong> (continued): A test's pass/fail record and supporting checklist must be captured once, at the point of test, not transcribed later.</p>
+      <ul>
+        <li><strong>FR-RPT-1</strong> [Must, Delivered - Phase 7]: The system shall let a test procedure be authored against a capability, with a summary, prose steps, required equipment/facility, safety notes, and an ordered checklist of check-items with pre-authored expected values.</li>
+        <li><strong>FR-RPT-2</strong> [Must, Delivered - Phase 7]: Once a work order has a procedure assigned, the system shall let its technician generate a test report pre-filled with test/order/equipment/technician identification and one fillable row per check-item.</li>
+        <li><strong>FR-RPT-3</strong> [Must, Delivered - Phase 7]: The system shall require every step and an overall result before a report can be submitted; submitting locks the report and time-stamps sign-off.</li>
+        <li><strong>FR-RPT-4</strong> [Must, Delivered - Phase 7]: The system shall let any technician other than the report's author, or a planner, approve or reject a submitted report (rejection requires a comment), and let the author reopen a rejected report.</li>
+        <li><strong>FR-RPT-5</strong> [Must, Delivered - Phase 7]: The system shall present the test report as a single printable A4 page, usable blank and completed, and provide a shared reports queue/history view.</li>
+      </ul>
+
+      <h3>8.11 Integrations (FR-INT)</h3>
+      <p>No integration requirement was identified in customer discovery beyond replacing the three internal documents (Sprint.xls, Projects.xls, testplan) with RMS itself.</p>
+      <ul>
+        <li><strong>FR-INT-1</strong> [Could, not scheduled]: Export a project's activities/results to a spreadsheet or PDF for customers/partners who are not RMS users, if a future need for this is confirmed.</li>
+      </ul>
+
+      <h3>8.12 Usability (FR-USE)</h3>
+      <ul>
+        <li><strong>FR-USE-1</strong> [Must, Delivered - Phase 3]: The system shall provide two interfaces over identical routes and data &mdash; "Simple" and "Modern" &mdash; switchable at any time, persisted for the session. See docs/dual-ui.html.</li>
+        <li><strong>FR-USE-2</strong> [Must, Delivered - Phase 7]: The technician workspace, work orders, procedure library, and test reports exist only in the Modern interface; a technician's session switches to Modern automatically on login.</li>
+        <li><strong>FR-USE-3</strong> [Must, Delivered - Phase 7]: The test report page shall render as a single A4 page with print-specific styling.</li>
+        <li><strong>FR-USE-4</strong> [Must, Delivered - Phase 8]: An anonymous visitor shall see a public landing page explaining RMS and prompting login, not the resource catalog or any other operational data; the resource catalog requires a signed-in admin, planner, or technician.</li>
+        <li><strong>FR-USE-5</strong> [Must, Delivered - Phase 8]: On login, and whenever a signed-in user visits <code>/</code>, the system shall route them directly to their own role's workspace (Admin, Planner, or Technician dashboard) rather than a shared landing/catalog page. The resource catalog remains implemented but is currently unlinked from navigation in every interface, pending a confirmed need for it.</li>
+      </ul>
+
+      <h3>8.13 Nice-to-have (FR-NTH)</h3>
+      <ul>
+        <li><strong>FR-NTH-1</strong> [Could, Planned - Phase 13]: The system shall keep a change history per test activity ("who moved this test, when, and &mdash; where provided &mdash; why"), viewable alongside the activity.</li>
+        <li><strong>FR-NTH-2</strong> [Could, not scheduled]: Alternate/what-if scheduling (propose an alternative plan without committing it).</li>
+        <li><strong>FR-NTH-3</strong> [Could, not scheduled]: File/photo attachments on test reports.</li>
       </ul>
     </section>
 
     <section>
-      <h2>5. Data Requirements</h2>
+      <h2>9. Data Requirements</h2>
       <ul>
         <li>Store users, roles (including a technician's optional link to their own resource), resources, and capabilities with many-to-many mapping.</li>
-        <li>Store customer orders, ordered tests, and resource allocations.</li>
+        <li>Store projects (customer_orders), and &mdash; from Phase 8 &mdash; EUTs per project, and an optional EUT reference on each test activity.</li>
+        <li>Store test activities (ordered_tests) and resource allocations.</li>
         <li>Store test procedures and their ordered check-items (description + expected value).</li>
-        <li>Store work orders (one per ordered test) with lifecycle status, schedule/execution timestamps, and result.</li>
-        <li>Store test reports (one per work order) with unit-under-test identification, snapshotted report steps (description, expected value, actual value, result), overall result, notes, and technician/reviewer sign-off fields.</li>
+        <li>Store work orders (one per test activity) with lifecycle status, schedule/execution timestamps, and result.</li>
+        <li>Store test reports (one per work order) with unit-under-test identification, snapshotted report steps, overall result, notes, and technician/reviewer sign-off fields.</li>
+        <li>From Phase 9: mutual-exclusion group membership for facility resources, and a site field on facility/equipment resources.</li>
+        <li>From Phase 12: staff absence periods and customer on-site day records.</li>
+        <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
     </section>
 
     <section>
-      <h2>6. Non-Functional Requirements</h2>
+      <h2>10. Non-Functional Requirements</h2>
       <ul>
         <li>Technology: Python with Flask.</li>
         <li>Local first: working local version uses SQLite.</li>
         <li>Cloud target: Railway hosting in later stage.</li>
-        <li>Documentation: SRS, architecture, ER model, development plan, and AI questions page in HTML.</li>
-        <li>Usability: the system shall provide two interfaces over identical routes and data &mdash; "Simple" (plain, dependency-free) and "Modern" (styled, tabbed, usability-focused, with help pages) &mdash; switchable at any time via a button present in both, with the choice persisted for the session. See docs/dual-ui.html.</li>
-        <li>Usability (v2 addition): the technician workspace, work orders, test procedure library, and test reports exist only in the Modern interface, since this workflow has no Simple-interface counterpart; a technician's session is switched to Modern automatically on login.</li>
-        <li>Printability: the test report page shall render as a single A4 page with print-specific styling that removes site navigation/chrome, suitable for printing or saving as PDF both before and after test completion.</li>
+        <li>Documentation: SRS, architecture, ER model, development plan, and AI questions page in HTML, cross-linked from docs/index.html.</li>
+        <li>Usability: see FR-USE-1 through FR-USE-3.</li>
+        <li>Printability: see FR-USE-3.</li>
       </ul>
     </section>
 
     <section>
-      <h2>7. Out of Scope</h2>
+      <h2>11. Out of Scope</h2>
       <ul>
-        <li>Advanced scheduling optimization and conflict auto-resolution.</li>
+        <li>Advanced scheduling optimization and fully automatic conflict auto-resolution (FR-RSC-2 is assisted suggestion only, not automation).</li>
         <li>Production-grade identity management (passwords, SSO, MFA).</li>
-        <li>Digital/cryptographic signatures for report sign-off (v2 uses a simple username + timestamp record, not a legally-binding e-signature).</li>
+        <li>Digital/cryptographic signatures for report sign-off (a simple username + timestamp record, not a legally-binding e-signature).</li>
         <li>Multi-level or multi-reviewer approval chains beyond a single reviewer decision.</li>
-        <li>File/photo attachments on test reports.</li>
+        <li>File/photo attachments on test reports (FR-NTH-3).</li>
+        <li>External system integrations (FR-INT-1) unless a concrete need is confirmed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>12. Requirement-to-Phase Traceability</h2>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead><tr><th>Phase</th><th>Theme</th><th>Requirement areas</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>3-4</td><td>Resource/capability setup, order allocation</td><td>FR-PRJ-1, FR-RES-1..4, FR-PLN-1, FR-RSC-1</td><td>Delivered</td></tr>
+          <tr><td>7</td><td>Technician workflow, test reports, schedule view</td><td>FR-STA-1, FR-PLN-2, FR-RPT-1..5, FR-USE-2..3</td><td>Delivered</td></tr>
+          <tr><td>8</td><td>EUT as a first-class entity; public landing page; role-based home routing</td><td>FR-PRJ-2, FR-TP-1..3, FR-USE-4, FR-USE-5</td><td>Delivered</td></tr>
+          <tr><td>9</td><td>Lab/equipment mutual-exclusion constraints</td><td>FR-RES-5, FR-CON-1..3, FR-PLN-3</td><td>Planned</td></tr>
+          <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Planned</td></tr>
+          <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Planned</td></tr>
+          <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Planned</td></tr>
+          <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Planned</td></tr>
+          <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="open-questions">
+      <h2>13. Assumptions and Open Questions</h2>
+      <ul>
+        <li>Assumed: a test activity's optional EUT reference does not become mandatory in Phase 8, so existing single-EUT projects keep working without data migration of existing rows. Revisit once multi-EUT usage is confirmed as the common case. See also <a href="ai-questions.html">AI Questions and Priorities</a> for the running list of business-rule questions (conflict handling detail, capacity limits, priority rules) raised during Phase 1 and still open.</li>
+        <li>Open: should the project (not the EUT) remain the primary planning unit for very small single-EUT orders? See Section 2's design note.</li>
+        <li>Open: is a spreadsheet/PDF export (FR-INT-1) actually needed, or does customer-facing reporting stay inside RMS?</li>
       </ul>
     </section>
   </main>

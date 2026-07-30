@@ -13,9 +13,21 @@ UI_MODES = ("simple", "modern")
 RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "capabilities"}
 RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "capabilities"]
 
+ROLE_HOME_ENDPOINT = {
+    "admin": "admin.admin_manage",
+    "planner": "planner.planner_orders",
+    "technician": "technician.technician_dashboard",
+}
+
 
 def current_role() -> str | None:
     return session.get("role")
+
+
+def role_home_url() -> str:
+    """Where a signed-in user lands: their role's own workspace, not the (hidden) catalog."""
+    endpoint = ROLE_HOME_ENDPOINT.get(current_role())
+    return url_for(endpoint) if endpoint else url_for("common.login")
 
 
 def current_ui_mode() -> str:
@@ -62,7 +74,7 @@ def require_any_role(*expected_roles: str):
 def set_ui_mode(mode):
     if mode not in UI_MODES:
         flash("Unknown interface mode.", "error")
-        return redirect(url_for("common.resource_catalog"))
+        return redirect(role_home_url())
 
     session["ui_mode"] = mode
 
@@ -70,12 +82,12 @@ def set_ui_mode(mode):
     if referrer:
         parsed = urlparse(referrer)
         if parsed.netloc == request.host:
-            target = parsed.path or url_for("common.resource_catalog")
+            target = parsed.path or role_home_url()
             if parsed.query:
                 target = f"{target}?{parsed.query}"
             return redirect(target)
 
-    return redirect(url_for("common.resource_catalog"))
+    return redirect(role_home_url())
 
 
 @bp.route("/help")
@@ -84,6 +96,14 @@ def help_page():
 
 
 @bp.route("/")
+def home():
+    if session.get("username"):
+        return redirect(role_home_url())
+    return render_ui("landing.html")
+
+
+@bp.route("/catalog")
+@require_any_role("admin", "planner", "technician")
 def resource_catalog():
     init_db()
     db = get_db()
@@ -166,9 +186,7 @@ def login():
             # The technician workspace only exists in the modern UI.
             session["ui_mode"] = "modern"
         flash(f"Signed in as {user['username']} ({user['role']}).", "info")
-        if user["role"] == "technician":
-            return redirect(url_for("technician.technician_dashboard"))
-        return redirect(url_for("common.resource_catalog"))
+        return redirect(role_home_url())
 
     return render_ui("login.html")
 
@@ -180,4 +198,4 @@ def logout():
     if ui_mode:
         session["ui_mode"] = ui_mode
     flash("Signed out.", "info")
-    return redirect(url_for("common.resource_catalog"))
+    return redirect(url_for("common.home"))

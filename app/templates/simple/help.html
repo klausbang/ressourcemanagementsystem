@@ -15,9 +15,6 @@
 </ul>
 <p>Log in with just a username &mdash; this is a local demonstrator with no passwords.</p>
 
-<h3>Resource Catalog</h3>
-<p>The home page (no login required) lists all resources with their type, status, and capabilities, filterable by type or capability.</p>
-
 <h3>Admin Workflow</h3>
 <ol>
   <li>Create capabilities (e.g. "Vibration Test") and resources (equipment, facility, procedure, technician, etc.).</li>
@@ -28,7 +25,8 @@
 <h3>Planner Workflow</h3>
 <ol>
   <li>Create a customer order (order code, customer name, product name).</li>
-  <li>Add one or more ordered tests to that order, each optionally requiring a capability.</li>
+  <li>If the order involves more than one physical unit, add each as an EUT (Equipment/Unit Under Test) &mdash; this is optional and can be left out for a simple, single-unit order.</li>
+  <li>Add one or more ordered tests to that order, each optionally requiring a capability and optionally tagged to the EUT it belongs to.</li>
   <li>Assign resources to each ordered test. A test can have <strong>several</strong> resources assigned at once (e.g. equipment, facility, and a technician together) &mdash; only resources with the test's required capability are offered, and the same resource cannot be assigned twice to the same test.</li>
 </ol>
 

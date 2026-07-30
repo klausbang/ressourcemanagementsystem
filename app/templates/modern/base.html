@@ -11,7 +11,7 @@
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="{{ url_for('common.resource_catalog') }}">
+      <a class="brand" href="{{ url_for('common.home') }}">
         <span class="brand-mark">RMS</span>
         <span class="brand-sub">Resource Management</span>
       </a>
@@ -19,7 +19,6 @@
       <button class="nav-toggle" id="navToggle" type="button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
 
       <nav class="main-nav" id="mainNav">
-        <a href="{{ url_for('common.resource_catalog') }}" class="{{ 'active' if request.endpoint == 'common.resource_catalog' }}">Catalog</a>
         {% if session.get('role') == 'admin' %}
         <a href="{{ url_for('admin.admin_manage') }}" class="{{ 'active' if request.endpoint == 'admin.admin_manage' }}">Admin</a>
         {% endif %}

@@ -40,6 +40,33 @@ Build a lean first version of the Resource Management System by moving through t
 31. Add a technician-then-reviewer sign-off workflow (draft -> submitted -> approved/rejected, reopenable on rejection), where the reviewer must be a different technician or a planner, plus a shared reports queue/history view.
 32. Style the test report as a single printable A4 page usable both blank (during the test) and completed (after sign-off).
 33. Refresh core documentation (SRS, architecture, ER model/diagram, dual-UI notes, backend scope) to describe the Phase 7 additions, and produce a one-page sales brochure summarizing RMS capabilities.
+34. Phase 8 - EUT (Unit Under Test) as a First-Class Entity
+35. Add an EUTs table so a project can hold multiple EUTs, each with a name and optional serial number.
+36. Let a test activity (ordered_test) optionally reference the EUT it belongs to, without breaking existing EUT-less test activities.
+37. Extend planner UI (Simple and Modern) to manage EUTs per order and tag test activities to one.
+38. Seed a multi-EUT demo order and update ER model/diagram and architecture docs to describe the EUT entity.
+39. Phase 9 - Lab and Equipment Mutual-Exclusion Constraints
+40. Model mutual-exclusion groups of facility resources (e.g. CON chamber: CE/CI; SAC chamber: RE/RI) that cannot run with overlapping time windows.
+41. Enforce the conflict check when a planner schedules or reschedules a work order, with a clear explanation of which activity it conflicts with.
+42. Add a site field (TLC/TLS) to facility/equipment resources and warn (not block) on cross-site overlap of shared equipment.
+43. Surface constraint conflicts inline in the existing schedule/Gantt view.
+44. Phase 10 - Standard Project Activity Template
+45. Define a reusable, ordered standard activity template (Kick-off through EUT return) that an admin/planner can maintain.
+46. Let a planner apply the template to a new EUT to bulk-create its test activities in one step, then freely reorder/add/remove per project.
+47. Phase 11 - Project and Discipline Dashboard
+48. Add project-level status and a weekly free-text note, replacing the equivalent Sprint.xls columns.
+49. Derive discipline-level status from underlying test activity/work order status rather than separate manual entry.
+50. Build a dashboard listing active projects with status, discipline status, and upcoming milestones, plus a read-only completed-projects history view.
+51. Surface constraint conflicts and activities missing an EUT/date/procedure on the dashboard.
+52. Phase 12 - Staff and Customer Calendar
+53. Add staff absence/vacation records per technician and customer on-site day records per project.
+54. Surface both on the schedule and dashboard views for the affected dates.
+55. Phase 13 - Change History and Audit Trail
+56. Add an append-only history record for schedule-affecting changes to a test activity (resource assignment, scheduling, status).
+57. Add a per-activity history view answering "who moved this, when, and why."
+58. Phase 14 - Dynamic Rescheduling Assistant (stretch, Could)
+59. Let a facility reservation span multiple consecutive days as a single booking.
+60. When an activity is delayed, failed, or its EUT is replaced, suggest how directly dependent downstream activities (per the Phase 10 template ordering) could shift, for the planner to accept or ignore manually. Full automatic optimization/conflict auto-resolution stays out of scope.
 
 ## Verification
 1. Documentation completeness check: landing page links to all required pages and each page links back to landing.
@@ -49,6 +76,12 @@ Build a lean first version of the Resource Management System by moving through t
 5. Role check validation: unauthorized role cannot execute the other role's protected action.
 6. Data design check: ER model relationships support many-to-many mapping where needed (resource-capability and order-resource allocation).
 7. Deployment readiness check: Railway deployment checklist exists and maps local configuration to production equivalents.
+8. EUT check: a project can have multiple EUTs; test activities can optionally be tagged to one and filtered/reported per EUT.
+9. Constraint check: two activities in the same mutual-exclusion group cannot be scheduled with overlapping windows; the rejection names the conflicting activity and time.
+10. Template check: applying the standard activity template creates all its activities, in the chosen order, in one step.
+11. Dashboard check: project/discipline status and milestones are derived from underlying activity data, not entered a second time, and stay consistent with it.
+12. Calendar check: a technician's absence and a customer's on-site day are visibly flagged on the schedule/dashboard for the correct dates.
+13. History check: a schedule-affecting change to a test activity produces a visible history entry recording who changed it and when.
 
 ## Decisions
 - Local database for first working versions: SQLite.
@@ -57,6 +90,10 @@ Build a lean first version of the Resource Management System by moving through t
 - Diagram embedding format in docs: PNG/SVG.
 - Cloud deployment timing: final stage after stable local app.
 - Duration estimates excluded by request; plan is activity/task based.
+- Customer discovery source for Phases 8-14: a shared ChatGPT conversation transcript with the customer, archived to the repo as `Jens_chatgpt_historic.md` for traceability.
+- SRS restructured as v0.3 around the chapter list the customer's own consultant proposed (Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have), with Must/Should/Could priority and a BR/FR/AC numbering split, per explicit customer request. Existing v0.1/v0.2 requirements were carried forward unchanged in meaning and marked Delivered.
+- A test activity's EUT reference (Phase 8) is optional, not mandatory, so existing single-EUT projects and previously-created test activities keep working without a data migration forcing a value onto them.
+- Phases 8-14 are deliberately kept small and independently demoable, so customer feedback after each one can confirm (or redirect) the approach before the next phase is committed.
 
 ## Progress Tracker
 Status legend: Not Started | In Progress | Done | Blocked
@@ -68,6 +105,13 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Phase 5 - Cloud Deployment Readiness and Final Stage: Not Started
 - Phase 6 - AI Collaboration and Open Questions Governance: Not Started
 - Phase 7 - Technician Workflow and Test Reports: Done
+- Phase 8 - EUT (Unit Under Test) as a First-Class Entity: Done
+- Phase 9 - Lab and Equipment Mutual-Exclusion Constraints: Not Started
+- Phase 10 - Standard Project Activity Template: Not Started
+- Phase 11 - Project and Discipline Dashboard: Not Started
+- Phase 12 - Staff and Customer Calendar: Not Started
+- Phase 13 - Change History and Audit Trail: Not Started
+- Phase 14 - Dynamic Rescheduling Assistant (stretch): Not Started
 
 ### Phase 1 Task Status
 - Task 2 (Minimum SRS scope extraction): Done
@@ -104,6 +148,12 @@ Status legend: Not Started | In Progress | Done | Blocked
 - Task 32 (Printable A4 test report styling): Done
 - Task 33 (Documentation refresh and sales brochure): Done
 
+### Phase 8 Task Status
+- Task 35 (EUTs table, optional per project): Done
+- Task 36 (Optional eut_id reference on ordered_tests): Done
+- Task 37 (Planner UI: EUT management + tagging, Simple and Modern): Done
+- Task 38 (Seed multi-EUT demo order; update ER model/diagram and architecture docs): Done
+
 ## Activity Log
 - 2026-07-21: Initial plan created from prompt and saved to project.
 - 2026-07-21: Preferences confirmed for SQLite, static wireframes first, basic role checks in first working local app, PNG/SVG diagrams, and Railway in final stage.
@@ -128,6 +178,11 @@ Status legend: Not Started | In Progress | Done | Blocked
 - 2026-07-26: Phase 7 Tasks 27-28 completed by adding a `technician` role (app/db.py: CHECK constraint extended, new `users.linked_resource_id` column with an in-place migration for existing SQLite files since SQLite can't alter a CHECK/FK in place), a new `work_orders` table, and `app/routes_technician.py` + `templates/modern/technician_dashboard.html` (Modern-only, see docs/dual-ui.html section 7): a dashboard of tests allocated to the technician's linked resource, showing co-allocated equipment/facility, with work orders moving through planned/in_progress/on_hold/completed. Seeded a second technician account/resource (technician2.demo/TECH-103) and a completed example work order for demo purposes.
 - 2026-07-26: Phase 7 Tasks 29-32 completed by adding `test_procedures`/`procedure_checks` (structured, expected-value checklists per procedure, seeded for all three demo capabilities) and `test_reports`/`report_steps` tables, plus `app/routes_reports.py` and three Modern-only templates (`report_detail.html`, `reports_list.html`). A technician generates a report from a work order once a procedure is set, pre-filled with test/order/equipment/technician identification and one row per check-item; fills in actual values/results/overall result/notes and submits (locks the report, time-stamps sign-off); any *other* technician or a planner approves/rejects (rejection requires a comment) from a shared reports queue; a rejected report can be reopened. The report page doubles as a single printable A4 form (`@page` sizing, `@media print` chrome hiding) for use both blank and completed. Verified end-to-end via an isolated throwaway order (created, exercised the full create/fill/submit/approve flow, then deleted to leave real in-progress user data untouched) plus targeted permission-boundary checks (self-review blocked, reject-without-comment blocked, premature-submit blocked).
 - 2026-07-28: Phase 7 Task 33 completed: refreshed docs/srs.html (v2: Test Technician role, work order/test procedure/test report requirements, updated data/non-functional/out-of-scope sections), docs/architecture.html + docs/architecture-diagram.svg (new blueprints, migration helper, review-permission notes), docs/er-diagram.mmd + regenerated docs/er-diagram.svg + docs/er-model.html (five new entities and their relationships), docs/dual-ui.html (new section 7 documenting the Modern-only exception for technician/report pages), docs/phase3-backend-scope.html and docs/index.html (entity/route/template/navigation updates), and docs/doc-style-guide.html (added Test Technician to the role-name convention). Added docs/brochure.html, a self-contained one-page A4 sales brochure (feature grid, 4-step workflow, role summary, tech stack); verified single-page fit and visual layout via a headless-Chrome PDF/screenshot render before finalizing. Archived to GitHub afterward.
+- 2026-07-30: Customer discovery reviewed (shared ChatGPT conversation transcript, saved as `Jens_chatgpt_historic.md`) covering the customer's current three-document workflow (Sprint.xls pipeline, Projects.xls production schedule, a separate testplan) and their consultant's proposed requirements structure. Rewrote docs/srs.html as v0.3, restructured around the customer's own chapter list (Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have) with Must/Should/Could priority and a BR-/FR-&lt;area&gt;-n/AC- numbering scheme; existing v0.1/v0.2 requirements carried forward unchanged in meaning and marked Delivered. Added matching open questions to docs/ai-questions.html. Added Phases 8-14 to PROJECT_PLAN.md (EUT entity; lab/equipment mutual-exclusion constraints; standard project activity template; project/discipline dashboard; staff/customer calendar; change history/audit trail; dynamic rescheduling assistant), each scoped as a small, independently demoable increment per explicit request to avoid a single large rewrite.
+- 2026-07-30: Phase 8 (EUT as a first-class entity) implemented: added a `euts` table (app/db.py) and an optional `eut_id` FK on `ordered_tests` (`ON DELETE SET NULL`, so deleting an EUT unlinks rather than deletes its test activities), with a migration helper for existing SQLite files that rebuilds the table (a plain `ALTER TABLE ADD COLUMN` cannot attach an `ON DELETE` action to a column added after table creation, unlike a fresh `CREATE TABLE`). Added EUT create/update/delete actions and an optional `eut_id` on add/update-test to app/routes_planner.py, with server-side validation that a test's EUT belongs to the same order. Extended both app/templates/simple/planner_orders.html and app/templates/modern/planner_orders.html with an EUT management section and an EUT column/selector on the ordered-tests and resource-assignment tables, plus updated both help.html pages. Seeded a second EUT ("Prototype Unit B") under ORD-2026-002 with its own Vibration Test activity, alongside the existing "Prototype Unit A" (matching the pre-existing seeded work order/report's serial number), to demonstrate multiple EUTs per project; added a one-time backfill so pre-Phase-8 dev databases link their existing Vibration/Humidity Test rows to Prototype Unit A instead of leaving them EUT-less. Updated docs/er-diagram.mmd + regenerated docs/er-diagram.svg, docs/er-model.html, docs/architecture.html, docs/phase3-backend-scope.html, and docs/index.html for the new entity. Verified with an end-to-end Flask test-client script (both UI modes render the EUT section and seeded EUTs; create/tag/reject-cross-order/delete-unlinks flow all behave correctly) run against the real dev database, plus a double-`create_app()` idempotency check; this verification caught and fixed two real bugs before they could reach the customer demo &mdash; the ADD-COLUMN migration silently dropping the `ON DELETE SET NULL` action (causing EUT deletion to fail with a foreign-key error instead of unlinking), and the original seed data's `INSERT OR IGNORE`/`NOT EXISTS` guards matching by order+test-name only, so introducing a second same-named test under one order caused a work-order/allocation seed collision and, on a pre-existing dev database, left the original test row's EUT link unset.
+- 2026-07-30: `Jens_chatgpt_historic.md` (the customer discovery source referenced above) added to .gitignore at the user's request so it is never included in a GitHub archive/commit, despite being read locally for requirements traceability.
+- 2026-07-30: Fixed an access-control gap noticed after Phase 8: the resource catalog was reachable at `/` with no login required at all. Split the root route in app/routes_common.py into a public `GET /` landing page (new `common.home`, rendering a new `landing.html` in each UI mode) that redirects a signed-in user straight to the catalog, and a `GET /catalog` route (kept as the `common.resource_catalog` endpoint, so every existing `url_for` reference and sortable-column link still resolves) now gated behind `require_any_role("admin", "planner", "technician")`. Updated both base.html navs so the "Catalog"/"Resource Catalog" link and the brand/home link only appear or point usefully once signed in. Updated docs/srs.html (new FR-USE-4), docs/architecture.html, and docs/phase3-backend-scope.html to match. Verified with a Flask test-client script: an anonymous request to `/` gets the landing page with no resource data in it, `/catalog` redirects anonymous requests to login, and a signed-in user is redirected from `/` to `/catalog` and can view it in both UI modes.
+- 2026-07-30: Per follow-up feedback, replaced the just-added catalog-focused redirect with role-based routing: added `role_home_url()` and a `ROLE_HOME_ENDPOINT` map (admin/planner/technician) to app/routes_common.py, used by `login()`, `home()` (`/`), and `set_ui_mode()`'s fallback, so each role lands on its own workspace (Admin/Planner/Technician) instead of the catalog; `logout()` now sends to `/` (the landing page) instead. Removed the Catalog/"Resource Catalog" nav link entirely from both templates/simple/base.html and templates/modern/base.html and the matching stale help text from templates/simple/help.html &mdash; the catalog route itself still works (unchanged access control) but is no longer linked from anywhere in the UI, pending a confirmed need for it. Updated docs/srs.html (new FR-USE-5), docs/architecture.html, and docs/phase3-backend-scope.html to match. Verified with a Flask test-client script across all three roles and both UI modes: login and a bare `/` both land on the correct role workspace, no page renders a Catalog link, and logout returns to the landing page.
 
 ## Open Questions Queue Policy
 - Blocker: Must be answered before current phase can continue.

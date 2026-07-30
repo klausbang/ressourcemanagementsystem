@@ -20,7 +20,8 @@
         <li>capabilities</li>
         <li>resource_capabilities</li>
         <li>customer_orders</li>
-        <li>ordered_tests</li>
+        <li>euts (Phase 8; one or more Equipment/Unit Under Test records per customer order)</li>
+        <li>ordered_tests (optional <code>eut_id</code> reference, added Phase 8)</li>
         <li>allocations</li>
         <li>test_procedures (Phase 7)</li>
         <li>procedure_checks (Phase 7)</li>
@@ -33,9 +34,10 @@
     <section>
       <h2>Route Scope</h2>
       <ul>
-        <li>GET / : resource catalog with filters</li>
+        <li>GET / : public landing page (guides an anonymous visitor to log in); redirects a signed-in user straight to their own role's workspace (Admin/Planner/Technician), not the catalog</li>
+        <li>GET /catalog : resource catalog with filters (requires a signed-in admin, planner, or technician); implemented but currently unlinked from navigation in both interfaces, reachable only by direct URL</li>
         <li>Admin scope (single POST-dispatch route, action field per operation): full CRUD on users, capabilities, and resources; assign/remove capability-to-resource mapping; link a technician user to their resource</li>
-        <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders and ordered tests; assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently</li>
+        <li>Planner scope (single POST-dispatch route, action field per operation): full CRUD on customer orders, EUTs (Phase 8), and ordered tests (optionally tagged to an EUT); assign multiple resources to an ordered test (one allocation per resource) and remove any one of them independently</li>
         <li>Technician scope (<code>routes_technician.py</code>, single POST-dispatch route): dashboard of tests allocated to the technician's linked resource; create a work order per assigned test; set/change its test procedure; move it through planned/in_progress/on_hold/completed; edit notes</li>
         <li>Test report scope (<code>routes_reports.py</code>): create a report from a work order (snapshots that procedure's check-items); fill in and save a draft report; submit for review; approve/reject a submitted report (any technician other than the author, or a planner); reopen a rejected report; list reports pending the current user's review and full report history</li>
         <li>Basic login/logout for role-aware actions; login switches a technician's session to the Modern UI automatically</li>
@@ -48,13 +50,13 @@
         <li>Required fields on create/update forms</li>
         <li>Unique username, resource code, capability name, order code, work_order_code, and report_code (checked on both create and update, excluding the row being edited)</li>
         <li>Role field restricted to admin/planner/technician on user create/update</li>
-        <li>Order must exist before adding an ordered test to it</li>
+        <li>Order must exist before adding an EUT or an ordered test to it; an ordered test's EUT, if selected, must belong to the same order (Phase 8)</li>
         <li>Allocation requires resource to have the test's required capability, and the same resource cannot be assigned twice to the same ordered test (unique on ordered_test_id + resource_id) &mdash; a test can otherwise have any number of different resources allocated at once (e.g. equipment, facility, procedure, and technician together)</li>
         <li>A work order requires a test procedure to be set before a test report can be generated from it; at most one work order per ordered test and at most one test report per work order (both enforced by a <code>UNIQUE</code> column)</li>
         <li>A test report can only be submitted once every step has a result and an overall result is set; only the report's own technician may edit or submit it; only a different technician or a planner may approve/reject it, and rejecting requires a comment</li>
         <li>Deletes that would violate a foreign key (e.g. deleting a capability still required by an ordered test, a resource or user still referenced by an allocation) are caught and reported with a specific reason instead of a raw database error</li>
-        <li>Deleting a customer order cascades to its ordered tests, all of their allocations, work orders, test reports, and report steps; deleting an ordered test cascades the same way at that level. These cascades are enforced at the database level (<code>ON DELETE CASCADE</code>), not in application code</li>
-        <li>Role checks for admin/planner/technician actions</li>
+        <li>Deleting a customer order cascades to its ordered tests, all of their allocations, work orders, test reports, and report steps, and its EUTs; deleting an ordered test cascades the same way at that level. These cascades are enforced at the database level (<code>ON DELETE CASCADE</code>), not in application code. Deleting an EUT does <em>not</em> cascade to its ordered tests &mdash; it clears their <code>eut_id</code> back to NULL instead (<code>ON DELETE SET NULL</code>), since a test activity's schedule/allocations/results are not tied to the EUT record's lifetime</li>
+        <li>Role checks for admin/planner/technician actions; the resource catalog itself requires any signed-in role (it is no longer visible to anonymous visitors)</li>
       </ul>
     </section>
 
@@ -62,6 +64,7 @@
       <h2>Template Scope</h2>
       <p>Every page exists once per interface mode under <code>templates/simple/</code> and <code>templates/modern/</code>; see docs/dual-ui.html for how mode selection and rendering work &mdash; except the Phase 7 technician/report pages below, which are Modern-only (see docs/dual-ui.html section 7).</p>
       <ul>
+        <li>landing.html (public, anonymous-visitor home page)</li>
         <li>resource_catalog.html</li>
         <li>admin_manage.html</li>
         <li>planner_orders.html</li>
@@ -78,7 +81,7 @@
     <section>
       <h2>Table Sorting and Duplicate-Row Highlighting</h2>
       <ul>
-        <li>Every listing table (resource catalog; admin users, capabilities, resources, and resource-capability mapping; planner customer orders, ordered tests, and resource assignment) has clickable, sortable column headers for every displayed column.</li>
+        <li>Every listing table (resource catalog; admin users, capabilities, resources, and resource-capability mapping; planner customer orders, EUTs, ordered tests, and resource assignment) has clickable, sortable column headers for every displayed column.</li>
         <li>Sorting is implemented server-side with no JavaScript: each header is a link that sets a table-scoped <code>&lt;table_id&gt;_sort</code> / <code>&lt;table_id&gt;_dir</code> query parameter (e.g. <code>resources_sort=code&amp;resources_dir=desc</code>), so multiple independent tables on one page (e.g. the four admin tables) sort independently, and existing filters are preserved when re-sorting.</li>
         <li>Any row whose full set of displayed columns exactly matches another row in the same table is flagged and highlighted (amber background, <code>.dup-row</code>), even though the underlying database row is distinct (different primary key). This surfaces cases such as two identical ordered tests added to the same order.</li>
         <li>Sorting and duplicate detection share one helper, <code>app/table_utils.py:rows_with_meta</code>, applied per table in each route.</li>

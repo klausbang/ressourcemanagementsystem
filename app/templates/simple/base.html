@@ -11,9 +11,8 @@
 </head>
 <body>
   <header>
-    <h1>RMS Minimal Local App</h1>
+    <h1><a href="{{ url_for('common.home') }}">RMS Minimal Local App</a></h1>
     <nav>
-      <a href="{{ url_for('common.resource_catalog') }}">Resource Catalog</a>
       <a href="{{ url_for('admin.admin_manage') }}">Admin</a>
       <a href="{{ url_for('planner.planner_orders') }}">Planner</a>
       <a href="{{ url_for('common.help_page') }}">Help</a>

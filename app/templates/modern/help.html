@@ -38,7 +38,8 @@
   <h3>🗂️ Planner workflow</h3>
   <ol>
     <li>Create a <strong>customer order</strong> (order code, customer name, product name) on the Customer orders tab.</li>
-    <li>Add one or more <strong>ordered tests</strong> to that order on the Ordered tests tab, each optionally requiring a capability.</li>
+    <li>If the order involves more than one physical unit, add each as an <strong>EUT</strong> (Equipment/Unit Under Test) on the Customer orders tab &mdash; this is optional and can be left out for a simple, single-unit order.</li>
+    <li>Add one or more <strong>ordered tests</strong> to that order on the Ordered tests tab, each optionally requiring a capability and optionally tagged to the EUT it belongs to.</li>
     <li>On the Resource assignment tab, assign resources to each test. A test can have <strong>several</strong> resources at once — e.g. equipment, a facility, and a technician together. Only resources with the test's required capability are offered, and the same resource can't be assigned twice to one test.</li>
   </ol>
 </div>

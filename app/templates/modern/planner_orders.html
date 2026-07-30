@@ -123,6 +123,76 @@
         <input type="hidden" name="order_id" value="{{ o['id'] }}">
       </form>
       {% endfor %}
+
+      <div class="card" style="margin-top:24px;">
+        <div class="card-title">Add an EUT (Unit Under Test)</div>
+        <div class="card-subtitle">An order can hold one or more EUTs; test activities can optionally be tagged to the EUT they belong to.</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_eut">
+          <div class="field">
+            <label for="eut-order">Order</label>
+            <select id="eut-order" name="order_id" required class="{{ 'invalid' if eut_form_errors.get('order_id') }}">
+              <option value="">Select an order</option>
+              {% for o in orders %}
+              <option value="{{ o['id'] }}" {% if eut_form_values.get('order_id')|string == o['id']|string %}selected{% endif %}>{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+              {% endfor %}
+            </select>
+            {% if eut_form_errors.get('order_id') %}<div class="field-error">{{ eut_form_errors['order_id'] }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="eut-name">EUT name</label>
+            <input type="text" id="eut-name" name="name" value="{{ eut_form_values.get('name', '') }}"
+                   class="{{ 'invalid' if eut_form_errors.get('name') }}" required>
+            {% if eut_form_errors.get('name') %}<div class="field-error">{{ eut_form_errors['name'] }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="eut-serial">Serial number</label>
+            <input type="text" id="eut-serial" name="serial_number" value="{{ eut_form_values.get('serial_number', '') }}">
+          </div>
+          <div class="field"><button type="submit" class="btn btn-primary">Add EUT</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing EUTs</h2></div>
+      {% if euts %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            {{ macros.sort_th('Order', 'order_code', 'euts', 'planner.planner_orders') }}
+            {{ macros.sort_th('Name', 'name', 'euts', 'planner.planner_orders') }}
+            {{ macros.sort_th('Serial Number', 'serial_number', 'euts', 'planner.planner_orders') }}
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for e in euts %}
+            <tr class="{{ 'dup-row' if e['_dup'] }}">
+              <td>{{ e['order_code'] }}{% if e['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+              <td><input type="text" name="name" value="{{ e['name'] }}" form="eut-save-{{ e['id'] }}"></td>
+              <td><input type="text" name="serial_number" value="{{ e['serial_number'] or '' }}" form="eut-save-{{ e['id'] }}"></td>
+              <td class="inline-form">
+                <button type="submit" form="eut-save-{{ e['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="eut-delete-{{ e['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete EUT '{{ e['name'] }}'? Its test activities remain, unlinked from an EUT.">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">📦</span>No EUTs yet. Add one above once an order has multiple units under test.</div>
+      {% endif %}
+      <p class="section-help">Deleting an EUT does not delete its test activities; they remain, unlinked from an EUT.</p>
+
+      {% for e in euts %}
+      <form id="eut-save-{{ e['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_eut">
+        <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+      </form>
+      <form id="eut-delete-{{ e['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_eut">
+        <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+      </form>
+      {% endfor %}
     </section>
 
     <section class="tab-panel" id="panel-tests">
@@ -137,6 +207,15 @@
               <option value="">Select an order</option>
               {% for o in orders %}
               <option value="{{ o['id'] }}">{{ o['order_code'] }} - {{ o['customer_name'] }} ({{ o['product_name'] }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="test-eut">EUT (optional)</label>
+            <select id="test-eut" name="eut_id">
+              <option value="">None / whole order</option>
+              {% for e in euts %}
+              <option value="{{ e['id'] }}">{{ e['order_code'] }} - {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -163,6 +242,7 @@
         <table class="modern-table">
           <thead><tr>
             {{ macros.sort_th('Order', 'order_code', 'tests', 'planner.planner_orders') }}
+            {{ macros.sort_th('EUT', 'eut_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
             <th>Actions</th>
@@ -171,6 +251,14 @@
             {% for t in ordered_tests_rows %}
             <tr class="{{ 'dup-row' if t['_dup'] }}">
               <td>{{ t['order_code'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</td>
+              <td>
+                <select name="eut_id" form="test-save-{{ t['ordered_test_id'] }}">
+                  <option value="">None / whole order</option>
+                  {% for e in euts if e['order_code'] == t['order_code'] %}
+                  <option value="{{ e['id'] }}" {% if t['eut_id'] == e['id'] %}selected{% endif %}>{{ e['name'] }}</option>
+                  {% endfor %}
+                </select>
+              </td>
               <td><input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}"></td>
               <td>
                 <select name="required_capability_id" form="test-save-{{ t['ordered_test_id'] }}">
@@ -217,7 +305,7 @@
         <div class="test-card-head">
           <div>
             <div class="test-card-title">{{ t['test_name'] }}{% if t['_dup'] %}{{ macros.dup_flag() }}{% endif %}</div>
-            <div class="test-card-meta">{{ t['order_code'] }} &middot; {{ t['customer_name'] }} &middot; requires {{ t['capability_name'] or 'no specific capability' }}</div>
+            <div class="test-card-meta">{{ t['order_code'] }} &middot; {{ t['customer_name'] }}{% if t['eut_name'] %} &middot; EUT: {{ t['eut_name'] }}{% endif %} &middot; requires {{ t['capability_name'] or 'no specific capability' }}</div>
           </div>
         </div>
 

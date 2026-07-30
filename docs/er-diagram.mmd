@@ -13,6 +13,8 @@ erDiagram
     resources ||--o{ allocations : "resource_id"
     ordered_tests ||--o{ allocations : "ordered_test_id"
     customer_orders ||--o{ ordered_tests : "order_id"
+    customer_orders ||--o{ euts : "order_id"
+    euts ||--o{ ordered_tests : "eut_id (optional)"
     capabilities ||--o{ ordered_tests : "required_capability_id"
     resources ||--o{ resource_capabilities : "resource_id"
     capabilities ||--o{ resource_capabilities : "capability_id"
@@ -62,9 +64,18 @@ erDiagram
         string product_name
     }
 
+    euts {
+        int id PK
+        int order_id FK
+        string name
+        string serial_number
+        string notes
+    }
+
     ordered_tests {
         int id PK
         int order_id FK
+        int eut_id FK "optional; which EUT this activity belongs to"
         string test_name
         int required_capability_id FK
     }
