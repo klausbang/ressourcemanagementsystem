@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Planner Orders, Option C (Master-Detail)</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #222; }
+    .wf-note { background: #f5f5f5; border: 1px dashed #999; padding: 10px 14px; font-size: 0.9em; }
+    .layout { display: flex; border: 1px solid #999; min-height: 480px; }
+    .master { flex: 0 0 240px; border-right: 1px solid #999; background: #f7f7f7; }
+    .master-item { padding: 10px 12px; border-bottom: 1px solid #ddd; cursor: pointer; font-size: 0.9em; }
+    .master-item .code { font-weight: bold; display: block; }
+    .master-item .cust { color: #555; font-size: 0.9em; }
+    .master-item.selected { background: #e2ecff; border-left: 4px solid #3355aa; padding-left: 8px; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: #999; }
+    .dot-progress { background: #3366cc; }
+    .dot-waiting { background: #cc8800; }
+    .dot-planned { background: #999; }
+    .detail { flex: 1; padding: 16px 20px; }
+    .detail h2 { margin-top: 0; }
+    .status-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .badge { display: inline-block; padding: 1px 8px; border: 1px solid #888; border-radius: 10px; font-size: 0.85em; background: #f0f0f0; }
+    .badge-conflict { border-color: #a00; color: #a00; font-weight: bold; }
+    .badge-waiting { border-color: #a06000; color: #a06000; }
+    .banner { background: #fdecec; border: 1px solid #a00; padding: 8px 12px; margin-bottom: 12px; font-size: 0.92em; }
+    .eut-section { border: 1px solid #ccc; margin-bottom: 12px; }
+    .eut-section h3 { background: #f0f0f0; margin: 0; padding: 6px 10px; font-size: 1em; border-bottom: 1px solid #ccc; }
+    table.acts { border-collapse: collapse; width: 100%; }
+    table.acts th, table.acts td { border: 1px solid #ddd; padding: 4px 8px; font-size: 0.9em; text-align: left; }
+    table.acts th { background: #fafafa; }
+    .side-facts { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; font-size: 0.9em; }
+    .side-facts > div { border: 1px solid #ccc; padding: 6px 10px; background: #fafafa; }
+    .note-box { border: 1px solid #ccc; background: #fffef2; padding: 8px 10px; font-size: 0.9em; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Planner Orders &mdash; Option C: Master-Detail</h1>
+    <p>Role focus: Test Planner</p>
+    <p><a href="customer-order-data-overview.html">&larr; Back to Customer Order Data Overview</a> &middot; <a href="index.html">Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>A slim, always-visible order list on the left; the full picture of whichever order is selected on the right &mdash; EUTs, activities, allocations, milestones, visits, weekly note, and any conflict, all in one screen, without tab-switching. Best for a planner doing sustained work on one order at a time (e.g. building out a new order's activities and assignments in one sitting), at the cost of portfolio-wide overview.</p>
+      <p class="wf-note"><strong>Wireframe only:</strong> dummy data; the left list shows ORD-2026-003 selected (highlighted) with its detail on the right, to demonstrate the pattern for the order that has the most going on (conflict + waiting-for-customer + multiple activities).</p>
+    </section>
+
+    <section>
+      <h2>Master-Detail View (Dummy Data)</h2>
+      <div class="layout">
+        <div class="master">
+          <div class="master-item"><span class="dot dot-planned"></span><span class="code">ORD-2026-001</span><span class="cust">Acme Instruments</span></div>
+          <div class="master-item"><span class="dot dot-progress"></span><span class="code">ORD-2026-002</span><span class="cust">Nova Mobile</span></div>
+          <div class="master-item selected"><span class="dot dot-waiting"></span><span class="code">ORD-2026-003</span><span class="cust">Contoso Labs</span></div>
+          <div class="master-item"><span class="dot dot-planned"></span><span class="code">ORD-2026-004</span><span class="cust">Helios Devices</span></div>
+        </div>
+
+        <div class="detail">
+          <h2>ORD-2026-003 &mdash; Contoso Labs &middot; IoT Gateway</h2>
+          <div class="status-row">
+            <span class="badge badge-waiting">Waiting for Customer</span>
+            <span class="badge">EMC: In Progress</span>
+            <span class="badge badge-conflict">🚫 Conflict</span>
+          </div>
+
+          <div class="banner">🚫 <strong>CE</strong> and <strong>CI</strong> are both in progress in the CON Chamber exclusion group at the same time, and share technician TECH-103.</div>
+
+          <div class="side-facts">
+            <div>📅 Milestone<br><strong>Final report due</strong><br>2026-08-05</div>
+            <div>🧑‍💼 Customer on-site<br><strong>2026-08-03</strong></div>
+            <div>📦 EUTs<br><strong>0</strong> (activities on the order directly)</div>
+          </div>
+
+          <div class="note-box">📝 Weekly note: "Blocked: waiting on customer to confirm which CE/CI limit class applies before we sign off the report." <a href="#">Edit</a></div>
+
+          <div class="eut-section">
+            <h3>Test Activities</h3>
+            <table class="acts">
+              <thead><tr><th>Activity</th><th>Capability</th><th>Resources</th><th>Status</th><th>&nbsp;</th></tr></thead>
+              <tbody>
+                <tr><td>CE</td><td>CE</td><td>FAC-010 (CON Chamber), TECH-103</td><td><span class="badge badge-conflict">In Progress</span></td><td><a href="#">History</a></td></tr>
+                <tr><td>CI</td><td>CI</td><td>FAC-011 (CON Chamber), TECH-103</td><td><span class="badge badge-conflict">In Progress</span></td><td><a href="#">History</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p><a href="#">+ Add EUT</a> &middot; <a href="#">+ Add activity</a> &middot; <a href="#">Apply template</a> &middot; <a href="#">+ Add milestone</a> &middot; <a href="#">+ Add customer visit</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Trade-offs</h2>
+      <ul>
+        <li><strong>Good for:</strong> deep, uninterrupted work on one order &mdash; every fact about it is on screen at once, with no tab-switching between "Ordered tests" and "Resource assignment" like the current layout requires.</li>
+        <li><strong>Weaker at:</strong> the left list only has room for a status dot and name per order, so it can't replace the portfolio-wide view Option B gives; a planner managing many orders in parallel would likely still want a Kanban/board landing screen (Option B) that opens into this detail view.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

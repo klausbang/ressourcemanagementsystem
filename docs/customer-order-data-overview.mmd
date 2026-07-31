@@ -1,0 +1,32 @@
+%% What data hangs off one Customer Order - a planner-oriented view, not a DB schema.
+%% Regenerate with: npx @mermaid-js/mermaid-cli -i docs/customer-order-data-overview.mmd -o docs/customer-order-data-overview.svg -b white
+flowchart TD
+    ORDER["📁 Customer Order<br/>order code · customer · product"]
+
+    NOTE["📝 Weekly note &amp;<br/>waiting-for-customer flag<br/><i>(the only manual status fields)</i>"]
+    STATUS["📊 Overall &amp; per-discipline status<br/><i>(derived from activities below,<br/>never entered twice)</i>"]
+    MILE["📅 Milestones<br/>e.g. report due, EUT delivery"]
+    VISIT["🧑‍💼 Customer on-site visits"]
+    EUT["📦 EUT(s)<br/>Unit(s) Under Test"]
+
+    ORDER --> NOTE
+    ORDER --> STATUS
+    ORDER --> MILE
+    ORDER --> VISIT
+    ORDER --> EUT
+
+    ACT["🧪 Test Activity<br/>(Ordered Test)<br/>e.g. RE, CE, ESD, Report writing"]
+    EUT --> ACT
+    ORDER -. "activities not tied to<br/>a specific EUT" .-> ACT
+
+    ALLOC["🔧 Resources Assigned<br/>equipment · facility · procedure · technician"]
+    HIST["🕘 Change History<br/>who / when / what / why"]
+    WO["📋 Work Order<br/>planned → in progress → on hold → completed"]
+    ACT --> ALLOC
+    ACT --> HIST
+    ACT --> WO
+
+    REPORT["📄 Test Report<br/>checklist, result, sign-off"]
+    CONFLICT["🚫 Conflict flag<br/><i>(if a shared lab/equipment is<br/>double-booked while in progress)</i>"]
+    WO --> REPORT
+    WO -.-> CONFLICT

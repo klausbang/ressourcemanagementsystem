@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Customer Order Data Overview</title>
+</head>
+<body>
+  <header>
+    <h1>Customer Order: Data Overview</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>A customer order is the anchor a planner works from all day, but the data that actually belongs to it is spread across a dozen tables (see <a href="er-model.html">the ER model</a>). This page gives the planner-facing view of the same information: what does one order actually carry, without the database column names. It exists specifically to inform the three view proposals on this page's companion wireframes (Section 3 below), which are alternative ways to present exactly this data.</p>
+    </section>
+
+    <section>
+      <h2>2. What Hangs Off One Customer Order</h2>
+      <img src="customer-order-data-overview.svg" alt="Diagram: a Customer Order relates to a weekly note/status flag, derived status, milestones, customer visits, EUTs, test activities, resource allocations, change history, work orders, test reports, and a conflict flag" width="100%">
+      <p>Source: <a href="customer-order-data-overview.mmd">customer-order-data-overview.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/customer-order-data-overview.mmd -o docs/customer-order-data-overview.svg -b white</pre>
+      <ul>
+        <li><strong>Weekly note &amp; waiting-for-customer flag</strong> are the only two fields a planner types directly onto the order &mdash; everything else below is either structural (created once) or derived (computed from activity status), per the Single Source of Truth principle (SRS BR-001).</li>
+        <li><strong>Status</strong> (overall and per-discipline) is never stored; it is computed from the status of the order's test activities every time it's displayed.</li>
+        <li><strong>Milestones</strong> and <strong>customer visits</strong> are dated entries a planner adds as they become known.</li>
+        <li><strong>EUTs</strong> split an order into its physical units under test, when there's more than one; a test activity can also skip the EUT and belong to the order directly, for simple single-unit orders.</li>
+        <li><strong>Test activities</strong> are the actual work items (RE, CE, ESD, report writing, etc.) &mdash; each one carries its own resource assignments, change history, work order lifecycle, and (once run) test report.</li>
+        <li><strong>Conflict flag</strong> surfaces when a currently in-progress activity is double-booked on a shared lab/piece of equipment with another order's activity (Phase 9).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Three Proposals for Presenting This to the Planner</h2>
+      <p>The current Planner page (<code>planner_orders.html</code>) spreads this across five tabs (Customer orders, EUTs, Ordered tests, Resource assignment, Schedule). These three wireframes are alternative ways to give the planner the overview <em>and</em> let them work with an order's data, for comparison against the current tabbed layout and each other:</p>
+      <ul>
+        <li><a href="wireframe-planner-orders-option-a-expandable-list.html">Option A &mdash; Expandable order list</a>: one flat, scannable list of every order; expand a row in place to see its EUTs and activities without leaving the list.</li>
+        <li><a href="wireframe-planner-orders-option-b-kanban-cards.html">Option B &mdash; Status-grouped cards (Kanban-style)</a>: one card per order, grouped into columns by its derived status &mdash; a pipeline view closer to the customer's original Sprint.xls mental model.</li>
+        <li><a href="wireframe-planner-orders-option-c-master-detail.html">Option C &mdash; Master-detail (two-pane)</a>: a slim order list on the left, full single-order detail on the right &mdash; for a planner working deeply on one order at a time.</li>
+      </ul>
+      <p>All three are static wireframes (dummy data, no working links/forms) meant to compare layout concepts, not finished designs; see each page's own Purpose section for its specific trade-offs.</p>
+    </section>
+  </main>
+</body>
+</html>

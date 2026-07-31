@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Planner Orders, Option B (Kanban Cards)</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #222; }
+    .wf-note { background: #f5f5f5; border: 1px dashed #999; padding: 10px 14px; font-size: 0.9em; }
+    .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 10px; }
+    .column { flex: 0 0 220px; border: 1px solid #999; background: #f7f7f7; min-height: 120px; }
+    .column-head { font-weight: bold; padding: 8px 10px; border-bottom: 1px solid #999; background: #e8e8e8; text-align: center; }
+    .column-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .card { background: #fff; border: 1px solid #999; padding: 8px 10px; font-size: 0.9em; }
+    .card .code { font-weight: bold; }
+    .card .cust { color: #444; }
+    .chip-row { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip { display: inline-block; border: 1px solid #aaa; border-radius: 10px; padding: 0 6px; font-size: 0.78em; background: #f0f0f0; }
+    .chip-conflict { border-color: #a00; color: #a00; font-weight: bold; }
+    .milestone { margin-top: 6px; font-size: 0.85em; color: #555; }
+    .column.col-waiting { background: #fbf3e6; }
+    .column.col-progress { background: #eef3fb; }
+    .column.col-reporting { background: #fbf3e6; }
+    .column.col-completed { background: #eef7ee; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Planner Orders &mdash; Option B: Status-Grouped Cards (Kanban-style)</h1>
+    <p>Role focus: Test Planner</p>
+    <p><a href="customer-order-data-overview.html">&larr; Back to Customer Order Data Overview</a> &middot; <a href="index.html">Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>One card per order, grouped into columns by its <strong>derived</strong> status &mdash; the same status the Dashboard already computes, so this view is just another way of looking at the same single source of truth, not a second place that could disagree with it. Closest in spirit to the customer's original Sprint.xls: a portfolio-level pipeline view across every active order, at the cost of activity-level detail (that still lives on the order's own page).</p>
+      <p class="wf-note"><strong>Wireframe only:</strong> dummy data, no working links, drag-and-drop, or forms &mdash; the column layout is the thing being proposed, not a drag-and-drop implementation (which would be a separate, larger decision).</p>
+    </section>
+
+    <section>
+      <h2>Board (Dummy Data)</h2>
+      <div class="board">
+        <div class="column">
+          <div class="column-head">Planned (2)</div>
+          <div class="column-body">
+            <div class="card">
+              <div class="code">ORD-2026-001</div>
+              <div class="cust">Acme Instruments &mdash; Multimeter</div>
+              <div class="chip-row"><span class="chip">1 activity</span><span class="chip">0 EUTs</span></div>
+            </div>
+            <div class="card">
+              <div class="code">ORD-2026-004</div>
+              <div class="cust">Helios Devices &mdash; Smart Thermostat</div>
+              <div class="chip-row"><span class="chip">17 activities</span><span class="chip">2 EUTs</span></div>
+              <div class="milestone">📅 EUT delivery expected 2026-08-01</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="column col-progress">
+          <div class="column-head">In Progress (1)</div>
+          <div class="column-body">
+            <div class="card">
+              <div class="code">ORD-2026-002</div>
+              <div class="cust">Nova Mobile &mdash; Mobile Phone Prototype</div>
+              <div class="chip-row"><span class="chip">Environmental: In Progress</span><span class="chip">2 EUTs</span></div>
+              <div class="milestone">📅 Draft report to customer 2026-08-10</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="column col-reporting">
+          <div class="column-head">Reporting (0)</div>
+          <div class="column-body">
+            <p style="color:#888; font-size:0.85em; padding:4px;">No orders currently in this state.</p>
+          </div>
+        </div>
+
+        <div class="column col-waiting">
+          <div class="column-head">Waiting for Customer (1)</div>
+          <div class="column-body">
+            <div class="card">
+              <div class="code">ORD-2026-003</div>
+              <div class="cust">Contoso Labs &mdash; IoT Gateway</div>
+              <div class="chip-row"><span class="chip">EMC: In Progress</span><span class="chip chip-conflict">🚫 Conflict</span></div>
+              <div class="milestone">📅 Final report due 2026-08-05</div>
+              <div class="milestone">📝 "Blocked: waiting on customer to confirm CE/CI limit class."</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="column col-completed">
+          <div class="column-head">Completed (0)</div>
+          <div class="column-body">
+            <p style="color:#888; font-size:0.85em; padding:4px;">No orders completed yet in this demo.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Trade-offs</h2>
+      <ul>
+        <li><strong>Good for:</strong> a fast, visual read of the whole pipeline &mdash; "what's stuck, what's moving, what's blocked" &mdash; and it reinforces that status is generated, not typed, by grouping on exactly that computed value.</li>
+        <li><strong>Weaker at:</strong> activity-level detail (which EUT, which resource, which work order) doesn't fit on a card; a planner would still need to open the order for that, so this view works best as a landing/triage screen in front of Option A or C, not a replacement for either.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

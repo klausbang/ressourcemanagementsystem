@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Wireframe - Planner Orders, Option A (Expandable List)</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #222; }
+    .wf-note { background: #f5f5f5; border: 1px dashed #999; padding: 10px 14px; font-size: 0.9em; }
+    .row-header, .row-summary { display: grid; grid-template-columns: 110px 1fr 130px 70px 90px 90px; gap: 8px; align-items: center; padding: 8px 10px; }
+    .row-header { font-weight: bold; background: #e8e8e8; border: 1px solid #999; }
+    .order-block { border: 1px solid #999; border-top: none; }
+    .order-block:first-of-type { border-top: 1px solid #999; }
+    summary.row-summary { cursor: pointer; background: #fafafa; list-style: none; }
+    summary.row-summary::-webkit-details-marker { display: none; }
+    summary.row-summary::before { content: "▶ "; }
+    details[open] > summary.row-summary::before { content: "▼ "; }
+    details[open] > summary.row-summary { background: #eef4ee; }
+    .row-detail { padding: 10px 14px 16px 34px; background: #fff; border-top: 1px dashed #ccc; }
+    .eut-block { margin-bottom: 12px; }
+    .eut-title { font-weight: bold; margin-bottom: 4px; }
+    table.acts { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+    table.acts th, table.acts td { border: 1px solid #ccc; padding: 4px 8px; font-size: 0.92em; text-align: left; }
+    table.acts th { background: #f0f0f0; }
+    .badge { display: inline-block; padding: 1px 8px; border: 1px solid #888; border-radius: 10px; font-size: 0.82em; background: #f0f0f0; }
+    .badge-conflict { border-color: #a00; color: #a00; font-weight: bold; }
+    .badge-waiting { border-color: #a06000; color: #a06000; }
+    .placeholder-actions a { margin-right: 10px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Wireframe: Planner Orders &mdash; Option A: Expandable List</h1>
+    <p>Role focus: Test Planner</p>
+    <p><a href="customer-order-data-overview.html">&larr; Back to Customer Order Data Overview</a> &middot; <a href="index.html">Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Purpose</h2>
+      <p>Keep every order in one flat, scannable list &mdash; sortable/filterable like today's table &mdash; but let the planner expand any row in place to see its EUTs and test activities, without navigating to a separate tab or page. Best when a planner mostly scans many orders and only occasionally needs to drill into one.</p>
+      <p class="wf-note"><strong>Wireframe only:</strong> dummy data, no working links or forms. The <code>▶</code>/<code>▼</code> rows below are real expand/collapse (no JavaScript needed) so you can try the interaction; everything inside them is static.</p>
+    </section>
+
+    <section>
+      <h2>Order List (Dummy Data)</h2>
+      <div class="row-header">
+        <span>Order</span><span>Customer / Product</span><span>Status</span><span>EUTs</span><span>Activities</span><span>Flags</span>
+      </div>
+
+      <div class="order-block">
+        <details>
+          <summary class="row-summary">
+            <span>ORD-2026-001</span><span>Acme Instruments &mdash; Multimeter</span><span><span class="badge">Planned</span></span><span>&mdash;</span><span>1</span><span></span>
+          </summary>
+          <div class="row-detail">
+            <table class="acts">
+              <thead><tr><th>Activity</th><th>Required Capability</th><th>Resources</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Multimeter Calibration</td><td>Multimeter Calibration</td><td>&mdash;</td><td><span class="badge">Not yet actioned</span></td></tr>
+              </tbody>
+            </table>
+            <div class="placeholder-actions"><a href="#">Add EUT</a><a href="#">Add activity</a><a href="#">Assign resources</a></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="order-block">
+        <details open>
+          <summary class="row-summary">
+            <span>ORD-2026-002</span><span>Nova Mobile &mdash; Mobile Phone Prototype</span><span><span class="badge">In Progress</span></span><span>2</span><span>3</span><span></span>
+          </summary>
+          <div class="row-detail">
+            <div class="eut-block">
+              <div class="eut-title">📦 Prototype Unit A (SN-88213-004)</div>
+              <table class="acts">
+                <thead><tr><th>Activity</th><th>Required Capability</th><th>Resources</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>Vibration Test</td><td>Vibration Test</td><td>EQ-020, TECH-102</td><td><span class="badge">Completed &mdash; pass</span></td></tr>
+                  <tr><td>Humidity Test</td><td>Humidity Test</td><td>FAC-004, TECH-102</td><td><span class="badge">In Progress</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="eut-block">
+              <div class="eut-title">📦 Prototype Unit B (SN-88213-005)</div>
+              <table class="acts">
+                <thead><tr><th>Activity</th><th>Required Capability</th><th>Resources</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>Vibration Test</td><td>Vibration Test</td><td>&mdash;</td><td><span class="badge">Not yet actioned</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>📅 Milestone: Draft report to customer &mdash; 2026-08-10</p>
+            <div class="placeholder-actions"><a href="#">Add EUT</a><a href="#">Add activity</a><a href="#">Assign resources</a><a href="#">History</a></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="order-block">
+        <details open>
+          <summary class="row-summary">
+            <span>ORD-2026-003</span><span>Contoso Labs &mdash; IoT Gateway</span><span><span class="badge badge-waiting">Waiting for Customer</span></span><span>&mdash;</span><span>2</span><span><span class="badge badge-conflict">🚫 Conflict</span></span>
+          </summary>
+          <div class="row-detail">
+            <table class="acts">
+              <thead><tr><th>Activity</th><th>Required Capability</th><th>Resources</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>CE</td><td>CE</td><td>FAC-010 (CON Chamber), TECH-103</td><td><span class="badge badge-conflict">In Progress &mdash; conflict</span></td></tr>
+                <tr><td>CI</td><td>CI</td><td>FAC-011 (CON Chamber), TECH-103</td><td><span class="badge badge-conflict">In Progress &mdash; conflict</span></td></tr>
+              </tbody>
+            </table>
+            <p><em>🚫 CE and CI are both using the CON Chamber exclusion group at the same time &mdash; and share technician TECH-103.</em></p>
+            <p>📝 Weekly note: "Blocked: waiting on customer to confirm which CE/CI limit class applies before we sign off the report."</p>
+            <p>📅 Milestone: Final report due &mdash; 2026-08-05</p>
+            <div class="placeholder-actions"><a href="#">Add EUT</a><a href="#">Add activity</a><a href="#">Assign resources</a><a href="#">History</a></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="order-block">
+        <details>
+          <summary class="row-summary">
+            <span>ORD-2026-004</span><span>Helios Devices &mdash; Smart Thermostat</span><span><span class="badge">Planned</span></span><span>2</span><span>17</span><span></span>
+          </summary>
+          <div class="row-detail">
+            <div class="eut-block">
+              <div class="eut-title">📦 Rev A (SN-71100-001) &mdash; 17 activities, applied from "Standard EMC Test Sequence"</div>
+              <table class="acts">
+                <thead><tr><th>Activity</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>Kick-off</td><td><span class="badge">Not yet actioned</span></td></tr>
+                  <tr><td>Testplan</td><td><span class="badge">Not yet actioned</span></td></tr>
+                  <tr><td>&hellip; 15 more (RE, RI, CI, CE, Burst, Surge&hellip;)</td><td>&mdash;</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="eut-block">
+              <div class="eut-title">📦 Rev B (SN-71100-002) &mdash; no activities yet</div>
+            </div>
+            <p>📅 Milestone: EUT delivery expected &mdash; 2026-08-01</p>
+            <div class="placeholder-actions"><a href="#">Apply template to Rev B</a><a href="#">Assign resources</a></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2>Trade-offs</h2>
+      <ul>
+        <li><strong>Good for:</strong> scanning many orders at once; keeping the whole-portfolio status visible while still being able to drill in without losing your place in the list.</li>
+        <li><strong>Weaker at:</strong> a heavily-loaded order (like ORD-2026-004 with 17 activities) makes for a long expanded block that pushes other rows far down the page; no room for a persistent "always visible" detail pane.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
