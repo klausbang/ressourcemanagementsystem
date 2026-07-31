@@ -1,0 +1,28 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}Activity History{% endblock %}
+
+{% block content %}
+<h2>History: {{ activity.test_name }}</h2>
+<p>{{ activity.order_code }} - {{ activity.customer_name }}{% if activity.eut_name %} - EUT: {{ activity.eut_name }}{% endif %}</p>
+<p><a href="{{ url_for('planner.planner_orders') }}">&larr; Back to Planner</a></p>
+
+{% if entries %}
+<table border="1" cellpadding="6">
+  <thead><tr><th>When</th><th>Who</th><th>What</th><th>Why</th></tr></thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td>{{ e.changed_at }}</td>
+      <td>{{ e.username or 'system' }}</td>
+      <td>{{ e.detail }}</td>
+      <td>{{ e.reason or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><em>Newest first. Every schedule-affecting change to this activity is recorded here automatically.</em></p>
+{% else %}
+<p><em>No recorded changes yet for this activity.</em></p>
+{% endif %}
+{% endblock %}

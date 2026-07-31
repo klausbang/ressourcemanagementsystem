@@ -313,6 +313,7 @@
               </td>
               <td class="inline-form">
                 <button type="submit" form="test-save-{{ t['ordered_test_id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}" class="btn btn-secondary btn-sm" title="View change history">🕘 History</a>
                 <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete test '{{ t['test_name'] }}'? This also deletes any resource allocations for it.">Delete</button>
               </td>
             </tr>

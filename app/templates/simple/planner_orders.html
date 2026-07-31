@@ -240,6 +240,7 @@
       </td>
       <td>
         <button type="submit" form="test-save-{{ t['ordered_test_id'] }}">Save</button>
+        <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}">History</a>
         <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}">Delete</button>
       </td>
     </tr>

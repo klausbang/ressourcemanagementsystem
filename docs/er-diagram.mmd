@@ -37,6 +37,8 @@ erDiagram
     customer_orders ||--o{ milestones : "order_id"
     resources ||--o{ staff_absences : "resource_id"
     customer_orders ||--o{ customer_visits : "order_id"
+    ordered_tests ||--o{ activity_history : "ordered_test_id"
+    users ||--o{ activity_history : "user_id"
 
     users {
         int id PK
@@ -108,6 +110,17 @@ erDiagram
         string start_date
         string end_date
         string notes "optional"
+    }
+
+    activity_history {
+        int id PK
+        int ordered_test_id FK
+        string changed_at
+        int user_id FK "nullable"
+        string username "denormalized snapshot, survives user deletion/rename"
+        string action "e.g. resource_assigned|reordered|eut_changed|work_order_started"
+        string detail "human-readable description of what changed"
+        string reason "optional; populated only when the acting workflow already collects a note"
     }
 
     euts {

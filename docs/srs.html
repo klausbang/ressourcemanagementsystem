@@ -206,7 +206,8 @@ Project (customer_orders)
 
       <h3>8.13 Nice-to-have (FR-NTH)</h3>
       <ul>
-        <li><strong>FR-NTH-1</strong> [Could, Planned - Phase 13]: The system shall keep a change history per test activity ("who moved this test, when, and &mdash; where provided &mdash; why"), viewable alongside the activity.</li>
+        <li><strong>FR-NTH-1</strong> [Could, Delivered - Phase 13]: The system shall keep a change history per test activity ("who moved this test, when, and &mdash; where provided &mdash; why"), viewable alongside the activity.</li>
+        <li><strong>Design note (FR-NTH-1 scope):</strong> history is recorded automatically for schedule-affecting changes &mdash; resource assignment/removal, reordering, EUT reassignment, and the work order lifecycle (created/started/held/resumed/completed, procedure changed) &mdash; rather than requiring every action to prompt for a reason. "Why" is only ever populated when the acting workflow already collects a note (currently: the technician's completion notes); every other entry's "why" column is blank, which is expected, not missing data.</li>
         <li><strong>FR-NTH-2</strong> [Could, not scheduled]: Alternate/what-if scheduling (propose an alternative plan without committing it).</li>
         <li><strong>FR-NTH-3</strong> [Could, not scheduled]: File/photo attachments on test reports.</li>
       </ul>
@@ -225,6 +226,7 @@ Project (customer_orders)
         <li>From Phase 10 (delivered): activity templates and their ordered items (activity name + optional required capability), and an optional sequence number on each test activity, scoped per order/EUT, so activities can be freely reordered.</li>
         <li>From Phase 11 (delivered): an optional discipline field on capabilities; a weekly note and a waiting-for-customer flag on each project (the only two manually-entered project-status fields); milestones per project (title, optional target date, optional notes).</li>
         <li>From Phase 12 (delivered): staff absences per technician resource (start/end date, optional reason), admin-managed; customer on-site visits per project (start/end date, optional notes), planner-managed.</li>
+        <li>From Phase 13 (delivered): an append-only change history per test activity (when, who, a system-generated description of what changed, and an optional why), covering resource assignment/removal, reordering, EUT reassignment, and the work order lifecycle.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -266,7 +268,7 @@ Project (customer_orders)
           <tr><td>10</td><td>Standard project activity template</td><td>FR-TP-4</td><td>Delivered</td></tr>
           <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Delivered</td></tr>
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Delivered</td></tr>
-          <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Planned</td></tr>
+          <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Delivered</td></tr>
           <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
         </tbody>
       </table>
@@ -284,6 +286,7 @@ Project (customer_orders)
         <li>Assumed (Phase 11): the discipline groupings seeded so far (Calibration, Environmental, EMC) and the two name-based fallback buckets (Report, Project Management) are a stopgap, not the confirmed taxonomy &mdash; see the matching open question in <a href="ai-questions.html">AI Questions</a>.</li>
         <li>Open (Phase 11): is "Waiting for Customer" the only manually-flagged project state needed, or are there other externally-caused holds (e.g. "waiting on a spare part", "lab closed") that deserve their own flag rather than being folded into the free-text weekly note?</li>
         <li>Open (Phase 12): the schedule's absence/visit banner only checks the single day being viewed; a multi-day absence/visit is otherwise invisible until you navigate to a day inside it. Is a compact "this week at a glance" strip worth adding, or is per-day plus the dashboard's 14-day absence list enough?</li>
+        <li>Open (Phase 13): should test activity edits (name/required capability changes, not just EUT/sequence) also be logged, or is the current schedule-affecting-only scope the right line? Should a project-level history view (across all its activities at once) be added, or is per-activity enough?</li>
       </ul>
     </section>
   </main>

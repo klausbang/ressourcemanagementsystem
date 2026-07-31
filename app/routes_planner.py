@@ -3,6 +3,7 @@ from datetime import date, datetime, time, timedelta
 
 from flask import Blueprint, flash, redirect, request, session, url_for
 
+from . import history
 from .db import get_db, init_db
 from .routes_common import render_ui, require_role
 from .scheduling import find_all_running_conflicts
@@ -585,6 +586,10 @@ def planner_orders():
                 else:
                     db.execute("UPDATE ordered_tests SET sequence = ? WHERE id = ?", (neighbor["sequence"], item["id"]))
                     db.execute("UPDATE ordered_tests SET sequence = ? WHERE id = ?", (item["sequence"], neighbor["id"]))
+                    history.record(
+                        db, item["id"], session.get("user_id"), session.get("username"),
+                        "reordered", f"Moved {direction} (sequence {item['sequence']} -> {neighbor['sequence']}).",
+                    )
                     db.commit()
                     flash("Test reordered.", "info")
 
@@ -611,12 +616,24 @@ def planner_orders():
                 # its new scope's order, rather than keeping a sequence number that was
                 # only meaningful in the old scope.
                 sequence = existing["sequence"]
-                if eut_id != existing["eut_id"]:
+                eut_changed = eut_id != existing["eut_id"]
+                if eut_changed:
                     sequence = _next_sequence(db, existing["order_id"], eut_id)
                 db.execute(
                     "UPDATE ordered_tests SET eut_id = ?, test_name = ?, required_capability_id = ?, sequence = ? WHERE id = ?",
                     (eut_id, test_name, required_capability_id, sequence, ordered_test_id),
                 )
+                if eut_changed:
+                    def _eut_label(eid):
+                        if not eid:
+                            return "no EUT"
+                        row = db.execute("SELECT name FROM euts WHERE id = ?", (eid,)).fetchone()
+                        return row["name"] if row else "no EUT"
+                    history.record(
+                        db, ordered_test_id, session.get("user_id"), session.get("username"),
+                        "eut_changed",
+                        f"Moved from {_eut_label(existing['eut_id'])} to {_eut_label(eut_id)}.",
+                    )
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")
 
@@ -631,7 +648,21 @@ def planner_orders():
 
         if action == "delete_allocation":
             allocation_id = request.form.get("allocation_id", "").strip()
+            alloc = db.execute(
+                """
+                SELECT a.ordered_test_id, r.code, r.name
+                FROM allocations a
+                JOIN resources r ON r.id = a.resource_id
+                WHERE a.id = ?
+                """,
+                (allocation_id,),
+            ).fetchone()
             db.execute("DELETE FROM allocations WHERE id = ?", (allocation_id,))
+            if alloc:
+                history.record(
+                    db, alloc["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "resource_removed", f"Resource {alloc['code']} ({alloc['name']}) unassigned.",
+                )
             db.commit()
             flash("Resource unassigned from test.", "info")
             return redirect(url_for("planner.planner_orders"))
@@ -670,6 +701,12 @@ def planner_orders():
                     VALUES (?, ?, ?, ?)
                     """,
                     (ordered_test_id, resource_id, session.get("user_id"), "Assigned by planner"),
+                )
+                resource = db.execute("SELECT code, name FROM resources WHERE id = ?", (resource_id,)).fetchone()
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "resource_assigned",
+                    f"Resource {resource['code']} ({resource['name']}) assigned." if resource else "Resource assigned.",
                 )
                 db.commit()
                 flash("Resource assigned to test.", "info")
@@ -937,3 +974,37 @@ def dashboard():
     orders = db.execute("SELECT id, order_code FROM customer_orders ORDER BY order_code").fetchall()
     context["orders"] = orders
     return render_ui("dashboard.html", **context)
+
+
+@bp.route("/activity/<int:ordered_test_id>/history")
+@require_role("planner")
+def activity_history(ordered_test_id):
+    init_db()
+    db = get_db()
+
+    activity = db.execute(
+        """
+        SELECT ot.id, ot.test_name, o.order_code, o.customer_name, e.name AS eut_name
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN euts e ON e.id = ot.eut_id
+        WHERE ot.id = ?
+        """,
+        (ordered_test_id,),
+    ).fetchone()
+
+    if activity is None:
+        flash("That test activity no longer exists.", "error")
+        return redirect(url_for("planner.planner_orders"))
+
+    entries = db.execute(
+        """
+        SELECT changed_at, username, action, detail, reason
+        FROM activity_history
+        WHERE ordered_test_id = ?
+        ORDER BY changed_at DESC, id DESC
+        """,
+        (ordered_test_id,),
+    ).fetchall()
+
+    return render_ui("activity_history.html", activity=activity, entries=entries)

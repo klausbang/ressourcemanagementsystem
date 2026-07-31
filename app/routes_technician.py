@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
+from . import history
 from .db import get_db, init_db
 from .routes_common import require_role
 from .scheduling import conflict_message, find_running_conflict
@@ -180,6 +181,10 @@ def technician_dashboard():
                     """,
                     (code, ordered_test_id, session.get("user_id"), procedure_id, scheduled_date, notes),
                 )
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "work_order_created", f"Work order {code} created.",
+                )
                 db.commit()
                 flash(f"Work order {code} created.", "info")
 
@@ -187,7 +192,7 @@ def technician_dashboard():
 
         if action == "start_work_order":
             work_order_id = request.form.get("work_order_id", "").strip()
-            wo = db.execute("SELECT ordered_test_id FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
+            wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
             if conflict:
                 flash(conflict_message(conflict), "error")
@@ -196,25 +201,39 @@ def technician_dashboard():
                     "UPDATE work_orders SET status = 'in_progress', started_at = ? WHERE id = ?",
                     (_now(), work_order_id),
                 )
+                history.record(
+                    db, wo["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "work_order_started", f"Work order {wo['work_order_code']} started.",
+                )
                 db.commit()
                 flash("Work order started.", "info")
             return redirect(url_for("technician.technician_dashboard"))
 
         if action == "hold_work_order":
             work_order_id = request.form.get("work_order_id", "").strip()
+            wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             db.execute("UPDATE work_orders SET status = 'on_hold' WHERE id = ?", (work_order_id,))
+            if wo:
+                history.record(
+                    db, wo["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "work_order_held", f"Work order {wo['work_order_code']} put on hold.",
+                )
             db.commit()
             flash("Work order put on hold.", "info")
             return redirect(url_for("technician.technician_dashboard"))
 
         if action == "resume_work_order":
             work_order_id = request.form.get("work_order_id", "").strip()
-            wo = db.execute("SELECT ordered_test_id FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
+            wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
             if conflict:
                 flash(conflict_message(conflict), "error")
             else:
                 db.execute("UPDATE work_orders SET status = 'in_progress' WHERE id = ?", (work_order_id,))
+                history.record(
+                    db, wo["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "work_order_resumed", f"Work order {wo['work_order_code']} resumed.",
+                )
                 db.commit()
                 flash("Work order resumed.", "info")
             return redirect(url_for("technician.technician_dashboard"))
@@ -227,10 +246,18 @@ def technician_dashboard():
             if not result:
                 flash("A pass/fail/n-a result is required to complete a work order.", "error")
             else:
+                wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
                 db.execute(
                     "UPDATE work_orders SET status = 'completed', completed_at = ?, result = ?, notes = ? WHERE id = ?",
                     (_now(), result, notes, work_order_id),
                 )
+                if wo:
+                    history.record(
+                        db, wo["ordered_test_id"], session.get("user_id"), session.get("username"),
+                        "work_order_completed",
+                        f"Work order {wo['work_order_code']} completed with result: {result}.",
+                        reason=notes,
+                    )
                 db.commit()
                 flash("Work order completed.", "info")
 
@@ -239,7 +266,15 @@ def technician_dashboard():
         if action == "update_procedure":
             work_order_id = request.form.get("work_order_id", "").strip()
             procedure_id = request.form.get("procedure_id", "").strip() or None
+            wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             db.execute("UPDATE work_orders SET procedure_id = ? WHERE id = ?", (procedure_id, work_order_id))
+            if wo:
+                proc = db.execute("SELECT title FROM test_procedures WHERE id = ?", (procedure_id,)).fetchone() if procedure_id else None
+                history.record(
+                    db, wo["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "procedure_changed",
+                    f"Test procedure changed to: {proc['title']}." if proc else "Test procedure cleared.",
+                )
             db.commit()
             flash("Test procedure updated.", "info")
             return redirect(url_for("technician.technician_dashboard"))

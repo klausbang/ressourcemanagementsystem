@@ -108,6 +108,19 @@ CREATE TABLE IF NOT EXISTS ordered_tests (
     FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
 );
 
+CREATE TABLE IF NOT EXISTS activity_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ordered_test_id INTEGER NOT NULL,
+    changed_at TEXT NOT NULL,
+    user_id INTEGER,
+    username TEXT,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    reason TEXT,
+    FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS activity_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -872,6 +885,12 @@ def init_demo_seed() -> None:
           AND NOT EXISTS (SELECT 1 FROM test_reports tr WHERE tr.work_order_id = wo.id)
     """)
 
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-19 14:00", "planner.demo", "resource_assigned", "Resource EQ-020 (Vibration Tester V-9) assigned.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-19 14:01", "planner.demo", "resource_assigned", "Resource TECH-102 (Maya Jensen) assigned.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 09:00", "technician.demo", "work_order_created", "Work order WO-0001 created.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 09:00", "technician.demo", "work_order_started", "Work order WO-0001 started.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 11:30", "technician.demo", "work_order_completed", "Work order WO-0001 completed with result: pass.", reason="No anomalies observed on functional monitoring; no visible damage on post-test inspection.")
+
     db.execute("""
         INSERT INTO report_steps (report_id, step_number, description, expected_value, actual_value, result)
         SELECT tr.id, pc.step_number, pc.description, pc.expected_value, pc.expected_value, 'pass'
@@ -916,6 +935,34 @@ def _seed_exclusion_group(db: sqlite3.Connection, name: str, notes: str, resourc
             """,
             (group_id, code),
         )
+
+
+def _seed_history_entry(
+    db: sqlite3.Connection,
+    order_code: str,
+    test_name: str,
+    eut_name: str,
+    changed_at: str,
+    username: str,
+    action: str,
+    detail: str,
+    reason: str | None = None,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO activity_history (ordered_test_id, changed_at, user_id, username, action, detail, reason)
+        SELECT ot.id, ?, u.id, u.username, ?, ?, ?
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN euts e ON e.id = ot.eut_id AND e.name = ?
+        JOIN users u ON u.username = ?
+        WHERE o.order_code = ? AND ot.test_name = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM activity_history h WHERE h.ordered_test_id = ot.id AND h.action = ? AND h.changed_at = ?
+          )
+        """,
+        (changed_at, action, detail, reason, eut_name, username, order_code, test_name, action, changed_at),
+    )
 
 
 def _seed_milestone(db: sqlite3.Connection, order_code: str, title: str, target_date: str) -> None:
