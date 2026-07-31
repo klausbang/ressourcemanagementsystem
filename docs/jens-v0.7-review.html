@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Review: Jens Udviklingsplan &amp; SRS v0.7</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 20px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #f0f0f0; }
+    .must { color: #a00; font-weight: bold; }
+    .should { color: #a06000; font-weight: bold; }
+    .could { color: #555; }
+    .gap { background: #fdecec; }
+    .escalation { background: #fff8e1; }
+    .aligned { background: #eef7ee; }
+    .verdict { background: #f5f5f5; border: 1px dashed #999; padding: 10px 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Review: <code>JENS_udviklingsplan.md</code> &amp; <code>JENS_SRS_EMC_Lab_v0.7.md</code></h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+    <p><em>This is a review document for you to comment on &mdash; nothing in it has been implemented yet. Where I propose a change, I've marked it as a proposal, not a decision.</em></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. What these two documents are</h2>
+      <ul>
+        <li><strong><code>JENS_SRS_EMC_Lab_v0.7.md</code></strong> (dated 2026-07-29, "ChatGPT + user collaboration") &mdash; a formal Danish-language SRS covering the same EMC lab scheduling problem, with its own domain model, roles, functional requirements (FR-001..039), non-functional requirements, business rules, and acceptance criteria.</li>
+        <li><strong><code>JENS_udviklingsplan.md</code></strong> &mdash; a shorter development plan: MVP scope, five build phases, a <em>recommended technical stack</em>, a prioritized backlog, MVP acceptance criteria, and risks.</li>
+      </ul>
+      <p><strong>Timing note:</strong> v0.7 is dated one day before we rewrote our own SRS to v0.3 from <code>Jens_chatgpt_historic.md</code> (the raw chat transcript). It looks like these two files are the same customer/consultant conversation's own polished output, rather than a separate, later round of discovery. That matters for how to read this review: it's largely a <strong>completeness check</strong> against what we already mined from the transcript, not a wholly new requirements set &mdash; but a few items either weren't in the transcript we saw, or were given a different priority here than we assumed. Worth confirming with the customer whether v0.7/the udviklingsplan supersede the transcript, or sit alongside it.</p>
+    </section>
+
+    <section>
+      <h2>2. Verdict summary</h2>
+      <div class="verdict">
+        <p><strong>Most of v0.7 is already covered</strong> by RMS as built (Phases 3&ndash;13) &mdash; often at a level of detail v0.7 doesn't even ask for (multi-resource allocation, change history, a project dashboard, a staff/customer calendar). No area was a total surprise.</p>
+        <p><strong>Two things deserve real attention:</strong></p>
+        <ol>
+          <li><strong>Activity dependencies</strong> (v0.7 FR-021&ndash;024, all <span class="must">Must</span>) don't exist in RMS at all today &mdash; we only have a cosmetic display <code>sequence</code>, not an enforced "B can't start before A finishes" rule. Both v0.7 and the udviklingsplan treat this, and the rescheduling it enables, as central. Our own SRS currently files most of this under Phase 14 as a <em>stretch</em> goal (Could/Should) &mdash; v0.7 disagrees and marks it Must. See Section 4.</li>
+          <li><strong>The udviklingsplan's recommended tech stack</strong> (React/Next.js, FastAPI or Node, PostgreSQL, JWT/SSO, Docker+CI/CD) is a generic greenfield recommendation that assumes nothing has been built yet. It doesn't match what RMS already is (Flask + Jinja2 server-rendered dual-UI, SQLite locally, Railway/Postgres planned later). This needs an explicit decision from you &mdash; see Section 3.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Technology stack: needs your decision</h2>
+      <table>
+        <thead><tr><th>Layer</th><th>Udviklingsplan recommends</th><th>RMS today</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend</td><td>React or Next.js (separate SPA/JS app)</td><td>Server-rendered Jinja2 templates, two parallel interfaces (Simple/Modern), no build step or JS framework</td></tr>
+          <tr><td>Backend</td><td>FastAPI (Python) or Node.js</td><td>Flask (Python)</td></tr>
+          <tr><td>Database</td><td>PostgreSQL</td><td>SQLite locally; our own SRS already names PostgreSQL/Railway as the later cloud target &mdash; <strong>aligned</strong>, just not done yet</td></tr>
+          <tr><td>Auth</td><td>JWT or SSO</td><td>Session-based login, username only, no password (explicitly Out of Scope: "production-grade identity management")</td></tr>
+          <tr><td>Hosting</td><td>Docker + cloud + CI/CD</td><td>Not yet set up; Railway named as the plan</td></tr>
+        </tbody>
+      </table>
+      <p><strong>My read:</strong> this looks like a stock recommendation for starting a project from zero, not a response to what actually exists after 13 delivered phases. Rewriting the frontend in React/Next.js and the backend in FastAPI/Node would mean re-building everything already working, for reasons the udviklingsplan doesn't state (it never argues the current stack is inadequate &mdash; it just wasn't aware of it). Two clean options, not a forced choice:</p>
+      <ul>
+        <li><strong>Continue incrementally on Flask/Jinja2</strong>, moving SQLite &rarr; PostgreSQL and adding real auth (password/SSO) when it's time to leave localhost &mdash; this was already the plan and keeps all delivered work.</li>
+        <li><strong>Treat the udviklingsplan's stack as a deliberate future rewrite</strong> (e.g. once the requirements/UX are fully proven out on Flask, a React frontend could be built against the same data model without re-deriving the requirements) &mdash; a much bigger, separate decision.</li>
+      </ul>
+      <p><em>Proposal: keep Flask/SQLite&rarr;PostgreSQL for now unless you tell me the customer specifically wants the React/FastAPI stack; I won't start a rewrite without that being an explicit instruction.</em></p>
+    </section>
+
+    <section>
+      <h2>4. Gap analysis: what v0.7 asks for vs. what RMS does today</h2>
+      <table>
+        <thead><tr><th>v0.7 area</th><th>v0.7 says</th><th>RMS today</th><th>Proposal</th></tr></thead>
+        <tbody>
+          <tr class="gap">
+            <td>Dependencies<br><span class="must">FR-021..024, Must</span></td>
+            <td>An activity can depend on another; scheduling is blocked until the prerequisite is met; parallel-vs-not is configurable; a hard rule that "report" can't start before its test ends.</td>
+            <td>No dependency concept exists. <code>ordered_tests.sequence</code> is a cosmetic reorder position (Phase 10), not an enforced blocker &mdash; a planner can start a "Report" work order before its test is complete today.</td>
+            <td><strong>New phase: "Activity dependencies."</strong> Add an optional <code>depends_on_ordered_test_id</code> (or a small dependency join table if one activity should depend on more than one), block <code>start_work_order</code>/<code>resume_work_order</code> with a clear message when the prerequisite isn't <code>completed</code> (mirrors the existing Phase 9 conflict-block pattern), and auto-link the "obvious" case &mdash; a Report activity depending on its own EUT's non-Report activities &mdash; when a template is applied.</td>
+          </tr>
+          <tr class="gap">
+            <td>Planned schedule (dates/duration)<br><span class="must">FR-004, FR-006, Must</span></td>
+            <td>Each activity carries an expected start date, expected end date, and duration, entered at planning time &mdash; independent of whether it has actually started.</td>
+            <td><code>ordered_tests</code> has no date fields at all. <code>work_orders.scheduled_date</code> is a single date (no end/duration), and <code>started_at</code>/<code>completed_at</code> only populate once a technician actually acts. There is no way today to see "this is planned for Aug 10&ndash;12" before work begins.</td>
+            <td>Add optional <code>planned_start_date</code>/<code>planned_end_date</code> (or a duration) to <code>ordered_tests</code> or <code>work_orders</code>, planner-editable independent of actual execution. This also unlocks a real "delayed" status (comparing planned vs. actual), which v0.7's status list has and ours doesn't (see next row).</td>
+          </tr>
+          <tr class="gap">
+            <td>"Delayed" status<br><span class="should">implied by FR-005, FR-029</span></td>
+            <td>A project/activity status list explicitly includes <em>delayed</em>, alongside pending/ongoing/completed/waiting.</td>
+            <td>RMS computes Planned/In Progress/Reporting/Completed/Waiting-for-Customer, but nothing corresponds to "delayed" &mdash; there's no planned-date baseline to be late against (see row above).</td>
+            <td>Once planned dates exist, add a derived "Delayed" flag (planned end date in the past, not completed) rather than a manually-set status &mdash; keeps BR-001 Single Source of Truth intact.</td>
+          </tr>
+          <tr class="gap">
+            <td>Enforce staff availability<br><span class="must">FR-013, Must</span></td>
+            <td>The system shall <em>prevent</em> scheduling a person during a recorded absence, not just show it.</td>
+            <td>Phase 12 only <em>displays</em> a technician's absence as a banner on the schedule/dashboard; nothing stops a work order from being started/assigned during it.</td>
+            <td>Extend the existing Phase 9 conflict-block (<code>find_running_conflict</code>) to also check the assigned technician's <code>staff_absences</code> on the work order's scheduled/actual date, reusing the same block-and-explain pattern.</td>
+          </tr>
+          <tr class="gap">
+            <td>Staff overload view<br><span class="should">FR-014, Should</span></td>
+            <td>Show when a technician is over-booked.</td>
+            <td>No utilization/overload view exists.</td>
+            <td>A small addition to the Dashboard: count of concurrently-scheduled work orders per technician per day; flag &gt;1 as an overload warning. Lower priority than the two above.</td>
+          </tr>
+          <tr class="gap">
+            <td>Week view<br><span class="must">FR-008, Must</span></td>
+            <td>Switch between day, week, and project views.</td>
+            <td>The schedule/Gantt view is day-only, navigated one day at a time. (Already an open question in our own SRS since Phase 12, now reinforced here.)</td>
+            <td>Add a week-at-a-glance strip (7 mini day-columns or a condensed week grid) alongside the existing day Gantt, rather than replacing it &mdash; the day view stays the detailed one.</td>
+          </tr>
+          <tr class="gap">
+            <td>Unstaffed activities<br><span class="should">Section 7.1 business rule</span></td>
+            <td>An activity can be run with no technician assigned (e.g. an unattended climate-chamber soak).</td>
+            <td><code>work_orders.technician_user_id</code> is <code>NOT NULL</code> &mdash; every work order must have a technician today.</td>
+            <td>Relax to nullable, with the technician dashboard/"my tests" filter treating unassigned work orders as visible to all technicians (or a planner-only "unattended" flag) rather than owned by one person.</td>
+          </tr>
+          <tr class="gap">
+            <td>Excel import<br><span class="should">FR-038, Should</span></td>
+            <td>Import existing projects/plans from Excel.</td>
+            <td>Not implemented (our SRS doesn't schedule it either).</td>
+            <td>Worth reconsidering only if it would materially ease the customer's transition off Sprint.xls/Projects.xls &mdash; a one-time migration script rather than an ongoing feature might be enough; recommend confirming actual need before building it.</td>
+          </tr>
+          <tr class="gap">
+            <td>Drag-and-drop / bulk edit<br><span>udviklingsplan risk mitigation</span></td>
+            <td>Named directly as a risk mitigation: "prioritize drag-and-drop and bulk editing" to reduce manual update burden.</td>
+            <td>All edits are one row/one form at a time; no drag-and-drop scheduling.</td>
+            <td>Lower priority UX improvement; worth a design conversation once dependencies/planned-dates exist, since drag-and-drop rescheduling is much more useful once the system knows what else would need to move.</td>
+          </tr>
+          <tr class="gap">
+            <td>Export (CSV/Excel/PDF)<br><span class="could">FR-032, Could</span></td>
+            <td>Export planning data.</td>
+            <td>Not implemented.</td>
+            <td>Both documents agree this is low priority (Could). No change proposed unless a concrete need surfaces &mdash; matches our existing FR-INT-1 stance.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Priority escalations: same requirement, different urgency</h2>
+      <p>These already exist in our SRS but were filed as Phase 14 "stretch" (Could/Should); v0.7 treats the underlying idea as Must. Worth re-reading in light of the dependency gap above, since several of these depend on dependencies existing first.</p>
+      <table>
+        <thead><tr><th>Requirement</th><th>Our current filing</th><th>v0.7's priority</th></tr></thead>
+        <tbody>
+          <tr class="escalation">
+            <td>Move an activity without manually touching other data; show the consequences of a change (FR-RSC-1/FR-026)</td>
+            <td>FR-RSC-1 already Delivered (data model doesn't require manual propagation); FR-RSC-2 (suggest downstream shifts) is Phase 14, Could</td>
+            <td>FR-025/026: <span class="must">Must</span> &mdash; "show affected activities/resources/labs when something changes"</td>
+          </tr>
+          <tr class="escalation">
+            <td>Automatic suggested reschedule</td>
+            <td>Phase 14, Could (FR-RSC-2)</td>
+            <td>FR-027: <span class="should">Should</span></td>
+          </tr>
+          <tr class="escalation">
+            <td>Cross-site double-booking warning / multi-day facility reservation</td>
+            <td>Phase 14, Should/Could (FR-CON-3/4)</td>
+            <td>Not explicitly separated in v0.7 (folded into general lab/equipment FR-015..020, Must)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><strong>Proposal:</strong> once the dependency gap (Section 4, row 1) is addressed, re-open Phase 14 as a real near-term phase instead of a stretch goal &mdash; "show consequences of a change" (FR-026) can't meaningfully be delivered until dependencies exist to trace, so the two belong together.</p>
+    </section>
+
+    <section>
+      <h2>6. Confirmed alignment (no action needed)</h2>
+      <ul>
+        <li>Multi-resource allocation per activity: v0.7 marks this <span class="could">Could</span> (FR-010); RMS already delivers it as a core Phase 3 feature. We exceed this requirement.</li>
+        <li>Mutual-exclusion / shared-facility conflict blocking (FR-CON-1/2, Phase 9) matches v0.7's FR-015..020 closely; the "exclusion group" modeling approach isn't contradicted anywhere in v0.7.</li>
+        <li>Change history (FR-NTH-1, Phase 13) exceeds v0.7's FR-028 (Should) &mdash; already Delivered.</li>
+        <li>Project/discipline dashboard (Phase 11) matches v0.7's FR-031/FR-033..036 visualization intent.</li>
+        <li>Staff/customer calendar (Phase 12) matches v0.7's FR-011/012 (minus the enforcement gap in Section 4).</li>
+        <li>Minute-precision internal scheduling with block-style display (our existing design note) matches v0.7's open question 9.1 almost verbatim &mdash; same answer, independently reached.</li>
+        <li>"Assisted, not automatic" rescheduling (our Out-of-Scope list) matches v0.7's open question 9.1 ("skal systemet primært være et beslutningsstøttesystem?" &mdash; yes).</li>
+        <li>Report-writing modeled as its own activity, not a separate structure (our existing design) matches v0.7's open question 9.1 directly.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Open questions for you</h2>
+      <ul>
+        <li>Do <code>JENS_udviklingsplan.md</code> and <code>JENS_SRS_EMC_Lab_v0.7.md</code> supersede <code>Jens_chatgpt_historic.md</code>, or are all three meant to be read together? (Affects how much weight to give any conflicts between them.)</li>
+        <li>Is the React/FastAPI/PostgreSQL/Docker stack in the udviklingsplan a genuine customer requirement, or a generic AI-generated recommendation nobody has weighed against what's already built? (Section 3)</li>
+        <li>Should activity dependencies (Section 4, row 1) become the next phase, ahead of the currently-next stretch items?</li>
+        <li>Is "unstaffed activity" (e.g. unattended chamber soak) a real, current need, or a hypothetical from the SRS template? Affects whether to relax <code>technician_user_id</code> now or wait for a concrete case.</li>
+        <li>Is a week view (Section 4) worth building now, or does the day view plus the dashboard's project list already cover planning needs well enough?</li>
+        <li>Is Excel import (Section 4) worth the effort, given it's a one-time migration concern rather than an ongoing feature?</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>8. Suggested next step</h2>
+      <p>Pending your comments above, my recommendation is a new phase focused narrowly on <strong>activity dependencies and planned dates</strong> (Section 4, rows 1&ndash;2), since almost every other gap and escalation in this review (delayed status, "show consequences of a change", the eventual Phase 14 rescheduling assistant, even drag-and-drop) either depends on it or becomes far more useful once it exists. Everything else in this document can follow independently, in whatever order you'd prioritize after reviewing.</p>
+    </section>
+  </main>
+</body>
+</html>

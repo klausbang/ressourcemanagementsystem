@@ -4,3 +4,5 @@ __pycache__/
 *.sqlite
 *.sqlite3
 Jens_chatgpt_historic.md
+JENS_udviklingsplan.md
+JENS_SRS_EMC_Lab_v0.7.md
