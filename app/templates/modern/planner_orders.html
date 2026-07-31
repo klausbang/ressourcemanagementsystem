@@ -78,11 +78,11 @@
 </div>
 
 <div class="tabs">
-  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" {{ 'checked' if not is_schedule_tab and not is_overview_tab }}>
-  <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input">
-  <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input">
-  <input type="radio" name="planner-tabs" id="tab-schedule" class="tab-input" {{ 'checked' if is_schedule_tab }}>
-  <input type="radio" name="planner-tabs" id="tab-overview" class="tab-input" {{ 'checked' if is_overview_tab }}>
+  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" {{ 'checked' if active_tab == 'orders' }}>
+  <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input" {{ 'checked' if active_tab == 'tests' }}>
+  <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input" {{ 'checked' if active_tab == 'assign' }}>
+  <input type="radio" name="planner-tabs" id="tab-schedule" class="tab-input" {{ 'checked' if active_tab == 'schedule' }}>
+  <input type="radio" name="planner-tabs" id="tab-overview" class="tab-input" {{ 'checked' if active_tab == 'overview' }}>
 
   <div class="tab-list" role="tablist">
     <label for="tab-orders" class="tab-label">🗂️ Customer orders</label>

@@ -370,6 +370,17 @@ def _load_planner_context(db) -> dict:
     }
     context.update(_load_schedule_context(db))
     context.update(_load_orders_overview_context(db, orders, tests_for_alloc, euts_rows))
+
+    if context["is_schedule_tab"]:
+        active_tab = "schedule"
+    elif context["is_overview_tab"]:
+        active_tab = "overview"
+    elif request.args.get("tab") in ("orders", "tests", "assign"):
+        active_tab = request.args.get("tab")
+    else:
+        active_tab = "orders"
+    context["active_tab"] = active_tab
+
     return context
 
 
@@ -501,7 +512,7 @@ def planner_orders():
             )
             db.commit()
             flash(f"Order {order_code} created.", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "update_order":
             order_id = request.form.get("order_id", "").strip()
@@ -523,14 +534,14 @@ def planner_orders():
                 db.commit()
                 flash(f"Order {order_code} updated.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "delete_order":
             order_id = request.form.get("order_id", "").strip()
             db.execute("DELETE FROM customer_orders WHERE id = ?", (order_id,))
             db.commit()
             flash("Order deleted, along with its ordered tests and allocations.", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "create_eut":
             order_id = request.form.get("order_id", "").strip()
@@ -558,7 +569,7 @@ def planner_orders():
             )
             db.commit()
             flash(f"EUT '{name}' added.", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "update_eut":
             eut_id = request.form.get("eut_id", "").strip()
@@ -575,14 +586,14 @@ def planner_orders():
                 db.commit()
                 flash(f"EUT '{name}' updated.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "delete_eut":
             eut_id = request.form.get("eut_id", "").strip()
             db.execute("DELETE FROM euts WHERE id = ?", (eut_id,))
             db.commit()
             flash("EUT deleted. Its test activities remain, now unlinked from an EUT.", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="orders"))
 
         if action == "add_test":
             order_id = request.form.get("order_id", "").strip()
@@ -606,7 +617,7 @@ def planner_orders():
                 db.commit()
                 flash(f"Test '{test_name}' added.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "apply_template":
             order_id = request.form.get("order_id", "").strip()
@@ -638,7 +649,7 @@ def planner_orders():
                     db.commit()
                     flash(f"Applied template: {len(items)} activities added.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "move_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -674,7 +685,7 @@ def planner_orders():
                     db.commit()
                     flash("Test reordered.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "update_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -718,14 +729,14 @@ def planner_orders():
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "delete_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
             db.execute("DELETE FROM ordered_tests WHERE id = ?", (ordered_test_id,))
             db.commit()
             flash("Ordered test deleted, along with its allocation (if any).", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "delete_allocation":
             allocation_id = request.form.get("allocation_id", "").strip()
@@ -746,7 +757,7 @@ def planner_orders():
                 )
             db.commit()
             flash("Resource unassigned from test.", "info")
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="assign"))
 
         if action == "assign_resource":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -754,7 +765,7 @@ def planner_orders():
 
             if not (ordered_test_id and resource_id):
                 flash("Ordered test and resource are required.", "error")
-                return redirect(url_for("planner.planner_orders"))
+                return redirect(url_for("planner.planner_orders", tab="assign"))
 
             valid = db.execute(
                 """
@@ -792,7 +803,7 @@ def planner_orders():
                 db.commit()
                 flash("Resource assigned to test.", "info")
 
-            return redirect(url_for("planner.planner_orders"))
+            return redirect(url_for("planner.planner_orders", tab="assign"))
 
     return _render_planner_orders(db)
 
