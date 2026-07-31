@@ -1,0 +1,4 @@
+%% Test Planner workflow (matches the tab order in Planner).
+%% Regenerate with: npx @mermaid-js/mermaid-cli -i docs/usage-role-planner.mmd -o docs/usage-role-planner.svg -b white
+flowchart LR
+    P1["🗂️ Customer order<br/>& EUTs"] --> P2["🧪 Ordered tests<br/>(or apply a template)"] --> P3["🔧 Assign resources<br/>to each test"] --> P4["📅 Schedule<br/>(conflicts, absences, visits)"] --> P5["📊 Dashboard<br/>(status, milestones)"]

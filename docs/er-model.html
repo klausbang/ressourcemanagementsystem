@@ -18,7 +18,15 @@
     </section>
 
     <section>
-      <h2>2. ER Diagram</h2>
+      <h2>2. ER Diagrams</h2>
+
+      <h3>2.1 Simplified (tables and relationships only)</h3>
+      <p>For a quick orientation or a customer presentation, this version drops every field and shows only table names and how they relate, with a short plain-language label per relationship instead of the underlying foreign-key column name.</p>
+      <img src="er-diagram-simple.svg" alt="RMS simplified ER diagram (tables and relationships only)" width="100%">
+      <p>Source: <a href="er-diagram-simple.mmd">er-diagram-simple.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/er-diagram-simple.mmd -o docs/er-diagram-simple.svg -b white</pre>
+
+      <h3>2.2 Detailed (fields and keys)</h3>
       <img src="er-diagram.svg" alt="RMS ER diagram" width="100%">
       <p>The diagram reflects current SQLite schema entities and keys used in the minimal working local app.</p>
       <p>Source: <a href="er-diagram.mmd">er-diagram.mmd</a> (Mermaid ER syntax). Regenerate the SVG after schema changes with:</p>

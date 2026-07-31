@@ -42,6 +42,11 @@
   <p class="lead">Set up who can use the system, what capabilities exist, what resources you have, and which resources can perform which capabilities.</p>
 </div>
 
+<details class="card" style="margin-bottom:20px;" open>
+  <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
+  <img src="{{ url_for('static', filename='img/usage-role-admin.svg') }}" alt="Admin workflow: Capabilities, then Resources, then assign capabilities to resources, then exclusion groups, activity templates, users, and staff absences" style="max-width:100%; height:auto; margin-top:10px;">
+</details>
+
 <div class="stat-strip">
   <div class="stat-tile"><div class="stat-value">{{ users|length }}</div><div class="stat-label">Users</div></div>
   <div class="stat-tile"><div class="stat-value">{{ capabilities|length }}</div><div class="stat-label">Capabilities</div></div>

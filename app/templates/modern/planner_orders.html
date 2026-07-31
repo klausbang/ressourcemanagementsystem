@@ -30,6 +30,11 @@
   <p class="lead">Create customer orders, add the tests they require, and assign one or more resources — equipment, facility, procedure, technician — to each test.</p>
 </div>
 
+<details class="card" style="margin-bottom:20px;" open>
+  <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
+  <img src="{{ url_for('static', filename='img/usage-role-planner.svg') }}" alt="Planner workflow: customer order and EUTs, then ordered tests or apply a template, then assign resources, then schedule, then dashboard" style="max-width:100%; height:auto; margin-top:10px;">
+</details>
+
 <div class="stat-strip">
   <div class="stat-tile"><div class="stat-value">{{ orders|length }}</div><div class="stat-label">Customer orders</div></div>
   <div class="stat-tile"><div class="stat-value">{{ ordered_tests_rows|length }}</div><div class="stat-label">Ordered tests</div></div>

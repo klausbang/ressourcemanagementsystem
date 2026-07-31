@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Usage Flow</title>
+</head>
+<body>
+  <header>
+    <h1>RMS Usage Flow</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>This page shows, at a glance, how the three roles use RMS and in what order: the RMS Administrator sets the system up, the Test Planner plans and allocates work against that setup, and the Test Technician executes and reports on it &mdash; with status flowing back to the Planner's Dashboard. It is a companion to <a href="srs.html">the SRS</a> (Section 5, User Roles) and <a href="er-model.html">the ER model</a>, aimed at a reader who wants the workflow picture before the data model.</p>
+    </section>
+
+    <section>
+      <h2>2. Overview: All Three Roles</h2>
+      <img src="usage-flow-overview.svg" alt="RMS overview usage flow: Administrator, then Planner, then Technician, with feedback to the Planner" width="100%">
+      <p>Source: <a href="usage-flow-overview.mmd">usage-flow-overview.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/usage-flow-overview.mmd -o docs/usage-flow-overview.svg -b white</pre>
+      <p>Setup (Administrator) is typically a one-time or occasional activity; planning and execution (Planner and Technician) repeat continuously per project. The dashed feedback arrow is the point of the whole redesign: a technician's result is the single source of truth the Planner's Dashboard reads from, not a separately re-typed status (see SRS BR-001).</p>
+    </section>
+
+    <section>
+      <h2>3. RMS Administrator</h2>
+      <img src="usage-role-admin.svg" alt="RMS Administrator workflow" width="100%">
+      <p>Capabilities and resources come first, since everything else (capability assignment, exclusion groups, activity templates) refers back to them. Users and staff absences can be set up any time after. This same diagram appears at the top of the Admin page in the running app.</p>
+      <p>Source: <a href="usage-role-admin.mmd">usage-role-admin.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/usage-role-admin.mmd -o docs/usage-role-admin.svg -b white</pre>
+    </section>
+
+    <section>
+      <h2>4. Test Planner</h2>
+      <img src="usage-role-planner.svg" alt="Test Planner workflow" width="100%">
+      <p>A project (customer order) is created, optionally split into EUTs for a multi-unit order, then populated with test activities either one at a time or in bulk from a standard activity template. Resources are assigned once the required capability is known. The Schedule and Dashboard are where the Planner watches it all play out afterward. This same diagram appears at the top of the Planner page in the running app.</p>
+      <p>Source: <a href="usage-role-planner.mmd">usage-role-planner.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/usage-role-planner.mmd -o docs/usage-role-planner.svg -b white</pre>
+    </section>
+
+    <section>
+      <h2>5. Test Technician</h2>
+      <img src="usage-role-technician.svg" alt="Test Technician workflow" width="100%">
+      <p>A technician only ever sees the tests allocated to their linked resource. Once a work order is started and run against its procedure, the technician fills in and submits a test report; a different technician or a planner then approves or rejects it. This same diagram appears at the top of the Technician dashboard in the running app.</p>
+      <p>Source: <a href="usage-role-technician.mmd">usage-role-technician.mmd</a>. Regenerate with:</p>
+      <pre>npx @mermaid-js/mermaid-cli -i docs/usage-role-technician.mmd -o docs/usage-role-technician.svg -b white</pre>
+    </section>
+  </main>
+</body>
+</html>

@@ -22,6 +22,11 @@
   <p class="lead">Tests a planner has assigned to you, the equipment and facilities allocated alongside you, and the work orders you run to perform them.</p>
 </div>
 
+<details class="card" style="margin-bottom:20px;" open>
+  <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
+  <img src="{{ url_for('static', filename='img/usage-role-technician.svg') }}" alt="Technician workflow: see assigned tests, then create and start a work order, then run the test against its procedure, then fill in and submit the report, then peer review" style="max-width:100%; height:auto; margin-top:10px;">
+</details>
+
 <div class="stat-strip">
   <div class="stat-tile"><div class="stat-value">{{ tests|length }}</div><div class="stat-label">Assigned tests</div></div>
   <div class="stat-tile"><div class="stat-value">{{ open_count }}</div><div class="stat-label">Open work orders</div></div>

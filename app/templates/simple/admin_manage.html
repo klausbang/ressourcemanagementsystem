@@ -6,6 +6,11 @@
 {% block content %}
 <h2>Admin: Manage Users, Capabilities, and Resources</h2>
 
+<details open>
+  <summary><strong>How this page fits in your workflow</strong></summary>
+  <p><img src="{{ url_for('static', filename='img/usage-role-admin.svg') }}" alt="Admin workflow: Capabilities, then Resources, then assign capabilities to resources, then exclusion groups, activity templates, users, and staff absences" style="max-width:100%; height:auto;"></p>
+</details>
+
 <section>
   <h3>Users</h3>
   <form method="post">

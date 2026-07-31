@@ -9,6 +9,11 @@
   input.invalid { border: 2px solid #b91c1c; }
 </style>
 
+<details open>
+  <summary><strong>How this page fits in your workflow</strong></summary>
+  <p><img src="{{ url_for('static', filename='img/usage-role-planner.svg') }}" alt="Planner workflow: customer order and EUTs, then ordered tests or apply a template, then assign resources, then schedule, then dashboard" style="max-width:100%; height:auto;"></p>
+</details>
+
 <h2>Planner: Create Customer Order</h2>
 <form method="post">
   <input type="hidden" name="action" value="create_order">
