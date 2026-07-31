@@ -14,6 +14,53 @@
   <p><img src="{{ url_for('static', filename='img/usage-role-planner.svg') }}" alt="Planner workflow: customer order and EUTs, then ordered tests or apply a template, then assign resources, then schedule, then dashboard" style="max-width:100%; height:auto;"></p>
 </details>
 
+<h2>Orders Overview</h2>
+<p><em>Every order grouped with its EUTs and test activities in one place. Expand an order to see its activities without switching sections.</em></p>
+{% if overview_orders %}
+{% for p in overview_orders %}
+<details {{ 'open' if loop.first }}>
+  <summary>
+    <strong>{{ p.order_code }}</strong> - {{ p.customer_name }} ({{ p.product_name }})
+    &mdash; {{ p.display_status }}{% if p.has_conflict %} [CONFLICT]{% endif %}
+  </summary>
+  <div style="padding:6px 0 6px 20px;">
+    {% for m in p.milestones %}
+    <p><em>Milestone: {{ m.title }}{% if m.target_date %} - {{ m.target_date }}{% endif %}</em></p>
+    {% endfor %}
+    {% if p.weekly_note %}<p><em>Note: {{ p.weekly_note }}</em></p>{% endif %}
+    {% for grp in p.eut_groups %}
+    <p><strong>{{ grp.eut.name }}{% if grp.eut.serial_number %} ({{ grp.eut.serial_number }}){% endif %}</strong></p>
+    {% if grp.tests %}
+    <table border="1" cellpadding="4">
+      <thead><tr><th>Activity</th><th>Capability</th><th>Resources</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for t in grp.tests %}
+        <tr><td>{{ t['test_name'] }}</td><td>{{ t['capability_name'] or '-' }}</td><td>{{ t['allocated_summary'] or '-' }}</td><td>{{ t['status_label'] }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No activities on this EUT yet.</p>
+    {% endif %}
+    {% endfor %}
+    {% if p.direct_tests %}
+    {% if p.eut_groups %}<p><strong>Activities not tied to a specific EUT</strong></p>{% endif %}
+    <table border="1" cellpadding="4">
+      <thead><tr><th>Activity</th><th>Capability</th><th>Resources</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for t in p.direct_tests %}
+        <tr><td>{{ t['test_name'] }}</td><td>{{ t['capability_name'] or '-' }}</td><td>{{ t['allocated_summary'] or '-' }}</td><td>{{ t['status_label'] }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</details>
+{% endfor %}
+{% else %}
+<p><em>No customer orders yet.</em></p>
+{% endif %}
+
 <h2>Planner: Create Customer Order</h2>
 <form method="post">
   <input type="hidden" name="action" value="create_order">
@@ -245,7 +292,11 @@
       </td>
       <td>
         <button type="submit" form="test-save-{{ t['ordered_test_id'] }}">Save</button>
+        {% if t['has_history'] %}
         <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}">History</a>
+        {% else %}
+        <span style="color:#999;" title="No recorded changes yet for this activity">History</span>
+        {% endif %}
         <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}">Delete</button>
       </td>
     </tr>

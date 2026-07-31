@@ -8,12 +8,14 @@
   #tab-orders:checked ~ .tabs-body #panel-orders,
   #tab-tests:checked ~ .tabs-body #panel-tests,
   #tab-assign:checked ~ .tabs-body #panel-assign,
-  #tab-schedule:checked ~ .tabs-body #panel-schedule { display: block; }
+  #tab-schedule:checked ~ .tabs-body #panel-schedule,
+  #tab-overview:checked ~ .tabs-body #panel-overview { display: block; }
 
   #tab-orders:checked ~ .tab-list label[for="tab-orders"],
   #tab-tests:checked ~ .tab-list label[for="tab-tests"],
   #tab-assign:checked ~ .tab-list label[for="tab-assign"],
-  #tab-schedule:checked ~ .tab-list label[for="tab-schedule"] {
+  #tab-schedule:checked ~ .tab-list label[for="tab-schedule"],
+  #tab-overview:checked ~ .tab-list label[for="tab-overview"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
@@ -22,6 +24,40 @@
   .test-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .test-card-title { font-weight: 700; }
   .test-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
+
+  .ov-view-switch { display: flex; gap: 6px; margin-bottom: 16px; }
+  .ov-view-switch input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .ov-view-switch label { padding: 6px 14px; border: 1px solid var(--color-border); border-radius: 999px; cursor: pointer; font-size: 0.88rem; }
+  #ov-view-list:checked ~ .ov-view-switch label[for="ov-view-list"],
+  #ov-view-kanban:checked ~ .ov-view-switch label[for="ov-view-kanban"],
+  #ov-view-detail:checked ~ .ov-view-switch label[for="ov-view-detail"] {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  }
+  #ov-panel-list, #ov-panel-kanban, #ov-panel-detail { display: none; }
+  #ov-view-list:checked ~ .ov-body #ov-panel-list,
+  #ov-view-kanban:checked ~ .ov-body #ov-panel-kanban,
+  #ov-view-detail:checked ~ .ov-body #ov-panel-detail { display: block; }
+
+  .ov-order-block { border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 10px; background: var(--color-surface); }
+  .ov-order-summary { cursor: pointer; list-style: none; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .ov-order-summary::-webkit-details-marker { display: none; }
+  .ov-order-summary::before { content: "▶ "; }
+  details[open] > .ov-order-summary::before { content: "▼ "; }
+  .ov-order-detail { padding: 4px 16px 14px 30px; border-top: 1px dashed var(--color-border); }
+  .ov-eut-title { font-weight: 700; margin: 10px 0 4px; }
+
+  .ov-board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 10px; }
+  .ov-column { flex: 0 0 240px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-subtle, #f7f7f9); min-height: 100px; }
+  .ov-column-head { font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--color-border); text-align: center; }
+  .ov-column-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .ov-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm, 4px); padding: 8px 10px; font-size: 0.88rem; }
+  .ov-card .ov-card-code { font-weight: 700; }
+
+  .ov-md-layout { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); min-height: 360px; }
+  .ov-md-master { flex: 0 0 240px; border-right: 1px solid var(--color-border); overflow-y: auto; }
+  .ov-md-item { display: block; padding: 10px 12px; border-bottom: 1px solid var(--color-border); font-size: 0.88rem; text-decoration: none; color: inherit; }
+  .ov-md-item.selected { background: var(--color-primary-subtle, #e2ecff); border-left: 4px solid var(--color-primary); font-weight: 700; }
+  .ov-md-detail { flex: 1; padding: 16px 20px; }
 </style>
 
 <div class="page-header">
@@ -42,16 +78,18 @@
 </div>
 
 <div class="tabs">
-  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" {{ 'checked' if not is_schedule_tab }}>
+  <input type="radio" name="planner-tabs" id="tab-orders" class="tab-input" {{ 'checked' if not is_schedule_tab and not is_overview_tab }}>
   <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input">
   <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input">
   <input type="radio" name="planner-tabs" id="tab-schedule" class="tab-input" {{ 'checked' if is_schedule_tab }}>
+  <input type="radio" name="planner-tabs" id="tab-overview" class="tab-input" {{ 'checked' if is_overview_tab }}>
 
   <div class="tab-list" role="tablist">
     <label for="tab-orders" class="tab-label">🗂️ Customer orders</label>
     <label for="tab-tests" class="tab-label">🧪 Ordered tests</label>
     <label for="tab-assign" class="tab-label">🔧 Resource assignment</label>
     <label for="tab-schedule" class="tab-label">📅 Schedule</label>
+    <label for="tab-overview" class="tab-label">📊 Orders overview</label>
   </div>
 
   <div class="tabs-body">
@@ -318,7 +356,11 @@
               </td>
               <td class="inline-form">
                 <button type="submit" form="test-save-{{ t['ordered_test_id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                {% if t['has_history'] %}
                 <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}" class="btn btn-secondary btn-sm" title="View change history">🕘 History</a>
+                {% else %}
+                <span class="btn btn-secondary btn-sm" aria-disabled="true" title="No recorded changes yet for this activity" style="opacity:0.45; cursor:default; pointer-events:none;">🕘 History</span>
+                {% endif %}
                 <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete test '{{ t['test_name'] }}'? This also deletes any resource allocations for it.">Delete</button>
               </td>
             </tr>
@@ -503,6 +545,154 @@
       {% else %}
       <div class="empty-state"><span class="icon">✅</span>Every ordered test either has a scheduled work order or is shown on the chart above.</div>
       {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-overview">
+      <div class="callout">
+        <strong>Three ways to look at the same orders:</strong> List groups every order's EUTs and activities for scanning top to bottom; Kanban groups whole orders by their computed status for a portfolio-level read; Master-detail keeps a slim order list on the left and the full picture of one order on the right. All three read from the same data as the tabs above &mdash; nothing here is a second source of truth.
+      </div>
+
+      {% macro ov_status_badge(status) %}
+        {% if status == 'Completed' %}<span class="badge badge-available">{{ status }}</span>
+        {% elif status == 'In Progress' %}<span class="badge badge-type">{{ status }}</span>
+        {% elif status == 'Reporting' %}<span class="badge badge-status-other">{{ status }}</span>
+        {% elif status == 'Waiting for Customer' %}<span class="badge badge-danger">{{ status }}</span>
+        {% else %}<span class="badge">{{ status }}</span>
+        {% endif %}
+      {% endmacro %}
+
+      {% macro ov_test_table(order_tests) %}
+        {% if order_tests %}
+        <table class="modern-table">
+          <thead><tr><th>Activity</th><th>Required capability</th><th>Resources</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for t in order_tests %}
+            <tr>
+              <td>{{ t['test_name'] }}</td>
+              <td>{{ t['capability_name'] or '—' }}</td>
+              <td>{{ t['allocated_summary'] or '—' }}</td>
+              <td><span class="badge">{{ t['status_label'] }}</span></td>
+              <td>
+                {% if t['has_history'] %}
+                <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}" class="btn btn-secondary btn-sm" title="View change history">🕘</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="section-help">No activities on this order yet.</p>
+        {% endif %}
+      {% endmacro %}
+
+      {% macro ov_order_body(p) %}
+        {% if p.milestones %}
+        {% for m in p.milestones %}
+        <p class="section-help" style="margin:2px 0;">📅 {{ m.title }}{% if m.target_date %} — {{ m.target_date }}{% endif %}</p>
+        {% endfor %}
+        {% endif %}
+        {% if p.weekly_note %}<p class="section-help" style="margin:2px 0;">📝 {{ p.weekly_note }}</p>{% endif %}
+        {% for grp in p.eut_groups %}
+        <div class="ov-eut-title">📦 {{ grp.eut.name }}{% if grp.eut.serial_number %} ({{ grp.eut.serial_number }}){% endif %}</div>
+        {{ ov_test_table(grp.tests) }}
+        {% endfor %}
+        {% if p.direct_tests or not p.eut_groups %}
+        {% if p.eut_groups %}<div class="ov-eut-title">Activities not tied to a specific EUT</div>{% endif %}
+        {{ ov_test_table(p.direct_tests) }}
+        {% endif %}
+        <p class="section-help" style="margin-top:10px;">
+          <a href="{{ url_for('planner.planner_orders') }}#panel-tests">Go to Ordered tests</a> &middot;
+          <a href="{{ url_for('planner.planner_orders') }}#panel-assign">Go to Resource assignment</a>
+        </p>
+      {% endmacro %}
+
+      <input type="radio" name="ov-view" id="ov-view-list" {{ 'checked' if overview_default_view != 'detail' }}>
+      <input type="radio" name="ov-view" id="ov-view-kanban">
+      <input type="radio" name="ov-view" id="ov-view-detail" {{ 'checked' if overview_default_view == 'detail' }}>
+      <div class="ov-view-switch">
+        <label for="ov-view-list">☰ List</label>
+        <label for="ov-view-kanban">🗂️ Kanban</label>
+        <label for="ov-view-detail">🖥️ Master-detail</label>
+      </div>
+
+      <div class="ov-body">
+        <div id="ov-panel-list">
+          {% if overview_orders %}
+          {% for p in overview_orders %}
+          <div class="ov-order-block">
+            <details {{ 'open' if loop.first }}>
+              <summary class="ov-order-summary">
+                <span><strong>{{ p.order_code }}</strong> &middot; {{ p.customer_name }} ({{ p.product_name }})</span>
+                <span>{{ ov_status_badge(p.display_status) }}{% if p.has_conflict %} <span class="badge badge-danger" title="A currently in-progress activity conflicts with another">🚫 Conflict</span>{% endif %}</span>
+              </summary>
+              <div class="ov-order-detail">
+                {{ ov_order_body(p) }}
+              </div>
+            </details>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="empty-state"><span class="icon">🗂️</span>No customer orders yet.</div>
+          {% endif %}
+        </div>
+
+        <div id="ov-panel-kanban">
+          {% if overview_orders %}
+          <div class="ov-board">
+            {% for col in kanban_columns %}
+            <div class="ov-column">
+              <div class="ov-column-head">{{ col }} ({{ kanban_board[col]|length }})</div>
+              <div class="ov-column-body">
+                {% for p in kanban_board[col] %}
+                <div class="ov-card">
+                  <div class="ov-card-code">{{ p.order_code }}</div>
+                  <div class="test-card-meta">{{ p.customer_name }} ({{ p.product_name }})</div>
+                  <div class="chip-list" style="margin-top:6px;">
+                    <span class="chip">{{ p.total_activities }} activit{{ 'y' if p.total_activities == 1 else 'ies' }}</span>
+                    <span class="chip">{{ p.eut_groups|length }} EUT{{ '' if p.eut_groups|length == 1 else 's' }}</span>
+                    {% if p.has_conflict %}<span class="chip" style="border-color:#a00; color:#a00;">🚫 Conflict</span>{% endif %}
+                  </div>
+                  {% if p.milestones %}<div class="test-card-meta" style="margin-top:4px;">📅 {{ p.milestones[0].title }}{% if p.milestones[0].target_date %} — {{ p.milestones[0].target_date }}{% endif %}</div>{% endif %}
+                  <div style="margin-top:6px;"><a href="{{ url_for('planner.planner_orders', overview_order_id=p.order_id) }}#panel-overview" class="btn btn-secondary btn-sm">Open in master-detail</a></div>
+                </div>
+                {% else %}
+                <p class="section-help" style="padding:4px;">No orders in this state.</p>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state"><span class="icon">🗂️</span>No customer orders yet.</div>
+          {% endif %}
+        </div>
+
+        <div id="ov-panel-detail">
+          {% if overview_orders %}
+          <div class="ov-md-layout">
+            <div class="ov-md-master">
+              {% for p in overview_orders %}
+              <a class="ov-md-item {{ 'selected' if overview_selected_order and p.order_id == overview_selected_order.order_id }}"
+                 href="{{ url_for('planner.planner_orders', overview_order_id=p.order_id) }}#panel-overview">
+                {{ p.order_code }}<br><span class="test-card-meta">{{ p.customer_name }}</span>
+              </a>
+              {% endfor %}
+            </div>
+            <div class="ov-md-detail">
+              {% if overview_selected_order %}
+              {% set p = overview_selected_order %}
+              <h2 style="margin-top:0;">{{ p.order_code }} &middot; {{ p.customer_name }} ({{ p.product_name }})</h2>
+              <div style="margin-bottom:10px;">{{ ov_status_badge(p.display_status) }}{% if p.has_conflict %} <span class="badge badge-danger">🚫 Conflict</span>{% endif %}</div>
+              {{ ov_order_body(p) }}
+              {% endif %}
+            </div>
+          </div>
+          {% else %}
+          <div class="empty-state"><span class="icon">🗂️</span>No customer orders yet.</div>
+          {% endif %}
+        </div>
+      </div>
     </section>
   </div>
 </div>

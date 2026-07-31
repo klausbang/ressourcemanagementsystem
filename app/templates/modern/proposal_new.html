@@ -1,0 +1,16 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Submit a Proposal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Feedback</div>
+  <h1>Suggest an enhancement or report a bug</h1>
+  <p class="lead">Seen automatically by the RMS Administrator on the Admin &rarr; Proposals tab, along with the page you were on when you submitted it.</p>
+</div>
+
+<div class="card">
+  {% set form_id = 'page' %}
+  {% include 'modern/_proposal_form.html' %}
+</div>
+{% endblock %}

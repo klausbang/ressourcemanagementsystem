@@ -1,0 +1,20 @@
+1) In Planner -> Ordered Tests -> Existing ordered tests -> Actions: History Grey out the history button there is "No recorded changes yet for this activity."
+
+[Done] Implementation note: added a `has_history` flag to the Ordered Tests query in app/routes_planner.py (`_load_planner_context`, an EXISTS check against activity_history). Both the Modern and Simple planner_orders.html templates now render an active History link only when has_history is true; otherwise a greyed-out, non-clickable label with the "No recorded changes yet for this activity" tooltip is shown instead.
+
+2) Add a small proposal button "P" in each section that opens up a "Proposal" window, where the user can add a proposal for enhancement or report a bug.
+The proposal shall be saved in the database with relevant meta data, including the path to where the user clicks the proposal button. The proposals shall be shown in the administration module of the RMS.
+The admin shall be able to comment on the proposal, including adding a status of the change proposal.
+
+[Done] Implementation note: added a `proposals` table (app/db.py) with path, type, title, description, submitter, status (new/accepted/in_progress/done/rejected) and admin comment/reviewer fields. A new app/routes_proposals.py blueprint (GET/POST /proposals/new) records the path automatically. In the Modern UI, a floating "P" button on every logged-in page opens a native <dialog> form; the Simple UI gets a plain "[P] Proposal" nav link to a standalone form page instead, keeping each UI's own style. Admin -> Manage gained a "Proposals" tab/section (both UI modes) listing every submission with an inline status/comment update form and a delete action.
+
+3) Lav illustrationer fra Mermaid, f.eks. ER diagrammet, søgbart (tekst) og med tool tips når musen holdes hen over en entity eller en relation.
+
+[Done] Implementation note: docs/er-model.html now renders both ER diagrams (simplified and detailed) live in the browser via Mermaid.js (CDN, client-side), instead of static SVG images, so the diagram content is real, browser-searchable (Ctrl+F) DOM text. Each diagram got its own search box that dims non-matching tables, plus native tooltips (SVG <title> elements) on every entity box and relationship label, describing what that table or relationship means in plain language. The static SVG regeneration commands are kept as a fallback for offline/print use.
+
+4) Implement all three options as described in file:///C:/Users/klaus/OneDrive/Documents/python/ressourcemanagementsystem/docs/index.html: Customer Order Overview & View Proposals:
+Wireframe: Planner Orders, Option A — Expandable List
+Wireframe: Planner Orders, Option B — Status-Grouped Cards (Kanban-style)
+Wireframe: Planner Orders, Option C — Master-Detail
+
+[Done] Implementation note: added a real (non-wireframe) "Orders overview" tab to the Planner Orders page, reusing the same order/EUT/test/status data as the existing tabs and Dashboard (no second source of truth). In the Modern UI it offers a view switcher between all three proposed layouts: List (expandable per-order details grouped by EUT, native <details>), Kanban (orders grouped into columns by their computed status, same statuses the Dashboard already derives), and Master-Detail (slim order list on the left, full order detail incl. milestones/visits/weekly note/activities on the right, selected via ?overview_order_id=). The Simple UI gets the List/expandable-details view only, consistent with its plain-HTML, no-JS design.

@@ -121,6 +121,23 @@ CREATE TABLE IF NOT EXISTS activity_history (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS proposals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    proposal_type TEXT NOT NULL CHECK(proposal_type IN ('enhancement', 'bug')),
+    title TEXT NOT NULL,
+    description TEXT,
+    submitted_by_user_id INTEGER,
+    submitted_by_username TEXT,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected')),
+    admin_comment TEXT,
+    admin_user_id INTEGER,
+    updated_at TEXT,
+    FOREIGN KEY (submitted_by_user_id) REFERENCES users(id),
+    FOREIGN KEY (admin_user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS activity_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RMS ER Model</title>
+  <style>
+    .er-tools { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+    .er-tools input[type="search"] { padding: 4px 8px; font-size: 0.95em; min-width: 240px; }
+    .er-tools button { padding: 4px 10px; }
+    .er-tools .er-count { color: #555; font-size: 0.9em; }
+    .er-diagram-wrap { border: 1px solid #ccc; padding: 8px; overflow-x: auto; }
+    .er-diagram-wrap .node.rms-dim, .er-diagram-wrap .er.entityBox.rms-dim { opacity: 0.15; transition: opacity 0.15s ease; }
+    .er-diagram-wrap [id^="entity-"] { transition: opacity 0.15s ease; }
+    .er-diagram-wrap [id^="entity-"].rms-dim { opacity: 0.15; }
+  </style>
 </head>
 <body>
   <header>
@@ -21,15 +31,279 @@
       <h2>2. ER Diagrams</h2>
 
       <h3>2.1 Simplified (tables and relationships only)</h3>
-      <p>For a quick orientation or a customer presentation, this version drops every field and shows only table names and how they relate, with a short plain-language label per relationship instead of the underlying foreign-key column name.</p>
-      <img src="er-diagram-simple.svg" alt="RMS simplified ER diagram (tables and relationships only)" width="100%">
-      <p>Source: <a href="er-diagram-simple.mmd">er-diagram-simple.mmd</a>. Regenerate with:</p>
+      <p>For a quick orientation or a customer presentation, this version drops every field and shows only table names and how they relate, with a short plain-language label per relationship instead of the underlying foreign-key column name. The diagram below is rendered live in the browser: type in the search box to highlight matching tables, and hover over a table box or a relationship label for a plain-language tooltip.</p>
+      <div class="er-tools">
+        <input type="search" id="er-search-simple" placeholder="Search tables (e.g. order, resource)...">
+        <button type="button" id="er-clear-simple">Clear</button>
+        <span class="er-count" id="er-count-simple"></span>
+      </div>
+      <div class="er-diagram-wrap" id="er-wrap-simple">
+        <pre class="mermaid" id="er-diagram-simple-src">
+erDiagram
+    users ||--o{ allocations : "assigned by"
+    resources ||--o{ allocations : "assigned"
+    ordered_tests ||--o{ allocations : "has"
+    customer_orders ||--o{ ordered_tests : "has"
+    customer_orders ||--o{ euts : "has"
+    euts ||--o{ ordered_tests : "has (optional)"
+    capabilities ||--o{ ordered_tests : "required"
+    resources ||--o{ resource_capabilities : "has"
+    capabilities ||--o{ resource_capabilities : "granted by"
+    resources ||--o{ users : "linked technician"
+    capabilities ||--o{ test_procedures : "documented by"
+    test_procedures ||--o{ procedure_checks : "checklist"
+    ordered_tests ||--o| work_orders : "worked as"
+    users ||--o{ work_orders : "technician"
+    test_procedures ||--o{ work_orders : "followed"
+    work_orders ||--o| test_reports : "reported as"
+    ordered_tests ||--o| test_reports : "reported as"
+    test_procedures ||--o{ test_reports : "based on"
+    users ||--o{ test_reports : "author"
+    users ||--o{ test_reports : "reviewer"
+    test_reports ||--o{ report_steps : "steps"
+    exclusion_groups ||--o{ exclusion_group_resources : "members"
+    resources ||--o{ exclusion_group_resources : "in group"
+    activity_templates ||--o{ activity_template_items : "steps"
+    capabilities ||--o{ activity_template_items : "required"
+    customer_orders ||--o{ milestones : "has"
+    resources ||--o{ staff_absences : "away"
+    customer_orders ||--o{ customer_visits : "on-site"
+    ordered_tests ||--o{ activity_history : "logged"
+    users ||--o{ activity_history : "acted"
+        </pre>
+      </div>
+      <p>Source: <a href="er-diagram-simple.mmd">er-diagram-simple.mmd</a>. A static image can still be regenerated (e.g. for offline printing) with:</p>
       <pre>npx @mermaid-js/mermaid-cli -i docs/er-diagram-simple.mmd -o docs/er-diagram-simple.svg -b white</pre>
 
       <h3>2.2 Detailed (fields and keys)</h3>
-      <img src="er-diagram.svg" alt="RMS ER diagram" width="100%">
-      <p>The diagram reflects current SQLite schema entities and keys used in the minimal working local app.</p>
-      <p>Source: <a href="er-diagram.mmd">er-diagram.mmd</a> (Mermaid ER syntax). Regenerate the SVG after schema changes with:</p>
+      <p>Same live-rendering, search and tooltip behaviour as above, this time with every field, type, key and the real foreign-key column name on each relationship.</p>
+      <div class="er-tools">
+        <input type="search" id="er-search-detailed" placeholder="Search tables (e.g. order, resource)...">
+        <button type="button" id="er-clear-detailed">Clear</button>
+        <span class="er-count" id="er-count-detailed"></span>
+      </div>
+      <div class="er-diagram-wrap" id="er-wrap-detailed">
+        <pre class="mermaid" id="er-diagram-detailed-src">
+erDiagram
+    users ||--o{ allocations : "planner_user_id"
+    resources ||--o{ allocations : "resource_id"
+    ordered_tests ||--o{ allocations : "ordered_test_id"
+    customer_orders ||--o{ ordered_tests : "order_id"
+    customer_orders ||--o{ euts : "order_id"
+    euts ||--o{ ordered_tests : "eut_id (optional)"
+    capabilities ||--o{ ordered_tests : "required_capability_id"
+    resources ||--o{ resource_capabilities : "resource_id"
+    capabilities ||--o{ resource_capabilities : "capability_id"
+    resources ||--o{ users : "linked_resource_id"
+    capabilities ||--o{ test_procedures : "capability_id"
+    test_procedures ||--o{ procedure_checks : "procedure_id"
+    ordered_tests ||--o| work_orders : "ordered_test_id"
+    users ||--o{ work_orders : "technician_user_id"
+    test_procedures ||--o{ work_orders : "procedure_id"
+    work_orders ||--o| test_reports : "work_order_id"
+    ordered_tests ||--o| test_reports : "ordered_test_id"
+    test_procedures ||--o{ test_reports : "procedure_id"
+    users ||--o{ test_reports : "technician_user_id"
+    users ||--o{ test_reports : "reviewer_user_id"
+    test_reports ||--o{ report_steps : "report_id"
+    exclusion_groups ||--o{ exclusion_group_resources : "group_id"
+    resources ||--o{ exclusion_group_resources : "resource_id"
+    activity_templates ||--o{ activity_template_items : "template_id"
+    capabilities ||--o{ activity_template_items : "required_capability_id"
+    customer_orders ||--o{ milestones : "order_id"
+    resources ||--o{ staff_absences : "resource_id"
+    customer_orders ||--o{ customer_visits : "order_id"
+    ordered_tests ||--o{ activity_history : "ordered_test_id"
+    users ||--o{ activity_history : "user_id"
+
+    users {
+        int id PK
+        string username UK
+        string role "admin|planner|technician"
+        int linked_resource_id FK "technician's own resource row, for finding their assigned tests"
+    }
+
+    resources {
+        int id PK
+        string code UK
+        string name
+        string resource_type
+        string status "default available"
+        string site "optional, e.g. TLC|TLS"
+    }
+
+    exclusion_groups {
+        int id PK
+        string name UK
+        string notes
+    }
+
+    exclusion_group_resources {
+        int group_id PK "also FK -> exclusion_groups.id"
+        int resource_id PK "also FK -> resources.id"
+    }
+
+    capabilities {
+        int id PK
+        string name UK
+        string description
+        string discipline "optional, e.g. EMC|Environmental|Calibration"
+    }
+
+    resource_capabilities {
+        int resource_id PK "also FK -> resources.id"
+        int capability_id PK "also FK -> capabilities.id"
+    }
+
+    customer_orders {
+        int id PK
+        string order_code UK
+        string customer_name
+        string product_name
+        string weekly_note "manual; the only free-text project status field"
+        bool waiting_for_customer "manual; the only externally-caused hold flag"
+    }
+
+    milestones {
+        int id PK
+        int order_id FK
+        string title
+        string target_date "optional"
+        string notes
+    }
+
+    staff_absences {
+        int id PK
+        int resource_id FK "the technician resource, not the user login"
+        string start_date
+        string end_date
+        string reason "optional"
+    }
+
+    customer_visits {
+        int id PK
+        int order_id FK
+        string start_date
+        string end_date
+        string notes "optional"
+    }
+
+    activity_history {
+        int id PK
+        int ordered_test_id FK
+        string changed_at
+        int user_id FK "nullable"
+        string username "denormalized snapshot, survives user deletion/rename"
+        string action "e.g. resource_assigned|reordered|eut_changed|work_order_started"
+        string detail "human-readable description of what changed"
+        string reason "optional; populated only when the acting workflow already collects a note"
+    }
+
+    euts {
+        int id PK
+        int order_id FK
+        string name
+        string serial_number
+        string notes
+    }
+
+    ordered_tests {
+        int id PK
+        int order_id FK
+        int eut_id FK "optional; which EUT this activity belongs to"
+        string test_name
+        int required_capability_id FK
+        int sequence "display/reorder position, scoped per (order_id, eut_id)"
+    }
+
+    activity_templates {
+        int id PK
+        string name UK
+        string notes
+    }
+
+    activity_template_items {
+        int id PK
+        int template_id FK
+        int step_number "the template's own ordering"
+        string activity_name
+        int required_capability_id FK "optional"
+        string notes
+    }
+
+    allocations {
+        int id PK
+        int ordered_test_id UK "also FK -> ordered_tests.id; UK is composite with resource_id"
+        int resource_id UK "also FK -> resources.id; UK is composite with ordered_test_id"
+        int planner_user_id FK
+        string notes
+    }
+
+    test_procedures {
+        int id PK
+        int capability_id FK
+        string title
+        string summary
+        string steps "newline-separated prose instructions"
+        string equipment_needed
+        string facility_needed
+        string safety_notes
+    }
+
+    procedure_checks {
+        int id PK
+        int procedure_id FK
+        int step_number
+        string description
+        string expected_value "pre-authored acceptance criterion, copied onto each report_steps row"
+    }
+
+    work_orders {
+        int id PK
+        string work_order_code UK
+        int ordered_test_id UK "also FK -> ordered_tests.id; one work order per ordered test"
+        int technician_user_id FK
+        int procedure_id FK "nullable until technician selects a procedure"
+        string status "planned|in_progress|on_hold|completed"
+        string scheduled_date
+        string started_at
+        string completed_at
+        string result "pass|fail|n_a, nullable"
+        string notes
+    }
+
+    test_reports {
+        int id PK
+        string report_code UK
+        int work_order_id UK "also FK -> work_orders.id; one report per work order"
+        int ordered_test_id FK
+        int procedure_id FK "nullable, source of the snapshotted report_steps"
+        string uut_name
+        string uut_serial_number
+        int technician_user_id FK "report author, normally the work order's technician"
+        string status "draft|submitted|approved|rejected"
+        string technician_signed_at
+        string overall_result "pass|fail|n_a, nullable"
+        string notes
+        int reviewer_user_id FK "nullable until reviewed; any technician/planner other than the author"
+        string reviewer_decision "approved|rejected, nullable"
+        string reviewer_comment
+        string reviewer_signed_at
+        string created_at
+    }
+
+    report_steps {
+        int id PK
+        int report_id FK
+        int step_number
+        string description
+        string expected_value "copied from procedure_checks at report-creation time"
+        string actual_value "filled in by the technician"
+        string result "pass|fail|n_a, filled in by the technician"
+    }
+        </pre>
+      </div>
+      <p>Source: <a href="er-diagram.mmd">er-diagram.mmd</a> (Mermaid ER syntax). A static image can still be regenerated after schema changes with:</p>
       <pre>npx @mermaid-js/mermaid-cli -i docs/er-diagram.mmd -o docs/er-diagram.svg -b white</pre>
     </section>
 
@@ -144,5 +418,134 @@
       </ul>
     </section>
   </main>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+
+    var ENTITY_DESCRIPTIONS = {
+      users: "Login identity and role (admin/planner/technician).",
+      resources: "Equipment, facility, procedure, or technician resource records.",
+      capabilities: "Named test capability a resource can have and a test can require.",
+      resource_capabilities: "Many-to-many: which resources have which capabilities.",
+      customer_orders: "A customer's project/order header.",
+      euts: "Equipment/Unit(s) Under Test belonging to one order.",
+      ordered_tests: "A test activity requested under an order, optionally tagged to an EUT.",
+      allocations: "A resource assigned to a test activity.",
+      test_procedures: "A documented test process authored against a capability.",
+      procedure_checks: "The ordered checklist items within a test procedure.",
+      work_orders: "A technician's job record for one test activity.",
+      test_reports: "The formal report generated from a work order.",
+      report_steps: "A snapshot of one checklist row on a test report.",
+      exclusion_groups: "A named group of facility resources that can't run at the same time.",
+      exclusion_group_resources: "Which facility resources belong to which exclusion group.",
+      activity_templates: "A reusable, named sequence of standard activities.",
+      activity_template_items: "The ordered steps within one activity template.",
+      milestones: "A dated thing to watch for on a project.",
+      staff_absences: "A technician's vacation/absence date range.",
+      customer_visits: "A customer's on-site date range for a project.",
+      activity_history: "An append-only log of who changed a test activity, when, and why."
+    };
+
+    var RELATIONSHIP_TOOLTIPS = {
+      "assigned by": "Who (planner) assigned this resource to the test.",
+      "assigned": "Which resource was assigned to the test.",
+      "has": "The left-hand table owns zero or more of the right-hand records.",
+      "has (optional)": "The left-hand table owns zero or more of the right-hand records; the link is optional.",
+      "required": "The right-hand record requires this left-hand capability.",
+      "granted by": "Which capability a resource is qualified for.",
+      "linked technician": "The resource record a technician user account is tied to.",
+      "documented by": "The test procedure written for this capability.",
+      "checklist": "The ordered check items belonging to this procedure.",
+      "worked as": "The technician job record created for this test activity.",
+      "technician": "The user who performed/owns this work.",
+      "followed": "The procedure the work order follows.",
+      "reported as": "The formal report generated for this work/test.",
+      "based on": "The procedure the report's checklist was copied from.",
+      "author": "The technician who authored/signed the report.",
+      "reviewer": "The second person who reviewed, approved, or rejected the report.",
+      "steps": "The ordered sub-items belonging to this record.",
+      "members": "The resources that belong to this group.",
+      "in group": "Which exclusion group a resource belongs to.",
+      "away": "The technician's recorded absence period.",
+      "on-site": "The customer's recorded on-site visit period.",
+      "logged": "A change-history entry recorded for this test activity.",
+      "acted": "The user who performed the logged change.",
+      "planner_user_id": "Foreign key: which planner user assigned this resource.",
+      "resource_id": "Foreign key: references resources.id (see Section 6 for cascade rules).",
+      "ordered_test_id": "Foreign key: references ordered_tests.id (see Section 6 for cascade rules).",
+      "order_id": "Foreign key: references customer_orders.id (see Section 6 for cascade rules).",
+      "eut_id (optional)": "Foreign key: references euts.id; nullable, so the link is optional.",
+      "required_capability_id": "Foreign key: references capabilities.id.",
+      "capability_id": "Foreign key: references capabilities.id.",
+      "linked_resource_id": "Foreign key: references resources.id (a technician's own resource row).",
+      "procedure_id": "Foreign key: references test_procedures.id.",
+      "technician_user_id": "Foreign key: references users.id.",
+      "work_order_id": "Foreign key: references work_orders.id.",
+      "reviewer_user_id": "Foreign key: references users.id; nullable until reviewed.",
+      "report_id": "Foreign key: references test_reports.id.",
+      "group_id": "Foreign key: references exclusion_groups.id.",
+      "template_id": "Foreign key: references activity_templates.id.",
+      "user_id": "Foreign key: references users.id."
+    };
+
+    function addTitle(el, text) {
+      if (!el || !text || el.querySelector(':scope > title')) return;
+      var ns = 'http://www.w3.org/2000/svg';
+      var title = document.createElementNS(ns, 'title');
+      title.textContent = text;
+      el.insertBefore(title, el.firstChild);
+    }
+
+    function annotate(wrap) {
+      wrap.querySelectorAll('[id^="entity-"]').forEach(function (g) {
+        var m = g.id.match(/^entity-(.+)-\d+$/);
+        if (!m) return;
+        var desc = ENTITY_DESCRIPTIONS[m[1]];
+        if (desc) addTitle(g, m[1] + ': ' + desc);
+      });
+      wrap.querySelectorAll('text').forEach(function (t) {
+        var label = (t.textContent || '').trim();
+        var desc = RELATIONSHIP_TOOLTIPS[label];
+        if (desc) addTitle(t, label + ': ' + desc);
+      });
+    }
+
+    function wireSearch(inputId, clearId, countId, wrapId) {
+      var input = document.getElementById(inputId);
+      var clearBtn = document.getElementById(clearId);
+      var countEl = document.getElementById(countId);
+      var wrap = document.getElementById(wrapId);
+      if (!input || !wrap) return;
+      function apply() {
+        var q = input.value.trim().toLowerCase();
+        var entities = wrap.querySelectorAll('[id^="entity-"]');
+        var shown = 0;
+        entities.forEach(function (g) {
+          var m = g.id.match(/^entity-(.+)-\d+$/);
+          var name = m ? m[1].toLowerCase() : '';
+          var match = !q || name.indexOf(q) !== -1;
+          g.classList.toggle('rms-dim', !match);
+          if (match) shown++;
+        });
+        countEl.textContent = q ? (shown + ' of ' + entities.length + ' tables match') : '';
+      }
+      input.addEventListener('input', apply);
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          input.value = '';
+          apply();
+        });
+      }
+    }
+
+    mermaid.run({ querySelector: '.mermaid' }).then(function () {
+      document.querySelectorAll('.er-diagram-wrap').forEach(annotate);
+      wireSearch('er-search-simple', 'er-clear-simple', 'er-count-simple', 'er-wrap-simple');
+      wireSearch('er-search-detailed', 'er-clear-detailed', 'er-count-detailed', 'er-wrap-detailed');
+    }).catch(function (err) {
+      console.error('Mermaid rendering failed:', err);
+    });
+  </script>
 </body>
 </html>

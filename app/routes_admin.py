@@ -1,6 +1,7 @@
 import sqlite3
+from datetime import datetime
 
-from flask import Blueprint, flash, redirect, request, url_for
+from flask import Blueprint, flash, redirect, request, session, url_for
 
 from .db import get_db, init_db
 from .routes_common import render_ui, require_role
@@ -27,6 +28,9 @@ EXCLUSION_GROUP_DUP_KEYS = ["name", "notes"]
 
 TEMPLATE_SORTABLE_KEYS = {"name", "notes"}
 TEMPLATE_DUP_KEYS = ["name", "notes"]
+
+PROPOSAL_SORTABLE_KEYS = {"path", "proposal_type", "title", "submitted_by_username", "created_at", "status"}
+PROPOSAL_DUP_KEYS = ["path", "title", "submitted_by_username"]
 
 ABSENCE_SORTABLE_KEYS = {"resource_code", "resource_name", "start_date", "end_date", "reason"}
 ABSENCE_DUP_KEYS = ["resource_code", "start_date", "end_date"]
@@ -142,6 +146,21 @@ def _load_admin_context(db) -> dict:
         sortable_keys=ABSENCE_SORTABLE_KEYS,
     )
 
+    proposals = rows_with_meta(
+        db.execute(
+            """
+            SELECT id, path, proposal_type, title, description, submitted_by_username,
+                   created_at, status, admin_comment, updated_at
+            FROM proposals
+            ORDER BY created_at DESC
+            """
+        ).fetchall(),
+        dup_keys=PROPOSAL_DUP_KEYS,
+        sort_key=request.args.get("proposals_sort"),
+        sort_dir=request.args.get("proposals_dir", "asc"),
+        sortable_keys=PROPOSAL_SORTABLE_KEYS,
+    )
+
     return {
         "users": users,
         "resources": resources,
@@ -151,6 +170,7 @@ def _load_admin_context(db) -> dict:
         "exclusion_groups": exclusion_groups,
         "templates": templates,
         "absences": absences,
+        "proposals": proposals,
     }
 
 
@@ -561,6 +581,32 @@ def admin_manage():
             db.execute("DELETE FROM staff_absences WHERE id = ?", (absence_id,))
             db.commit()
             flash("Absence deleted.", "info")
+
+        elif action == "update_proposal":
+            proposal_id = request.form.get("proposal_id", "").strip()
+            status = request.form.get("status", "").strip()
+            admin_comment = request.form.get("admin_comment", "").strip() or None
+            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected")
+
+            if not (proposal_id and status in valid_statuses):
+                flash("A valid proposal and status are required.", "error")
+            else:
+                db.execute(
+                    """
+                    UPDATE proposals
+                    SET status = ?, admin_comment = ?, admin_user_id = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (status, admin_comment, session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id),
+                )
+                db.commit()
+                flash("Proposal updated.", "info")
+
+        elif action == "delete_proposal":
+            proposal_id = request.form.get("proposal_id", "").strip()
+            db.execute("DELETE FROM proposals WHERE id = ?", (proposal_id,))
+            db.commit()
+            flash("Proposal deleted.", "info")
 
         return redirect(url_for("admin.admin_manage"))
 

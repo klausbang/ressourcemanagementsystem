@@ -430,4 +430,39 @@
     </tbody>
   </table>
 </section>
+
+<section>
+  <h3>Proposals</h3>
+  <p><em>Enhancement ideas and bug reports submitted from the "P" link any signed-in user sees on every page, along with the exact page they were on.</em></p>
+  {% for p in proposals %}
+  <fieldset style="margin-bottom:14px;">
+    <legend>{{ '[Bug]' if p['proposal_type'] == 'bug' else '[Enhancement]' }} {{ p['title'] }}</legend>
+    <p>By {{ p['submitted_by_username'] or 'unknown user' }} on {{ p['created_at'] }} &mdash; page: <code>{{ p['path'] }}</code></p>
+    {% if p['description'] %}<p>{{ p['description'] }}</p>{% endif %}
+    <form method="post">
+      <input type="hidden" name="action" value="update_proposal">
+      <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+      <label>Status
+        <select name="status">
+          <option value="new" {% if p['status'] == 'new' %}selected{% endif %}>New</option>
+          <option value="accepted" {% if p['status'] == 'accepted' %}selected{% endif %}>Accepted</option>
+          <option value="in_progress" {% if p['status'] == 'in_progress' %}selected{% endif %}>In progress</option>
+          <option value="done" {% if p['status'] == 'done' %}selected{% endif %}>Done</option>
+          <option value="rejected" {% if p['status'] == 'rejected' %}selected{% endif %}>Rejected</option>
+        </select>
+      </label>
+      <label>Admin comment <input type="text" name="admin_comment" value="{{ p['admin_comment'] or '' }}"></label>
+      <button type="submit">Save</button>
+      <button type="submit" form="proposal-delete-{{ p['id'] }}">Delete</button>
+    </form>
+    <form id="proposal-delete-{{ p['id'] }}" method="post" hidden>
+      <input type="hidden" name="action" value="delete_proposal">
+      <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+    </form>
+    {% if p['updated_at'] %}<p><em>Last reviewed {{ p['updated_at'] }}</em></p>{% endif %}
+  </fieldset>
+  {% else %}
+  <p><em>No proposals submitted yet.</em></p>
+  {% endfor %}
+</section>
 {% endblock %}

@@ -1,0 +1,23 @@
+{% import 'modern/_macros.html' as macros %}
+<form method="post" action="{{ url_for('proposals.new_proposal') }}" class="form-grid">
+  <input type="hidden" name="path" value="{{ path }}">
+  <div class="field" style="flex:1 1 100%;">
+    <label>Reporting against: <code>{{ path }}</code></label>
+  </div>
+  <div class="field" style="flex:1 1 100%;">
+    <label for="proposal-type-{{ form_id }}">Type</label>
+    <select id="proposal-type-{{ form_id }}" name="proposal_type" required>
+      <option value="enhancement" {% if form_values.get('proposal_type') == 'enhancement' %}selected{% endif %}>💡 Enhancement idea</option>
+      <option value="bug" {% if form_values.get('proposal_type') == 'bug' %}selected{% endif %}>🐛 Bug report</option>
+    </select>
+  </div>
+  <div class="field" style="flex:1 1 100%;">
+    <label for="proposal-title-{{ form_id }}">Title</label>
+    <input type="text" id="proposal-title-{{ form_id }}" name="title" value="{{ form_values.get('title', '') }}" placeholder="Short summary" required>
+  </div>
+  <div class="field" style="flex:1 1 100%;">
+    <label for="proposal-desc-{{ form_id }}">Description (optional)</label>
+    <textarea id="proposal-desc-{{ form_id }}" name="description" rows="4" style="width:100%;" placeholder="What did you expect, what happened, or what would help?">{{ form_values.get('description', '') }}</textarea>
+  </div>
+  <div class="field"><button type="submit" class="btn btn-primary">Submit</button></div>
+</form>

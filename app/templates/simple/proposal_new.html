@@ -1,0 +1,29 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}Submit a Proposal{% endblock %}
+
+{% block content %}
+<h2>Suggest an Enhancement or Report a Bug</h2>
+<p><em>Seen automatically by the RMS Administrator on the Admin page's Proposals section, along with the page you were on when you submitted it.</em></p>
+
+<form method="post" action="{{ url_for('proposals.new_proposal') }}">
+  <input type="hidden" name="path" value="{{ path }}">
+  <p>Reporting against: <code>{{ path }}</code></p>
+  <label>Type
+    <select name="proposal_type" required>
+      <option value="enhancement" {% if form_values.get('proposal_type') == 'enhancement' %}selected{% endif %}>Enhancement idea</option>
+      <option value="bug" {% if form_values.get('proposal_type') == 'bug' %}selected{% endif %}>Bug report</option>
+    </select>
+  </label>
+  <br>
+  <label>Title
+    <input type="text" name="title" value="{{ form_values.get('title', '') }}" required>
+  </label>
+  <br>
+  <label>Description<br>
+    <textarea name="description" rows="4" cols="50">{{ form_values.get('description', '') }}</textarea>
+  </label>
+  <br>
+  <button type="submit">Submit</button>
+</form>
+{% endblock %}

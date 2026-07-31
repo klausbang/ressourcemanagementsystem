@@ -263,6 +263,7 @@ def _load_planner_context(db) -> dict:
         """
         SELECT
             ot.id AS ordered_test_id,
+            o.id AS order_id,
             o.order_code,
             o.customer_name,
             ot.eut_id,
@@ -270,7 +271,8 @@ def _load_planner_context(db) -> dict:
             ot.test_name,
             ot.sequence,
             c.id AS capability_id,
-            c.name AS capability_name
+            c.name AS capability_name,
+            EXISTS(SELECT 1 FROM activity_history h WHERE h.ordered_test_id = ot.id) AS has_history
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         LEFT JOIN euts e ON e.id = ot.eut_id
@@ -367,7 +369,86 @@ def _load_planner_context(db) -> dict:
         "templates": templates,
     }
     context.update(_load_schedule_context(db))
+    context.update(_load_orders_overview_context(db, orders, tests_for_alloc, euts_rows))
     return context
+
+
+def _test_status_label(wo_status: str | None, result: str | None) -> str:
+    if wo_status is None:
+        return "Not yet actioned"
+    label = {
+        "planned": "Planned",
+        "in_progress": "In Progress",
+        "on_hold": "On hold",
+        "completed": "Completed",
+    }.get(wo_status, wo_status)
+    if wo_status == "completed" and result:
+        return f"{label} — {result}"
+    return label
+
+
+def _load_orders_overview_context(db, orders, tests_for_alloc, euts_rows) -> dict:
+    """Build the data for the three alternate 'Orders Overview' presentations
+    (expandable list, status-grouped Kanban board, master-detail), reusing
+    the same underlying data as the Ordered Tests / Dashboard views so this
+    stays a read-oriented lens on one source of truth, not a second one."""
+    status_rows = db.execute(
+        """
+        SELECT ot.id AS ordered_test_id, wo.status AS wo_status, wo.result AS result
+        FROM ordered_tests ot
+        LEFT JOIN work_orders wo ON wo.ordered_test_id = ot.id
+        """
+    ).fetchall()
+    status_by_test = {
+        row["ordered_test_id"]: _test_status_label(row["wo_status"], row["result"]) for row in status_rows
+    }
+
+    dashboard_ctx = _load_dashboard_context(db)
+    projects_by_id = {p["order_id"]: p for p in dashboard_ctx["active_projects"] + dashboard_ctx["completed_projects"]}
+
+    overview_orders = []
+    for o in orders:
+        proj = projects_by_id.get(o["id"])
+        if proj is None:
+            continue
+        order_tests = [dict(t) for t in tests_for_alloc if t.get("order_id") == o["id"]]
+        for t in order_tests:
+            t["status_label"] = status_by_test.get(t["ordered_test_id"], "Not yet actioned")
+
+        eut_groups = []
+        for e in euts_rows:
+            if e["order_id"] != o["id"]:
+                continue
+            eut_groups.append({"eut": e, "tests": [t for t in order_tests if t["eut_id"] == e["id"]]})
+
+        overview_orders.append(
+            {
+                **proj,
+                "eut_groups": eut_groups,
+                "direct_tests": [t for t in order_tests if t["eut_id"] is None],
+            }
+        )
+
+    overview_orders.sort(key=lambda p: p["order_code"])
+
+    kanban_columns = ["Planned", "In Progress", "Reporting", "Waiting for Customer", "Completed"]
+    kanban_board = {col: [] for col in kanban_columns}
+    for p in overview_orders:
+        kanban_board.setdefault(p["display_status"], []).append(p)
+
+    selected_id = request.args.get("overview_order_id", type=int)
+    selected_order = None
+    if overview_orders:
+        selected_order = next((p for p in overview_orders if p["order_id"] == selected_id), overview_orders[0])
+
+    return {
+        "overview_orders": overview_orders,
+        "kanban_columns": kanban_columns,
+        "kanban_board": kanban_board,
+        "overview_selected_order": selected_order,
+        "overview_default_view": "detail" if request.args.get("overview_order_id") is not None else "list",
+        "is_overview_tab": request.args.get("overview_order_id") is not None,
+    }
 
 
 def _render_planner_orders(db, order_form_values=None, order_form_errors=None, eut_form_values=None, eut_form_errors=None):
