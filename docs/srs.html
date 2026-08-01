@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v7</title>
+  <title>RMS SRS v8</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v7</h1>
-    <p>Version: 0.7 | Date: 2026-08-01</p>
+    <h1>Resource Management System (RMS) - SRS v8</h1>
+    <p>Version: 0.8 | Date: 2026-08-01</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -24,7 +24,8 @@
         <li><strong>v0.4 (Phase 14):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
         <li><strong>v0.5 (Phase 15):</strong> delivered the stretch goal renumbered above &mdash; FR-CON-3 (cross-site equipment warning), FR-CON-4 (planned-date facility overlap warning), and FR-RSC-2 (reschedule suggestions from a late prerequisite) are now all Delivered rather than Planned/stretch, building directly on Phase 14's dependency and planned-date data.</li>
         <li><strong>v0.6 (Phase 16):</strong> added FR-USE-6, a single-page per-order workspace consolidating order creation/maintenance with everything that hangs off it (EUTs, test activities, dependencies, planned dates, resource allocations, milestones, visits, derived status) into one view, alongside the existing multi-tab Planner page.</li>
-        <li><strong>v0.7 (Phases 17-18, this revision):</strong> implemented five planner-submitted proposals found in the live proposals queue. New BR-007/FR-PRJ-5/FR-PRJ-6 (Phase 17): a customer database a planner can pick from or add to inline when creating/editing an order, with incomplete profiles flagged to the admin without ever blocking the order. New FR-TP-7 (Phase 18): activities from one "apply template" action are grouped, individually removable or deletable as a whole, with drift detection and an additive sync when the source template changes. The remaining three proposals (preserve scroll position across Save/Add/Apply; grey out Save until a form is actually changed, with an unsaved-changes warning; inline confirmation for Apply Template/Add Activity) were Modern-UI usability fixes with no new requirement ID, since they don't change what the system does, only how it confirms/preserves state while doing it.</li>
+        <li><strong>v0.7 (Phases 17-18):</strong> implemented five planner-submitted proposals found in the live proposals queue. New BR-007/FR-PRJ-5/FR-PRJ-6 (Phase 17): a customer database a planner can pick from or add to inline when creating/editing an order, with incomplete profiles flagged to the admin without ever blocking the order. New FR-TP-7 (Phase 18): activities from one "apply template" action are grouped, individually removable or deletable as a whole, with drift detection and an additive sync when the source template changes. The remaining three proposals (preserve scroll position across Save/Add/Apply; grey out Save until a form is actually changed, with an unsaved-changes warning; inline confirmation for Apply Template/Add Activity) were Modern-UI usability fixes with no new requirement ID, since they don't change what the system does, only how it confirms/preserves state while doing it.</li>
+        <li><strong>v0.8 (Phase 19, this revision):</strong> new FR-PLN-5, from a planner-submitted proposal: the production schedule chart (FR-PLN-2) gains selectable Week and Month scales (day-column Gantt grids, 1-8 weeks or 1-6 months wide) alongside the existing Day scale, plus an "All" mode showing Day/Week/Month stacked together, all pivoting around the same viewed date. No new stored data - purely a new way of visualizing the same work-order/ordered-test records the Day chart already reads.</li>
       </ul>
     </section>
 
@@ -178,7 +179,9 @@ Project (customer_orders)
         <li><strong>FR-PLN-2</strong> [Should, Delivered - Phase 7 (WIP)]: The system shall provide a day-view production schedule showing each work order as a time-blocked bar against the resources/technician assigned to it, navigable by day.</li>
         <li><strong>FR-PLN-3</strong> [Should, Delivered - Phase 9]: The schedule view shall display constraint conflicts (see 8.4) inline rather than requiring a separate check.</li>
         <li><strong>FR-PLN-4</strong> [Should, Delivered - Phase 14]: See FR-TP-6 (planned start/end date on a test activity).</li>
+        <li><strong>FR-PLN-5</strong> [Should, Delivered - Phase 19]: In addition to the day-view chart (FR-PLN-2), the schedule shall offer a Week scale and a Month scale (1-day columns instead of 1-hour columns), each spanning a selectable number of weeks (default 1, up to 8) or months (default 1, up to 6), and an "All" mode showing Day, Week, and Month together (Day at top, Week below it, Month at the bottom). All three read the same work-order data as the Day chart and stay anchored to the same viewed date when switching between them.</li>
         <li><strong>Design note:</strong> the customer's spreadsheet plans in 2-hour blocks because that suits Excel's grid. RMS stores actual start/end timestamps internally (minute resolution) and only uses fixed blocks for the visual grid, so finer-grained scheduling is possible later without a data model change.</li>
+        <li><strong>Design note (FR-PLN-5 scope):</strong> the Week/Month scales are visualization only - they reuse the Day chart's bar-placement logic at a coarser (1-day) granularity and deliberately do not re-run the Day chart's live conflict/cross-site overlay (FR-CON-2/3), which stays a Day-only feature, since checking every pair of activities across weeks or months of columns would be expensive and wasn't asked for; the underlying hard block at work-order start/resume (FR-CON-2) still applies regardless of which chart scale is being viewed.</li>
       </ul>
 
       <h3>8.8 Rescheduling (FR-RSC)</h3>
@@ -252,6 +255,7 @@ Project (customer_orders)
         <li>Phase 16 added no new stored data at all &mdash; the order workspace page is a new arrangement of the same order/EUT/activity/milestone/visit/status data the tabbed Planner page and Dashboard already read and write, through the exact same actions.</li>
         <li>From Phase 17 (delivered): a customers table (name, optional contact name/email/phone/address, created-by/at); an optional customer_id on customer_orders linking to it, alongside the existing customer_name (kept as a denormalized snapshot so every existing display/report is unaffected).</li>
         <li>From Phase 18 (delivered): a template_applications table (one row per "apply template" action: which template, order, optional EUT, when, and whether any member has since been individually changed) and an optional template_application_id on ordered_tests linking an activity back to the batch that created it; an integer version counter on activity_templates for drift detection.</li>
+        <li>Phase 19 added no new stored data at all &mdash; the Week/Month schedule scales read the same work_orders/ordered_tests records the Day chart already reads, just windowed and placed at a coarser (1-day) granularity.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -299,6 +303,7 @@ Project (customer_orders)
           <tr><td>16</td><td>Single-page customer order workspace</td><td>FR-USE-6</td><td>Delivered</td></tr>
           <tr><td>17</td><td>Customer database</td><td>BR-007, FR-PRJ-5..6</td><td>Delivered</td></tr>
           <tr><td>18</td><td>Template application grouping</td><td>FR-TP-7</td><td>Delivered</td></tr>
+          <tr><td>19</td><td>Week/Month schedule scales</td><td>FR-PLN-5</td><td>Delivered</td></tr>
         </tbody>
       </table>
     </section>

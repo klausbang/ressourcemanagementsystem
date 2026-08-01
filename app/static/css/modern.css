@@ -515,6 +515,12 @@ table.gantt-table th, table.gantt-table td { padding: 4px; text-align: center; }
 .gantt-hour-col.current, td.current { background: var(--color-primary-light); }
 .gantt-hnum { font-weight: 700; color: var(--color-text); }
 
+.gantt-day-col { min-width: 54px; width: 54px; font-size: 0.7rem; color: var(--color-text-muted); }
+.gantt-day-col-narrow { min-width: 22px; width: 22px; font-size: 0.68rem; }
+.gantt-day-col.current { background: var(--color-primary-light); }
+.gantt-day-col.gantt-weekend { background: var(--color-surface-alt, rgba(128,128,128,0.08)); }
+table.gantt-table-compact th, table.gantt-table-compact td { padding: 2px; }
+
 .gantt-bar {
   border-radius: 6px;
   font-size: 0.7rem;

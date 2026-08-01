@@ -30,6 +30,8 @@ ALLOC_DUP_KEYS = ["order_code", "customer_name", "eut_name", "test_name", "capab
 
 SCHEDULE_WINDOW_HOURS = 24
 SCHEDULE_DEFAULT_HOUR = 8  # assumed start-of-shift time when only a scheduled_date (no time) is known
+SCHEDULE_MAX_WEEKS = 8
+SCHEDULE_MAX_MONTHS = 6
 
 
 def _parse_date_only(value: str | None) -> date | None:
@@ -57,22 +59,70 @@ def _schedule_view_day() -> date:
     return _parse_date_only(request.args.get("sched_start")) or date.today()
 
 
+def _schedule_view_mode() -> str:
+    """Which of the three Gantt scales (or all three at once) to render, from ?sched_view=."""
+    mode = request.args.get("sched_view", "day")
+    return mode if mode in ("day", "week", "month", "all") else "day"
+
+
+def _schedule_span_count(param_name: str, default: int, maximum: int) -> int:
+    """A selectable-count query param (?sched_weeks=/?sched_months=), clamped to [1, maximum]."""
+    try:
+        n = int(request.args.get(param_name, ""))
+    except ValueError:
+        return default
+    return max(1, min(n, maximum))
+
+
+def _add_months(d: date, months: int) -> date:
+    """Add a whole number of months to a date. Only ever called with day=1 dates in this
+    app (month-start anchors), so there's no day-of-month overflow (e.g. Jan 31 + 1 month)
+    to worry about."""
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    return date(year, month, 1)
+
+
+def _place_bars(items: list, window_start: datetime, window_end: datetime, slot_hours: float) -> tuple[list, int]:
+    """Position a list of items (each already carrying _bar_start/_bar_end) into slot-column
+    offsets within [window_start, window_end), clipping bars that spill outside it. Shared by
+    the day view (1-hour slots) and the week/month views (24-hour slots) so all three scales
+    place and clip bars with exactly the same rules."""
+    slot_seconds = slot_hours * 3600
+    slot_count = max(1, round((window_end - window_start).total_seconds() / slot_seconds))
+    placed = []
+    for item in items:
+        bar_start = item["_bar_start"]
+        bar_end = item["_bar_end"]
+        if bar_end <= window_start or bar_start >= window_end:
+            continue  # entirely outside this window; reachable via prev/next
+
+        clipped_start = max(bar_start, window_start)
+        clipped_end = min(bar_end, window_end)
+
+        start_offset = int((clipped_start - window_start).total_seconds() // slot_seconds)
+        end_offset = math.ceil((clipped_end - window_start).total_seconds() / slot_seconds)
+        start_offset = max(0, min(start_offset, slot_count - 1))
+        end_offset = max(start_offset + 1, min(end_offset, slot_count))
+
+        entry = dict(item)
+        entry["col_offset"] = start_offset
+        entry["col_span"] = end_offset - start_offset
+        entry["clipped_before"] = clipped_start > bar_start
+        entry["clipped_after"] = clipped_end < bar_end
+        placed.append(entry)
+
+    placed.sort(key=lambda r: (r["col_offset"], r["order_code"]))
+    return placed, slot_count
+
+
 def _load_schedule_context(db) -> dict:
     view_day = _schedule_view_day()
-    window_start = datetime.combine(view_day, time.min)
-    window_end = window_start + timedelta(hours=SCHEDULE_WINDOW_HOURS)
+    sched_view = _schedule_view_mode()
+    weeks_count = _schedule_span_count("sched_weeks", 1, SCHEDULE_MAX_WEEKS)
+    months_count = _schedule_span_count("sched_months", 1, SCHEDULE_MAX_MONTHS)
     now = datetime.now()
-
-    hours = []
-    for i in range(SCHEDULE_WINDOW_HOURS):
-        slot_start = window_start + timedelta(hours=i)
-        hours.append(
-            {
-                "hour": slot_start.hour,
-                "label": f"{slot_start.hour:02d}",
-                "is_current": view_day == now.date() and slot_start.hour == now.hour,
-            }
-        )
 
     raw = db.execute(
         """
@@ -122,7 +172,7 @@ def _load_schedule_context(db) -> dict:
         groups_b = set().union(*(groups_by_resource.get(rid, set()) for rid in res_ids_b)) if res_ids_b else set()
         return bool(groups_a & groups_b)
 
-    visible_rows = []
+    all_items = []
     unscheduled = []
 
     for row in raw:
@@ -153,26 +203,24 @@ def _load_schedule_context(db) -> dict:
         if bar_end <= bar_start:
             bar_end = bar_start + timedelta(hours=1)
 
-        if bar_end <= window_start or bar_start >= window_end:
-            continue  # entirely outside the visible day; reachable via prev/next
-
-        clipped_start = max(bar_start, window_start)
-        clipped_end = min(bar_end, window_end)
-
-        start_offset = int((clipped_start - window_start).total_seconds() // 3600)
-        end_offset = math.ceil((clipped_end - window_start).total_seconds() / 3600)
-        start_offset = max(0, min(start_offset, SCHEDULE_WINDOW_HOURS - 1))
-        end_offset = max(start_offset + 1, min(end_offset, SCHEDULE_WINDOW_HOURS))
-
-        item["col_offset"] = start_offset
-        item["col_span"] = end_offset - start_offset
-        item["clipped_before"] = clipped_start > bar_start
-        item["clipped_after"] = clipped_end < bar_end
         item["_bar_start"] = bar_start
         item["_bar_end"] = bar_end
-        visible_rows.append(item)
+        all_items.append(item)
 
-    visible_rows.sort(key=lambda r: (r["col_offset"], r["order_code"]))
+    # --- Day view: the original hour-by-hour Gantt for the single day in view_day ---
+    day_window_start = datetime.combine(view_day, time.min)
+    day_window_end = day_window_start + timedelta(hours=SCHEDULE_WINDOW_HOURS)
+    hours = []
+    for i in range(SCHEDULE_WINDOW_HOURS):
+        slot_start = day_window_start + timedelta(hours=i)
+        hours.append(
+            {
+                "hour": slot_start.hour,
+                "label": f"{slot_start.hour:02d}",
+                "is_current": view_day == now.date() and slot_start.hour == now.hour,
+            }
+        )
+    visible_rows, _ = _place_bars(all_items, day_window_start, day_window_end, slot_hours=1)
 
     # Flag lab/equipment mutual-exclusion conflicts (Phase 9): two different ordered
     # tests, both visible today, whose resources collide (same resource, or two
@@ -217,6 +265,55 @@ def _load_schedule_context(db) -> dict:
                 cross_site.append(b)
         a["cross_site_with"] = cross_site
 
+    # --- Week view: day-by-day columns across `weeks_count` weeks (default 1), starting
+    # from the Monday of view_day's week, so switching scales stays anchored to the same
+    # point in time rather than jumping to an unrelated range.
+    week_start = view_day - timedelta(days=view_day.weekday())
+    week_window_start = datetime.combine(week_start, time.min)
+    week_window_end = week_window_start + timedelta(days=7 * weeks_count)
+    week_day_headers = []
+    d = week_start
+    while d < week_window_end.date():
+        week_day_headers.append(
+            {"label": d.strftime("%a %m/%d"), "is_today": d == now.date(), "is_weekend": d.weekday() >= 5}
+        )
+        d += timedelta(days=1)
+    week_group_labels = [
+        {"label": f"Week of {(week_start + timedelta(days=7 * w)).strftime('%b %d')}", "span": 7}
+        for w in range(weeks_count)
+    ]
+    week_rows, week_slot_count = _place_bars(all_items, week_window_start, week_window_end, slot_hours=24)
+    week_range_label = (
+        f"{week_start.strftime('%b %d, %Y')} – "
+        f"{(week_window_end.date() - timedelta(days=1)).strftime('%b %d, %Y')}"
+    )
+
+    # --- Month view: day-by-day columns across `months_count` calendar months (default 1),
+    # starting from the 1st of view_day's month.
+    month_start = view_day.replace(day=1)
+    month_end = _add_months(month_start, months_count)
+    month_window_start = datetime.combine(month_start, time.min)
+    month_window_end = datetime.combine(month_end, time.min)
+    month_day_headers = []
+    d = month_start
+    while d < month_end:
+        month_day_headers.append(
+            {"label": str(d.day), "is_today": d == now.date(), "is_weekend": d.weekday() >= 5}
+        )
+        d += timedelta(days=1)
+    month_group_labels = []
+    cursor = month_start
+    for _ in range(months_count):
+        nxt = _add_months(cursor, 1)
+        month_group_labels.append({"label": cursor.strftime("%B %Y"), "span": (nxt - cursor).days})
+        cursor = nxt
+    month_rows, month_slot_count = _place_bars(all_items, month_window_start, month_window_end, slot_hours=24)
+    month_range_label = (
+        month_start.strftime("%b %Y")
+        if months_count == 1
+        else f"{month_start.strftime('%b %Y')} – {(month_end - timedelta(days=1)).strftime('%b %Y')}"
+    )
+
     view_day_iso = view_day.isoformat()
     absences_today = [
         dict(row)
@@ -257,6 +354,25 @@ def _load_schedule_context(db) -> dict:
         "is_schedule_tab": bool(request.args.get("sched_start")),
         "absences_today": absences_today,
         "visits_today": visits_today,
+        "sched_view": sched_view,
+        "sched_weeks": weeks_count,
+        "sched_months": months_count,
+        "sched_weeks_options": list(range(1, SCHEDULE_MAX_WEEKS + 1)),
+        "sched_months_options": list(range(1, SCHEDULE_MAX_MONTHS + 1)),
+        "week_day_headers": week_day_headers,
+        "week_group_labels": week_group_labels,
+        "week_rows": week_rows,
+        "week_slot_count": week_slot_count,
+        "week_range_label": week_range_label,
+        "week_prev": (view_day - timedelta(days=7 * weeks_count)).isoformat(),
+        "week_next": (view_day + timedelta(days=7 * weeks_count)).isoformat(),
+        "month_day_headers": month_day_headers,
+        "month_group_labels": month_group_labels,
+        "month_rows": month_rows,
+        "month_slot_count": month_slot_count,
+        "month_range_label": month_range_label,
+        "month_prev": _add_months(month_start, -months_count).isoformat(),
+        "month_next": _add_months(month_start, months_count).isoformat(),
     }
 
 
