@@ -10,10 +10,19 @@
   <input type="hidden" name="action" value="create_order">
   <input type="hidden" name="return_to" value="order_new">
   <label>Order Code <input type="text" name="order_code" required></label>
-  <label>Customer Name <input type="text" name="customer_name" required></label>
+  <label>Existing customer
+    <select name="customer_id">
+      <option value="">Add a new customer below&hellip;</option>
+      {% for c in customers %}
+      <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>New customer name <input type="text" name="new_customer_name" placeholder="Only if not selecting an existing customer above"></label>
   <label>Product Name <input type="text" name="product_name" required></label>
   <button type="submit">Create &amp; Open Workspace</button>
 </form>
+<p><em>New customers can be filled in with full contact details later on the Admin page's Customers section.</em></p>
 
 <p><a href="{{ url_for('planner.planner_orders') }}">Prefer the classic tabbed view? Go to Planner</a></p>
 {% endblock %}

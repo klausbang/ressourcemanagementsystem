@@ -61,10 +61,19 @@
   <input type="hidden" name="order_id" value="{{ order['id'] }}">
   <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
   <label>Order Code <input type="text" name="order_code" value="{{ order['order_code'] }}" required></label>
-  <label>Customer Name <input type="text" name="customer_name" value="{{ order['customer_name'] }}" required></label>
+  <label>Customer
+    <select name="customer_id">
+      <option value="">Add a new customer below&hellip;</option>
+      {% for c in customers %}
+      <option value="{{ c['id'] }}" {% if order['customer_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>New customer name <input type="text" name="new_customer_name" placeholder="Only if not selecting an existing customer above"></label>
   <label>Product Name <input type="text" name="product_name" value="{{ order['product_name'] }}" required></label>
   <button type="submit">Save</button>
 </form>
+<p><em>Currently: {{ order['customer_name'] }}. New customers can be filled in with full contact details later on the Admin page's Customers section.</em></p>
 
 {% if project %}
 <form method="post" action="{{ url_for('planner.dashboard') }}">
@@ -190,6 +199,9 @@
   </label>
   <button type="submit">Apply Template</button>
 </form>
+{% for msg in get_flashed_messages(category_filter=['template-applied']) %}
+<p><strong>{{ msg }}</strong></p>
+{% endfor %}
 
 <h3>Add a Test Activity</h3>
 <form method="post" action="{{ url_for('planner.planner_orders') }}">
@@ -217,11 +229,22 @@
   <label>Planned End <input type="date" name="planned_end_date"></label>
   <button type="submit">Add Activity</button>
 </form>
+{% for msg in get_flashed_messages(category_filter=['test-added']) %}
+<p><strong>{{ msg }}</strong></p>
+{% endfor %}
 
 <h3>Test Activities</h3>
 {% macro ow_test_block(t) %}
 <fieldset style="margin-bottom:14px;" class="{{ 'dup-row' if t['_dup'] }}">
-  <legend>{{ t['sequence'] if t['sequence'] is not none else '-' }}. {{ t['test_name'] }}{% if t['is_blocked'] %} [BLOCKED]{% endif %}</legend>
+  <legend>{{ t['sequence'] if t['sequence'] is not none else '-' }}. {{ t['test_name'] }}{% if t['is_blocked'] %} [BLOCKED]{% endif %}{% if t['template_batch'] %} (from template: {{ t['template_batch']['template_name'] }}){% endif %}</legend>
+  {% if t['template_batch'] %}
+  <form method="post" action="{{ url_for('planner.planner_orders') }}" style="display:inline">
+    <input type="hidden" name="action" value="exclude_from_template_group">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <button type="submit">Ungroup (keep activity, remove from template group)</button>
+  </form>
+  {% endif %}
 
   <form method="post" action="{{ url_for('planner.planner_orders') }}">
     <input type="hidden" name="action" value="update_test">
@@ -334,16 +357,44 @@
 </fieldset>
 {% endmacro %}
 
-{% if ordered_tests_rows %}
-  {% set direct_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', none)|list %}
-  {% for e in euts %}
-    {% set eut_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', e['id'])|list %}
-    <h4>📦 {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</h4>
-    {% for t in eut_tests %}{{ ow_test_block(t) }}{% else %}<p><em>No activities on this EUT yet.</em></p>{% endfor %}
+{% macro ow_test_groups(batches, ungrouped) %}
+  {% for group in batches %}
+  <div style="border:1px solid #999; padding:8px; margin-bottom:10px;">
+    <p>
+      <strong>📐 From template: {{ group.batch.template_name }}</strong>{% if group.batch.modified %} [MODIFIED]{% endif %}
+      {% if group.batch.is_stale %}<br><em>The "{{ group.batch.template_name }}" template has changed since this group was applied.</em>
+      <form method="post" action="{{ url_for('planner.planner_orders') }}" style="display:inline">
+        <input type="hidden" name="action" value="sync_template_group">
+        <input type="hidden" name="template_application_id" value="{{ group.batch.id }}">
+        <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+        <button type="submit">Update to match template</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('planner.planner_orders') }}" style="display:inline">
+        <input type="hidden" name="action" value="delete_template_group">
+        <input type="hidden" name="template_application_id" value="{{ group.batch.id }}">
+        <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+        <button type="submit">Delete whole group ({{ group.tests|length }} activities)</button>
+      </form>
+    </p>
+    {% for t in group.tests %}{{ ow_test_block(t) }}{% endfor %}
+  </div>
   {% endfor %}
-  {% if direct_tests or not euts %}
+  {% for t in ungrouped %}{{ ow_test_block(t) }}{% endfor %}
+{% endmacro %}
+
+{% if ordered_tests_rows %}
+  {% for e in euts %}
+    <h4>📦 {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</h4>
+    {% if e.test_batches or e.test_ungrouped %}
+      {{ ow_test_groups(e.test_batches, e.test_ungrouped) }}
+    {% else %}
+    <p><em>No activities on this EUT yet.</em></p>
+    {% endif %}
+  {% endfor %}
+  {% if direct_test_batches or direct_test_ungrouped or not euts %}
     {% if euts %}<h4>Activities not tied to a specific EUT</h4>{% endif %}
-    {% for t in direct_tests %}{{ ow_test_block(t) }}{% endfor %}
+    {{ ow_test_groups(direct_test_batches, direct_test_ungrouped) }}
   {% endif %}
 {% else %}
 <p><em>No test activities yet.</em></p>

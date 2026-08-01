@@ -19,8 +19,17 @@
       <input type="text" id="order_code" name="order_code" required autofocus>
     </div>
     <div class="field">
-      <label for="customer_name">Customer name</label>
-      <input type="text" id="customer_name" name="customer_name" required>
+      <label for="customer_id">Existing customer</label>
+      <select id="customer_id" name="customer_id">
+        <option value="">Add a new customer below&hellip;</option>
+        {% for c in customers %}
+        <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="new_customer_name">New customer name</label>
+      <input type="text" id="new_customer_name" name="new_customer_name" placeholder="Only if not selecting an existing customer above">
     </div>
     <div class="field">
       <label for="product_name">Product name</label>
@@ -28,6 +37,7 @@
     </div>
     <div class="field"><button type="submit" class="btn btn-primary">Create &amp; open workspace</button></div>
   </form>
+  <p class="section-help">New customers can be filled in with full contact details later on the Admin &rarr; Customers tab.</p>
 </div>
 
 <p class="section-help">Prefer the classic tabbed view? <a href="{{ url_for('planner.planner_orders') }}">Go to Planner &rarr;</a></p>

@@ -51,13 +51,30 @@ CREATE TABLE IF NOT EXISTS resource_capabilities (
     FOREIGN KEY (capability_id) REFERENCES capabilities(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    contact_name TEXT,
+    contact_email TEXT,
+    contact_phone TEXT,
+    address TEXT,
+    created_at TEXT NOT NULL,
+    created_by_user_id INTEGER,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS customer_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_code TEXT NOT NULL UNIQUE,
     customer_name TEXT NOT NULL,
     product_name TEXT NOT NULL,
     weekly_note TEXT,
-    waiting_for_customer INTEGER NOT NULL DEFAULT 0
+    waiting_for_customer INTEGER NOT NULL DEFAULT 0,
+    customer_id INTEGER -- no declared FK, same reasoning as ordered_tests.template_application_id:
+        -- an existing table, so a plain ADD COLUMN is the only safe way to add this without
+        -- risking silently dropping an ON DELETE action (Phase 8's eut_id lesson); deleting a
+        -- customer clears this application-side (see delete_customer) rather than via a
+        -- DB-level ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS milestones (
@@ -105,6 +122,11 @@ CREATE TABLE IF NOT EXISTS ordered_tests (
     sequence INTEGER,
     planned_start_date TEXT,
     planned_end_date TEXT,
+    template_application_id INTEGER, -- no declared FK: deleting the whole group is an
+        -- application-level cascade (delete matching ordered_tests, then the
+        -- template_applications row), not a DB-enforced one, so a later ADD COLUMN
+        -- migration on this table can't silently drop an ON DELETE action (the exact
+        -- bug hit adding eut_id in Phase 8)
     FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL,
     FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
@@ -162,7 +184,22 @@ CREATE TABLE IF NOT EXISTS proposals (
 CREATE TABLE IF NOT EXISTS activity_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    notes TEXT
+    notes TEXT,
+    version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS template_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER,
+    template_name TEXT NOT NULL,
+    order_id INTEGER NOT NULL,
+    eut_id INTEGER,
+    applied_at TEXT NOT NULL,
+    applied_template_version INTEGER,
+    modified INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (template_id) REFERENCES activity_templates(id) ON DELETE SET NULL,
+    FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS activity_template_items (
@@ -454,6 +491,8 @@ def _migrate_customer_orders_table(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE customer_orders ADD COLUMN weekly_note TEXT")
     if "waiting_for_customer" not in columns:
         db.execute("ALTER TABLE customer_orders ADD COLUMN waiting_for_customer INTEGER NOT NULL DEFAULT 0")
+    if "customer_id" not in columns:
+        db.execute("ALTER TABLE customer_orders ADD COLUMN customer_id INTEGER")
     db.commit()
 
 
@@ -472,6 +511,32 @@ def _migrate_ordered_tests_planned_dates(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def _migrate_ordered_tests_template_application(db: sqlite3.Connection) -> None:
+    """Upgrade an ordered_tests table created before the optional template_application_id
+    column existed. No FK is declared on this column (see the schema comment), so a plain
+    ADD COLUMN is enough - nothing to lose in a later rebuild."""
+    if not _table_exists(db, "ordered_tests"):
+        return
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(ordered_tests)").fetchall()}
+    if "template_application_id" not in columns:
+        db.execute("ALTER TABLE ordered_tests ADD COLUMN template_application_id INTEGER")
+        db.commit()
+
+
+def _migrate_activity_templates_version(db: sqlite3.Connection) -> None:
+    """Upgrade an activity_templates table created before the optional version column
+    existed. An integer counter (bumped on every item add/edit/delete/reorder) rather than
+    a last-modified timestamp, so a template_applications batch's staleness check is exact
+    even if both changes land within the same minute-resolution timestamp used elsewhere
+    in this app."""
+    if not _table_exists(db, "activity_templates"):
+        return
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(activity_templates)").fetchall()}
+    if "version" not in columns:
+        db.execute("ALTER TABLE activity_templates ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        db.commit()
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
@@ -482,6 +547,8 @@ def init_db() -> None:
     _migrate_capabilities_table(db)
     _migrate_customer_orders_table(db)
     _migrate_ordered_tests_planned_dates(db)
+    _migrate_ordered_tests_template_application(db)
+    _migrate_activity_templates_version(db)
     db.commit()
 
 

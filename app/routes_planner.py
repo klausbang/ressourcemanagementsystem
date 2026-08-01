@@ -272,6 +272,39 @@ def _redirect_after(fallback_endpoint: str, **fallback_kwargs):
     return redirect(url_for(fallback_endpoint, **fallback_kwargs))
 
 
+def _resolve_customer_fields(db) -> tuple[int | None, str | None, str | None]:
+    """Resolve (customer_id, customer_name, error) for a create/update-order submission.
+    Supports either an existing customer picked via customer_id, a brand-new name typed
+    into new_customer_name (auto-creating a minimal customer record, to be filled in
+    later), or a plain customer_name field with no picker at all (the Customer Orders
+    table's inline row-edit form still submits this way) - whichever the form sent.
+    Every path ends up linked to a customers row, matched by name, so customer_name is
+    never a second, disconnected copy of the same fact."""
+    customer_id_raw = request.form.get("customer_id", "").strip()
+    new_customer_name = request.form.get("new_customer_name", "").strip()
+    plain_customer_name = request.form.get("customer_name", "").strip()
+
+    if customer_id_raw:
+        row = db.execute("SELECT id, name FROM customers WHERE id = ?", (customer_id_raw,)).fetchone()
+        if row is None:
+            return None, None, "Selected customer does not exist."
+        return row["id"], row["name"], None
+
+    name = new_customer_name or plain_customer_name
+    if not name:
+        return None, None, "Customer name is required."
+
+    existing = db.execute("SELECT id, name FROM customers WHERE name = ?", (name,)).fetchone()
+    if existing:
+        return existing["id"], existing["name"], None
+
+    cur = db.execute(
+        "INSERT INTO customers (name, created_at, created_by_user_id) VALUES (?, ?, ?)",
+        (name, datetime.now().strftime("%Y-%m-%d %H:%M"), session.get("user_id")),
+    )
+    return cur.lastrowid, name, None
+
+
 def _next_sequence(db, order_id, eut_id) -> int:
     """Next free sequence number for ordered_tests within one (order_id, eut_id) scope."""
     if eut_id:
@@ -320,6 +353,7 @@ def _load_planner_context(db) -> dict:
             ot.sequence,
             ot.planned_start_date,
             ot.planned_end_date,
+            ot.template_application_id,
             c.id AS capability_id,
             c.name AS capability_name,
             EXISTS(SELECT 1 FROM activity_history h WHERE h.ordered_test_id = ot.id) AS has_history
@@ -403,6 +437,24 @@ def _load_planner_context(db) -> dict:
     for row in raw_tests:
         tests_by_order.setdefault(row["order_id"], []).append(dict(row))
 
+    template_batches: dict[int, dict] = {}
+    for row in db.execute(
+        """
+        SELECT ta.id, ta.template_id, ta.template_name, ta.modified, ta.applied_template_version,
+               at.version AS template_current_version
+        FROM template_applications ta
+        LEFT JOIN activity_templates at ON at.id = ta.template_id
+        """
+    ).fetchall():
+        is_stale = row["template_id"] is not None and row["template_current_version"] != row["applied_template_version"]
+        template_batches[row["id"]] = {
+            "id": row["id"],
+            "template_id": row["template_id"],
+            "template_name": row["template_name"],
+            "modified": bool(row["modified"]),
+            "is_stale": is_stale,
+        }
+
     tests_for_alloc = []
     for row in raw_tests:
         item = dict(row)
@@ -424,6 +476,7 @@ def _load_planner_context(db) -> dict:
             and other["ordered_test_id"] not in already
             and not would_create_dependency_cycle(db, item["ordered_test_id"], other["ordered_test_id"])
         ]
+        item["template_batch"] = template_batches.get(item["template_application_id"])
 
         tests_for_alloc.append(item)
 
@@ -445,7 +498,7 @@ def _load_planner_context(db) -> dict:
 
     orders = rows_with_meta(
         db.execute(
-            "SELECT id, order_code, customer_name, product_name FROM customer_orders ORDER BY order_code"
+            "SELECT id, order_code, customer_name, product_name, customer_id FROM customer_orders ORDER BY order_code"
         ).fetchall(),
         dup_keys=ORDER_DUP_KEYS,
         sort_key=request.args.get("orders_sort"),
@@ -455,6 +508,7 @@ def _load_planner_context(db) -> dict:
 
     capabilities = db.execute("SELECT id, name FROM capabilities ORDER BY name").fetchall()
     templates = db.execute("SELECT id, name FROM activity_templates ORDER BY name").fetchall()
+    customers = db.execute("SELECT id, name, contact_name, contact_email FROM customers ORDER BY name").fetchall()
 
     context = {
         "tests": tests,
@@ -464,6 +518,7 @@ def _load_planner_context(db) -> dict:
         "euts": euts_rows,
         "capabilities": capabilities,
         "templates": templates,
+        "customers": customers,
     }
     context.update(_load_schedule_context(db))
     context.update(_load_orders_overview_context(db, orders, tests_for_alloc, euts_rows))
@@ -579,7 +634,6 @@ def planner_orders():
 
         if action == "create_order":
             order_code = request.form.get("order_code", "").strip()
-            customer_name = request.form.get("customer_name", "").strip()
             product_name = request.form.get("product_name", "").strip()
 
             order_form_errors = {}
@@ -587,10 +641,14 @@ def planner_orders():
                 order_form_errors["order_code"] = "Order code is required."
             elif db.execute("SELECT 1 FROM customer_orders WHERE order_code = ?", (order_code,)).fetchone():
                 order_form_errors["order_code"] = f"Order code {order_code} already exists."
-            if not customer_name:
-                order_form_errors["customer_name"] = "Customer name is required."
             if not product_name:
                 order_form_errors["product_name"] = "Product name is required."
+
+            customer_id, customer_name, customer_error = (None, request.form.get("customer_name", "").strip(), None)
+            if not order_form_errors:
+                customer_id, customer_name, customer_error = _resolve_customer_fields(db)
+                if customer_error:
+                    order_form_errors["customer_name"] = customer_error
 
             if order_form_errors:
                 if request.form.get("return_to") == "order_new":
@@ -608,8 +666,8 @@ def planner_orders():
                 )
 
             cur = db.execute(
-                "INSERT INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)",
-                (order_code, customer_name, product_name),
+                "INSERT INTO customer_orders (order_code, customer_name, product_name, customer_id) VALUES (?, ?, ?, ?)",
+                (order_code, customer_name, product_name, customer_id),
             )
             db.commit()
             flash(f"Order {order_code} created.", "info")
@@ -620,22 +678,25 @@ def planner_orders():
         if action == "update_order":
             order_id = request.form.get("order_id", "").strip()
             order_code = request.form.get("order_code", "").strip()
-            customer_name = request.form.get("customer_name", "").strip()
             product_name = request.form.get("product_name", "").strip()
 
-            if not (order_id and order_code and customer_name and product_name):
-                flash("Order code, customer name, and product name are required.", "error")
+            if not (order_id and order_code and product_name):
+                flash("Order code and product name are required.", "error")
             elif db.execute(
                 "SELECT 1 FROM customer_orders WHERE order_code = ? AND id != ?", (order_code, order_id)
             ).fetchone():
                 flash(f"Order code {order_code} already exists.", "error")
             else:
-                db.execute(
-                    "UPDATE customer_orders SET order_code = ?, customer_name = ?, product_name = ? WHERE id = ?",
-                    (order_code, customer_name, product_name, order_id),
-                )
-                db.commit()
-                flash(f"Order {order_code} updated.", "info")
+                customer_id, customer_name, customer_error = _resolve_customer_fields(db)
+                if customer_error:
+                    flash(customer_error, "error")
+                else:
+                    db.execute(
+                        "UPDATE customer_orders SET order_code = ?, customer_name = ?, product_name = ?, customer_id = ? WHERE id = ?",
+                        (order_code, customer_name, product_name, customer_id, order_id),
+                    )
+                    db.commit()
+                    flash(f"Order {order_code} updated.", "info")
 
             return _redirect_after("planner.planner_orders", tab="orders")
 
@@ -733,7 +794,7 @@ def planner_orders():
                     ),
                 )
                 db.commit()
-                flash(f"Test '{test_name}' added.", "info")
+                flash(f"Test '{test_name}' added.", "test-added")
 
             return _redirect_after("planner.planner_orders", tab="tests")
 
@@ -751,22 +812,128 @@ def planner_orders():
             ).fetchone() is None:
                 flash("Selected EUT does not belong to this order.", "error")
             else:
+                template = db.execute("SELECT name, version FROM activity_templates WHERE id = ?", (template_id,)).fetchone()
                 items = db.execute(
                     "SELECT activity_name, required_capability_id FROM activity_template_items WHERE template_id = ? ORDER BY step_number",
                     (template_id,),
                 ).fetchall()
-                if not items:
+                if not items or template is None:
                     flash("That template has no activities yet.", "error")
                 else:
+                    cur = db.execute(
+                        """
+                        INSERT INTO template_applications
+                            (template_id, template_name, order_id, eut_id, applied_at, applied_template_version)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (template_id, template["name"], order_id, eut_id, datetime.now().strftime("%Y-%m-%d %H:%M"), template["version"]),
+                    )
+                    application_id = cur.lastrowid
                     next_seq = _next_sequence(db, order_id, eut_id)
                     for offset, item in enumerate(items):
                         db.execute(
-                            "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence) VALUES (?, ?, ?, ?, ?)",
-                            (order_id, eut_id, item["activity_name"], item["required_capability_id"], next_seq + offset),
+                            """
+                            INSERT INTO ordered_tests
+                                (order_id, eut_id, test_name, required_capability_id, sequence, template_application_id)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """,
+                            (order_id, eut_id, item["activity_name"], item["required_capability_id"], next_seq + offset, application_id),
                         )
                     db.commit()
-                    flash(f"Applied template: {len(items)} activities added.", "info")
+                    flash(f"Applied template '{template['name']}': {len(items)} activities added.", "template-applied")
 
+            return _redirect_after("planner.planner_orders", tab="tests")
+
+        if action == "exclude_from_template_group":
+            ordered_test_id = request.form.get("ordered_test_id", "").strip()
+            row = db.execute(
+                "SELECT template_application_id FROM ordered_tests WHERE id = ?", (ordered_test_id,)
+            ).fetchone()
+            if row and row["template_application_id"]:
+                db.execute(
+                    "UPDATE ordered_tests SET template_application_id = NULL WHERE id = ?", (ordered_test_id,)
+                )
+                db.execute(
+                    "UPDATE template_applications SET modified = 1 WHERE id = ?", (row["template_application_id"],)
+                )
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "removed_from_template_group", "Removed from its template application group.",
+                )
+                db.commit()
+                flash("Activity removed from its template group (kept on the order).", "info")
+            return _redirect_after("planner.planner_orders", tab="tests")
+
+        if action == "delete_template_group":
+            application_id = request.form.get("template_application_id", "").strip()
+            application = db.execute(
+                "SELECT template_name FROM template_applications WHERE id = ?", (application_id,)
+            ).fetchone()
+            db.execute("DELETE FROM ordered_tests WHERE template_application_id = ?", (application_id,))
+            db.execute("DELETE FROM template_applications WHERE id = ?", (application_id,))
+            db.commit()
+            if application:
+                flash(f"Deleted the '{application['template_name']}' group and its activities.", "info")
+            else:
+                flash("Group deleted.", "info")
+            return _redirect_after("planner.planner_orders", tab="tests")
+
+        if action == "sync_template_group":
+            application_id = request.form.get("template_application_id", "").strip()
+            application = db.execute(
+                "SELECT * FROM template_applications WHERE id = ?", (application_id,)
+            ).fetchone()
+            if application is None or application["template_id"] is None:
+                flash("That template no longer exists, so this group can't be synced.", "error")
+            else:
+                current_names = {
+                    row["test_name"]
+                    for row in db.execute(
+                        "SELECT test_name FROM ordered_tests WHERE template_application_id = ?", (application_id,)
+                    ).fetchall()
+                }
+                template_items = db.execute(
+                    """
+                    SELECT activity_name, required_capability_id FROM activity_template_items
+                    WHERE template_id = ? ORDER BY step_number
+                    """,
+                    (application["template_id"],),
+                ).fetchall()
+                new_items = [item for item in template_items if item["activity_name"] not in current_names]
+                current_version = db.execute(
+                    "SELECT version FROM activity_templates WHERE id = ?", (application["template_id"],)
+                ).fetchone()["version"]
+
+                if not new_items:
+                    db.execute(
+                        "UPDATE template_applications SET applied_at = ?, applied_template_version = ? WHERE id = ?",
+                        (datetime.now().strftime("%Y-%m-%d %H:%M"), current_version, application_id),
+                    )
+                    db.commit()
+                    flash("Already up to date with the template - nothing new to add.", "info")
+                else:
+                    next_seq = _next_sequence(db, application["order_id"], application["eut_id"])
+                    for offset, item in enumerate(new_items):
+                        db.execute(
+                            """
+                            INSERT INTO ordered_tests
+                                (order_id, eut_id, test_name, required_capability_id, sequence, template_application_id)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                application["order_id"], application["eut_id"], item["activity_name"],
+                                item["required_capability_id"], next_seq + offset, application_id,
+                            ),
+                        )
+                    db.execute(
+                        "UPDATE template_applications SET applied_at = ?, applied_template_version = ? WHERE id = ?",
+                        (datetime.now().strftime("%Y-%m-%d %H:%M"), current_version, application_id),
+                    )
+                    db.commit()
+                    flash(
+                        f"Added {len(new_items)} new activit{'y' if len(new_items) == 1 else 'ies'} from the updated template.",
+                        "info",
+                    )
             return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "move_test":
@@ -1193,6 +1360,26 @@ def _load_dashboard_context(db) -> dict:
     }
 
 
+def _group_tests_by_template(tests: list) -> tuple[list, list]:
+    """Split a sequence-ordered list of test rows into template-application batch groups
+    (each with its member tests, in first-seen order) and the remaining ungrouped tests."""
+    batches: list[dict] = []
+    batches_by_id: dict[int, dict] = {}
+    ungrouped: list = []
+    for t in tests:
+        batch = t.get("template_batch")
+        if batch is None:
+            ungrouped.append(t)
+            continue
+        group = batches_by_id.get(batch["id"])
+        if group is None:
+            group = {"batch": batch, "tests": []}
+            batches_by_id[batch["id"]] = group
+            batches.append(group)
+        group["tests"].append(t)
+    return batches, ungrouped
+
+
 def _load_order_workspace_context(db, order_id: int) -> dict | None:
     """Phase 16: everything that hangs off one customer order (see
     docs/customer-order-data-overview.html section 2), on one page. Reuses the exact same
@@ -1220,13 +1407,23 @@ def _load_order_workspace_context(db, order_id: int) -> dict | None:
     euts = [e for e in full_ctx["euts"] if e["order_id"] == order_id]
     ordered_tests_rows = [t for t in full_ctx["ordered_tests_rows"] if t["order_id"] == order_id]
 
+    for e in euts:
+        eut_tests = [t for t in ordered_tests_rows if t["eut_id"] == e["id"]]
+        e["test_batches"], e["test_ungrouped"] = _group_tests_by_template(eut_tests)
+
+    direct_tests = [t for t in ordered_tests_rows if t["eut_id"] is None]
+    direct_test_batches, direct_test_ungrouped = _group_tests_by_template(direct_tests)
+
     return {
         "order": order,
         "project": project,
         "euts": euts,
         "ordered_tests_rows": ordered_tests_rows,
+        "direct_test_batches": direct_test_batches,
+        "direct_test_ungrouped": direct_test_ungrouped,
         "capabilities": full_ctx["capabilities"],
         "templates": full_ctx["templates"],
+        "customers": full_ctx["customers"],
         "reschedule_suggestions": reschedule_suggestions,
     }
 
@@ -1236,7 +1433,8 @@ def _load_order_workspace_context(db, order_id: int) -> dict | None:
 def order_workspace_new():
     init_db()
     db = get_db()
-    return render_ui("order_workspace_new.html")
+    customers = db.execute("SELECT id, name, contact_name, contact_email FROM customers ORDER BY name").fetchall()
+    return render_ui("order_workspace_new.html", customers=customers)
 
 
 @bp.route("/order/<int:order_id>", methods=["GET"])

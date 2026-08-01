@@ -35,6 +35,9 @@ PROPOSAL_DUP_KEYS = ["path", "title", "submitted_by_username"]
 ABSENCE_SORTABLE_KEYS = {"resource_code", "resource_name", "start_date", "end_date", "reason"}
 ABSENCE_DUP_KEYS = ["resource_code", "start_date", "end_date"]
 
+CUSTOMER_SORTABLE_KEYS = {"name", "contact_name", "contact_email", "contact_phone"}
+CUSTOMER_DUP_KEYS = ["name"]
+
 
 def _load_admin_context(db) -> dict:
     users = rows_with_meta(
@@ -161,6 +164,25 @@ def _load_admin_context(db) -> dict:
         sortable_keys=PROPOSAL_SORTABLE_KEYS,
     )
 
+    customers = rows_with_meta(
+        db.execute(
+            """
+            SELECT id, name, contact_name, contact_email, contact_phone, address, created_at
+            FROM customers
+            ORDER BY name
+            """
+        ).fetchall(),
+        dup_keys=CUSTOMER_DUP_KEYS,
+        sort_key=request.args.get("customers_sort"),
+        sort_dir=request.args.get("customers_dir", "asc"),
+        sortable_keys=CUSTOMER_SORTABLE_KEYS,
+    )
+    # A customer's "complete" profile is derived at read time (BR-001), not a stored flag:
+    # it just needs a contact name, email, and address to be considered fully filled in.
+    for c in customers:
+        c["is_complete"] = bool(c["contact_name"] and c["contact_email"] and c["address"])
+    incomplete_customers = [c for c in customers if not c["is_complete"]]
+
     return {
         "users": users,
         "resources": resources,
@@ -171,6 +193,8 @@ def _load_admin_context(db) -> dict:
         "templates": templates,
         "absences": absences,
         "proposals": proposals,
+        "customers": customers,
+        "incomplete_customers": incomplete_customers,
     }
 
 
@@ -183,6 +207,15 @@ def _resequence_template_items(db, template_id) -> None:
         db.execute(
             "UPDATE activity_template_items SET step_number = ? WHERE id = ?", (step_number, row["id"])
         )
+
+
+def _touch_template(db, template_id) -> None:
+    """Mark a template's activity sequence as changed, so any already-applied
+    template_applications batch can be flagged as out of date with what the template now
+    contains. Only bumped for changes to the template's *items* (add/edit/delete/reorder),
+    not a plain name/notes edit, since only the item sequence is what a batch would need
+    re-syncing against."""
+    db.execute("UPDATE activity_templates SET version = version + 1 WHERE id = ?", (template_id,))
 
 
 def _render_admin(db):
@@ -498,6 +531,7 @@ def admin_manage():
                     """,
                     (template_id, next_step, activity_name, required_capability_id),
                 )
+                _touch_template(db, template_id)
                 db.commit()
                 flash(f"Activity '{activity_name}' added to template.", "info")
 
@@ -509,10 +543,13 @@ def admin_manage():
             if not (item_id and activity_name):
                 flash("Activity name is required.", "error")
             else:
+                row = db.execute("SELECT template_id FROM activity_template_items WHERE id = ?", (item_id,)).fetchone()
                 db.execute(
                     "UPDATE activity_template_items SET activity_name = ?, required_capability_id = ? WHERE id = ?",
                     (activity_name, required_capability_id, item_id),
                 )
+                if row:
+                    _touch_template(db, row["template_id"])
                 db.commit()
                 flash(f"Activity '{activity_name}' updated.", "info")
 
@@ -522,6 +559,7 @@ def admin_manage():
             db.execute("DELETE FROM activity_template_items WHERE id = ?", (item_id,))
             if row:
                 _resequence_template_items(db, row["template_id"])
+                _touch_template(db, row["template_id"])
             db.commit()
             flash("Activity removed from template.", "info")
 
@@ -555,6 +593,7 @@ def admin_manage():
                         "UPDATE activity_template_items SET step_number = ? WHERE id = ?",
                         (item["step_number"], neighbor["id"]),
                     )
+                    _touch_template(db, item["template_id"])
                     db.commit()
                     flash("Activity reordered.", "info")
 
@@ -607,6 +646,70 @@ def admin_manage():
             db.execute("DELETE FROM proposals WHERE id = ?", (proposal_id,))
             db.commit()
             flash("Proposal deleted.", "info")
+
+        elif action == "create_customer":
+            name = request.form.get("name", "").strip()
+            contact_name = request.form.get("contact_name", "").strip() or None
+            contact_email = request.form.get("contact_email", "").strip() or None
+            contact_phone = request.form.get("contact_phone", "").strip() or None
+            address = request.form.get("address", "").strip() or None
+
+            if not name:
+                flash("Customer name is required.", "error")
+            elif db.execute("SELECT 1 FROM customers WHERE name = ?", (name,)).fetchone():
+                flash(f"Customer '{name}' already exists.", "error")
+            else:
+                db.execute(
+                    """
+                    INSERT INTO customers (name, contact_name, contact_email, contact_phone, address, created_at, created_by_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (name, contact_name, contact_email, contact_phone, address, datetime.now().strftime("%Y-%m-%d %H:%M"), session.get("user_id")),
+                )
+                db.commit()
+                flash(f"Customer '{name}' added.", "info")
+
+        elif action == "update_customer":
+            customer_id = request.form.get("customer_id", "").strip()
+            name = request.form.get("name", "").strip()
+            contact_name = request.form.get("contact_name", "").strip() or None
+            contact_email = request.form.get("contact_email", "").strip() or None
+            contact_phone = request.form.get("contact_phone", "").strip() or None
+            address = request.form.get("address", "").strip() or None
+
+            if not (customer_id and name):
+                flash("Customer name is required.", "error")
+            elif db.execute(
+                "SELECT 1 FROM customers WHERE name = ? AND id != ?", (name, customer_id)
+            ).fetchone():
+                flash(f"Customer '{name}' already exists.", "error")
+            else:
+                db.execute(
+                    """
+                    UPDATE customers
+                    SET name = ?, contact_name = ?, contact_email = ?, contact_phone = ?, address = ?
+                    WHERE id = ?
+                    """,
+                    (name, contact_name, contact_email, contact_phone, address, customer_id),
+                )
+                # customer_orders.customer_name is a denormalized snapshot (kept so every
+                # existing order display/report continues to work unchanged) - refresh it
+                # for any order pointing at this customer so a rename doesn't leave orders
+                # showing the old name.
+                db.execute(
+                    "UPDATE customer_orders SET customer_name = ? WHERE customer_id = ?", (name, customer_id)
+                )
+                db.commit()
+                flash(f"Customer '{name}' updated.", "info")
+
+        elif action == "delete_customer":
+            customer_id = request.form.get("customer_id", "").strip()
+            if db.execute("SELECT 1 FROM customer_orders WHERE customer_id = ?", (customer_id,)).fetchone():
+                flash("Cannot delete a customer still referenced by an order.", "error")
+            else:
+                db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+                db.commit()
+                flash("Customer deleted.", "info")
 
         return redirect(url_for("admin.admin_manage"))
 

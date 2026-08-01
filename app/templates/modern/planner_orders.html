@@ -106,10 +106,20 @@
             {% if order_form_errors.get('order_code') %}<div class="field-error">{{ order_form_errors['order_code'] }}</div>{% endif %}
           </div>
           <div class="field">
-            <label for="customer_name">Customer name</label>
-            <input type="text" id="customer_name" name="customer_name"
+            <label for="customer_id">Existing customer</label>
+            <select id="customer_id" name="customer_id">
+              <option value="">Add a new customer below&hellip;</option>
+              {% for c in customers %}
+              <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="new_customer_name">New customer name</label>
+            <input type="text" id="new_customer_name" name="new_customer_name"
                    value="{{ order_form_values.get('customer_name', '') }}"
-                   class="{{ 'invalid' if order_form_errors.get('customer_name') }}" required>
+                   class="{{ 'invalid' if order_form_errors.get('customer_name') }}"
+                   placeholder="Only if not selecting an existing customer above">
             {% if order_form_errors.get('customer_name') %}<div class="field-error">{{ order_form_errors['customer_name'] }}</div>{% endif %}
           </div>
           <div class="field">
@@ -121,6 +131,7 @@
           </div>
           <div class="field"><button type="submit" class="btn btn-primary">Create order</button></div>
         </form>
+        <p class="section-help">New customers can be filled in with full contact details later on the Admin &rarr; Customers tab.</p>
       </div>
 
       <div class="section-head"><h2>Existing customer orders</h2></div>

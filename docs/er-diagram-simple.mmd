@@ -36,3 +36,8 @@ erDiagram
     ordered_tests ||--o{ activity_dependencies : "blocks"
     ordered_tests ||--o{ reschedule_dismissals : "suggestion for"
     ordered_tests ||--o{ reschedule_dismissals : "cause of"
+    customers ||--o{ customer_orders : "known as"
+    activity_templates ||--o{ template_applications : "applied as"
+    customer_orders ||--o{ template_applications : "has"
+    euts ||--o{ template_applications : "has (optional)"
+    template_applications ||--o{ ordered_tests : "created"

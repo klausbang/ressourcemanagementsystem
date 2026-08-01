@@ -101,10 +101,20 @@
     <input type="hidden" name="order_id" value="{{ order['id'] }}">
     <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
     <div class="field"><label for="order-code">Order code</label><input type="text" id="order-code" name="order_code" value="{{ order['order_code'] }}" required></div>
-    <div class="field"><label for="order-customer">Customer name</label><input type="text" id="order-customer" name="customer_name" value="{{ order['customer_name'] }}" required></div>
+    <div class="field">
+      <label for="order-customer">Customer</label>
+      <select id="order-customer" name="customer_id">
+        <option value="">Add a new customer below&hellip;</option>
+        {% for c in customers %}
+        <option value="{{ c['id'] }}" {% if order['customer_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field"><label for="order-new-customer">New customer name</label><input type="text" id="order-new-customer" name="new_customer_name" placeholder="Only if not selecting an existing customer above"></div>
     <div class="field"><label for="order-product">Product name</label><input type="text" id="order-product" name="product_name" value="{{ order['product_name'] }}" required></div>
     <div class="field"><button type="submit" class="btn btn-secondary btn-sm">Save</button></div>
   </form>
+  <p class="section-help">Currently: <strong>{{ order['customer_name'] }}</strong>. New customers can be filled in with full contact details later on the Admin &rarr; Customers tab.</p>
 
   {% if project %}
   <form method="post" action="{{ url_for('planner.dashboard') }}" class="form-grid" style="margin-top:10px;">
@@ -249,6 +259,9 @@
     </div>
     <div class="field"><button type="submit" class="btn btn-primary">Apply template</button></div>
   </form>
+  {% for msg in get_flashed_messages(category_filter=['template-applied']) %}
+  <div class="callout" style="margin-top:10px;">✅ {{ msg }}</div>
+  {% endfor %}
 </div>
 
 <div class="card">
@@ -281,6 +294,9 @@
     <div class="field"><label for="test-planned-end">Planned end</label><input type="date" id="test-planned-end" name="planned_end_date"></div>
     <div class="field"><button type="submit" class="btn btn-primary">➕ Add activity</button></div>
   </form>
+  {% for msg in get_flashed_messages(category_filter=['test-added']) %}
+  <div class="callout" style="margin-top:10px;">✅ {{ msg }}</div>
+  {% endfor %}
 </div>
 
 {% macro ow_test_card(t, order, euts, capabilities) %}
@@ -294,6 +310,7 @@
       <div class="test-card-meta">
         Capability: {{ t['capability_name'] or 'none' }}
         {% if t['planned_start_date'] or t['planned_end_date'] %} &middot; Planned: {{ t['planned_start_date'] or '?' }} &rarr; {{ t['planned_end_date'] or '?' }}{% endif %}
+        {% if t['template_batch'] %} &middot; <span class="badge badge-type" title="Added by the '{{ t['template_batch']['template_name'] }}' template">from template: {{ t['template_batch']['template_name'] }}</span>{% endif %}
       </div>
     </div>
     <div class="inline-form">
@@ -303,6 +320,9 @@
       <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}" class="btn btn-secondary btn-sm" title="View change history">🕘</a>
       {% else %}
       <span class="btn btn-secondary btn-sm" aria-disabled="true" title="No recorded changes yet for this activity" style="opacity:0.45; cursor:default; pointer-events:none;">🕘</span>
+      {% endif %}
+      {% if t['template_batch'] %}
+      <form method="post" action="{{ url_for('planner.planner_orders') }}"><input type="hidden" name="action" value="exclude_from_template_group"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}"><button type="submit" class="btn btn-secondary btn-sm" title="Keep this activity, but remove it from its template group">Ungroup</button></form>
       {% endif %}
     </div>
   </div>
@@ -409,22 +429,51 @@
 </div>
 {% endmacro %}
 
+{% macro ow_test_groups(batches, ungrouped, order, euts, capabilities) %}
+  {% for group in batches %}
+  <div class="card" style="border-left:3px solid var(--color-primary); margin-bottom:12px;">
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span>📐 From template: {{ group.batch.template_name }}{% if group.batch.modified %} <span class="badge badge-status-other" title="At least one activity has been moved, deleted, or ungrouped since this was applied">modified</span>{% endif %}</span>
+      <span class="inline-form" style="margin:0;">
+        {% if group.batch.is_stale %}
+        <form method="post" action="{{ url_for('planner.planner_orders') }}">
+          <input type="hidden" name="action" value="sync_template_group">
+          <input type="hidden" name="template_application_id" value="{{ group.batch.id }}">
+          <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+          <button type="submit" class="btn btn-secondary btn-sm" title="The template has new/changed activities since this was applied - add whatever's missing">🔄 Update to match template</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('planner.planner_orders') }}">
+          <input type="hidden" name="action" value="delete_template_group">
+          <input type="hidden" name="template_application_id" value="{{ group.batch.id }}">
+          <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+          <button type="submit" class="btn btn-danger btn-sm" data-confirm="Delete all {{ group.tests|length }} activities from the '{{ group.batch.template_name }}' group? This cannot be undone.">Delete whole group</button>
+        </form>
+      </span>
+    </div>
+    {% if group.batch.is_stale %}
+    <p class="section-help">The "{{ group.batch.template_name }}" template has changed since this group was applied.</p>
+    {% endif %}
+    {% for t in group.tests %}{{ ow_test_card(t, order, euts, capabilities) }}{% endfor %}
+  </div>
+  {% endfor %}
+  {% for t in ungrouped %}{{ ow_test_card(t, order, euts, capabilities) }}{% endfor %}
+{% endmacro %}
+
 <div class="section-head" style="margin-top:24px;"><h2>Test activities</h2></div>
 {% if ordered_tests_rows %}
-  {% set direct_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', none)|list %}
   {% for e in euts %}
-    {% set eut_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', e['id'])|list %}
     <div class="ow-eut-title">📦 {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</div>
-    {% if eut_tests %}
-      {% for t in eut_tests %}{{ ow_test_card(t, order, euts, capabilities) }}{% endfor %}
+    {% if e.test_batches or e.test_ungrouped %}
+      {{ ow_test_groups(e.test_batches, e.test_ungrouped, order, euts, capabilities) }}
     {% else %}
     <div class="empty-state"><span class="icon">🧪</span>No activities on this EUT yet.</div>
     {% endif %}
   {% endfor %}
-  {% if direct_tests or not euts %}
+  {% if direct_test_batches or direct_test_ungrouped or not euts %}
     {% if euts %}<div class="ow-eut-title">Activities not tied to a specific EUT</div>{% endif %}
-    {% for t in direct_tests %}{{ ow_test_card(t, order, euts, capabilities) }}{% endfor %}
-    {% if euts and not direct_tests %}<div class="empty-state"><span class="icon">🧪</span>No activities directly on the order.</div>{% endif %}
+    {{ ow_test_groups(direct_test_batches, direct_test_ungrouped, order, euts, capabilities) }}
+    {% if euts and not direct_test_batches and not direct_test_ungrouped %}<div class="empty-state"><span class="icon">🧪</span>No activities directly on the order.</div>{% endif %}
   {% endif %}
 {% else %}
 <div class="empty-state"><span class="icon">🧪</span>No test activities yet. Add one above, or apply a template.</div>

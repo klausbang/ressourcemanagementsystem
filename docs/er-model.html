@@ -74,6 +74,11 @@ erDiagram
     ordered_tests ||--o{ activity_dependencies : "blocks"
     ordered_tests ||--o{ reschedule_dismissals : "suggestion for"
     ordered_tests ||--o{ reschedule_dismissals : "cause of"
+    customers ||--o{ customer_orders : "known as"
+    activity_templates ||--o{ template_applications : "applied as"
+    customer_orders ||--o{ template_applications : "has"
+    euts ||--o{ template_applications : "has (optional)"
+    template_applications ||--o{ ordered_tests : "created"
         </pre>
       </div>
       <p>Source: <a href="er-diagram-simple.mmd">er-diagram-simple.mmd</a>. A static image can still be regenerated (e.g. for offline printing) with:</p>
@@ -123,6 +128,11 @@ erDiagram
     ordered_tests ||--o{ activity_dependencies : "depends_on_ordered_test_id"
     ordered_tests ||--o{ reschedule_dismissals : "ordered_test_id"
     ordered_tests ||--o{ reschedule_dismissals : "depends_on_ordered_test_id"
+    customers ||--o{ customer_orders : "customer_id (optional)"
+    activity_templates ||--o{ template_applications : "template_id (optional)"
+    customer_orders ||--o{ template_applications : "order_id"
+    euts ||--o{ template_applications : "eut_id (optional)"
+    template_applications ||--o{ ordered_tests : "template_application_id (optional)"
 
     users {
         int id PK
@@ -163,13 +173,25 @@ erDiagram
         int capability_id PK "also FK -> capabilities.id"
     }
 
+    customers {
+        int id PK
+        string name UK
+        string contact_name "optional"
+        string contact_email "optional"
+        string contact_phone "optional"
+        string address "optional"
+        string created_at
+        int created_by_user_id FK "nullable"
+    }
+
     customer_orders {
         int id PK
         string order_code UK
-        string customer_name
+        string customer_name "denormalized snapshot of customers.name, kept so every existing display/report is unaffected"
         string product_name
         string weekly_note "manual; the only free-text project status field"
         bool waiting_for_customer "manual; the only externally-caused hold flag"
+        int customer_id FK "optional; also FK -> customers.id"
     }
 
     milestones {
@@ -224,6 +246,18 @@ erDiagram
         int sequence "display/reorder position, scoped per (order_id, eut_id)"
         string planned_start_date "optional; planner-set target window, independent of actual execution"
         string planned_end_date "optional; used to compute the dashboard's overdue flag"
+        int template_application_id "optional; also FK -> template_applications.id"
+    }
+
+    template_applications {
+        int id PK
+        int template_id FK "nullable, if the source template is later deleted"
+        string template_name "denormalized snapshot, survives template deletion/rename"
+        int order_id FK
+        int eut_id FK "optional"
+        string applied_at
+        int applied_template_version "the template's version at apply/last-sync time, for drift detection"
+        bool modified "set once any member activity is moved/deleted/ungrouped"
     }
 
     activity_dependencies {
@@ -243,6 +277,7 @@ erDiagram
         int id PK
         string name UK
         string notes
+        int version "bumped on every item add/edit/delete/reorder, for template_applications drift detection"
     }
 
     activity_template_items {
@@ -469,7 +504,9 @@ erDiagram
       customer_visits: "A customer's on-site date range for a project.",
       activity_history: "An append-only log of who changed a test activity, when, and why.",
       activity_dependencies: "Which test activities must finish before another one can start.",
-      reschedule_dismissals: "A reschedule suggestion the planner accepted or ignored, so it isn't repeated."
+      reschedule_dismissals: "A reschedule suggestion the planner accepted or ignored, so it isn't repeated.",
+      customers: "A known customer a planner can pick when creating or editing an order.",
+      template_applications: "One 'Apply activity template' action - groups the activities it created, so they can be managed or synced together."
     };
 
     var RELATIONSHIP_TOOLTIPS = {
@@ -500,6 +537,9 @@ erDiagram
       "blocks": "This activity must finish before a dependent one can start.",
       "suggestion for": "A reschedule suggestion computed for this (dependent) activity.",
       "cause of": "The late prerequisite that triggered a reschedule suggestion.",
+      "known as": "The order's customer, picked from (or newly added to) the customer list.",
+      "applied as": "One run of 'Apply activity template', grouping the activities it created.",
+      "created": "The activities this template application added to the order/EUT.",
       "planner_user_id": "Foreign key: which planner user assigned this resource.",
       "resource_id": "Foreign key: references resources.id (see Section 6 for cascade rules).",
       "ordered_test_id": "Foreign key: references ordered_tests.id (see Section 6 for cascade rules).",
@@ -516,7 +556,10 @@ erDiagram
       "group_id": "Foreign key: references exclusion_groups.id.",
       "template_id": "Foreign key: references activity_templates.id.",
       "user_id": "Foreign key: references users.id.",
-      "depends_on_ordered_test_id": "Foreign key: references ordered_tests.id (the prerequisite activity)."
+      "depends_on_ordered_test_id": "Foreign key: references ordered_tests.id (the prerequisite activity).",
+      "customer_id (optional)": "Foreign key: references customers.id; nullable, so an order can still just have a plain customer name.",
+      "template_id (optional)": "Foreign key: references activity_templates.id; nullable if the source template is later deleted.",
+      "template_application_id (optional)": "Foreign key: references template_applications.id; nullable for an activity not created by (or since removed from) a template group."
     };
 
     function addTitle(el, text) {

@@ -12,7 +12,8 @@
   #tab-exclusion:checked ~ .tabs-body #panel-exclusion,
   #tab-templates:checked ~ .tabs-body #panel-templates,
   #tab-absences:checked ~ .tabs-body #panel-absences,
-  #tab-proposals:checked ~ .tabs-body #panel-proposals { display: block; }
+  #tab-proposals:checked ~ .tabs-body #panel-proposals,
+  #tab-customers:checked ~ .tabs-body #panel-customers { display: block; }
 
   #tab-users:checked ~ .tab-list label[for="tab-users"],
   #tab-capabilities:checked ~ .tab-list label[for="tab-capabilities"],
@@ -21,7 +22,8 @@
   #tab-exclusion:checked ~ .tab-list label[for="tab-exclusion"],
   #tab-templates:checked ~ .tab-list label[for="tab-templates"],
   #tab-absences:checked ~ .tab-list label[for="tab-absences"],
-  #tab-proposals:checked ~ .tab-list label[for="tab-proposals"] {
+  #tab-proposals:checked ~ .tab-list label[for="tab-proposals"],
+  #tab-customers:checked ~ .tab-list label[for="tab-customers"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
@@ -58,6 +60,7 @@
   <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
   <div class="stat-tile"><div class="stat-value">{{ absences|length }}</div><div class="stat-label">Staff absences</div></div>
   <div class="stat-tile"><div class="stat-value">{{ proposals|selectattr('status', 'equalto', 'new')|list|length }}</div><div class="stat-label">New proposals</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ incomplete_customers|length }}</div><div class="stat-label">Customers needing info</div></div>
 </div>
 
 <div class="tabs">
@@ -69,6 +72,7 @@
   <input type="radio" name="admin-tabs" id="tab-templates" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-absences" class="tab-input">
   <input type="radio" name="admin-tabs" id="tab-proposals" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-customers" class="tab-input">
 
   <div class="tab-list" role="tablist">
     <label for="tab-users" class="tab-label">👤 Users</label>
@@ -79,6 +83,7 @@
     <label for="tab-absences" class="tab-label">🌴 Staff absences</label>
     <label for="tab-templates" class="tab-label">📋 Activity templates</label>
     <label for="tab-proposals" class="tab-label">💡 Proposals{% if proposals|selectattr('status', 'equalto', 'new')|list|length %} ({{ proposals|selectattr('status', 'equalto', 'new')|list|length }}){% endif %}</label>
+    <label for="tab-customers" class="tab-label">🏢 Customers{% if incomplete_customers %} ({{ incomplete_customers|length }}){% endif %}</label>
   </div>
 
   <div class="tabs-body">
@@ -686,6 +691,67 @@
       {% else %}
       <div class="empty-state"><span class="icon">💡</span>No proposals submitted yet.</div>
       {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-customers">
+      <div class="callout">
+        <strong>What this is:</strong> the known-customer list a planner can pick from when creating or editing a customer order, instead of retyping a name each time. A customer created on the fly from an order (just a name) shows up here as needing more information &mdash; filling it in is optional, never required to place an order.
+      </div>
+
+      <div class="card">
+        <div class="card-title">Add a customer</div>
+        <form method="post" class="form-grid">
+          <input type="hidden" name="action" value="create_customer">
+          <div class="field"><label for="cust-name">Name</label><input type="text" id="cust-name" name="name" required></div>
+          <div class="field"><label for="cust-contact-name">Contact name</label><input type="text" id="cust-contact-name" name="contact_name"></div>
+          <div class="field"><label for="cust-contact-email">Contact email</label><input type="email" id="cust-contact-email" name="contact_email"></div>
+          <div class="field"><label for="cust-contact-phone">Contact phone</label><input type="text" id="cust-contact-phone" name="contact_phone"></div>
+          <div class="field" style="flex:1 1 100%;"><label for="cust-address">Address</label><input type="text" id="cust-address" name="address"></div>
+          <div class="field"><button type="submit" class="btn btn-primary">Add customer</button></div>
+        </form>
+      </div>
+
+      <div class="section-head"><h2>Existing customers</h2></div>
+      {% if customers %}
+      <div class="table-wrap">
+        <table class="modern-table">
+          <thead><tr>
+            <th>Name</th><th>Contact name</th><th>Contact email</th><th>Contact phone</th><th>Address</th><th>Actions</th>
+          </tr></thead>
+          <tbody>
+            {% for c in customers %}
+            <tr class="{{ 'dup-row' if c['_dup'] }}">
+              <td>
+                <input type="text" name="name" value="{{ c['name'] }}" form="customer-save-{{ c['id'] }}">
+                {% if not c['is_complete'] %}<span class="badge badge-status-other" title="Missing contact name, email, or address">needs info</span>{% endif %}
+              </td>
+              <td><input type="text" name="contact_name" value="{{ c['contact_name'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+              <td><input type="email" name="contact_email" value="{{ c['contact_email'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+              <td><input type="text" name="contact_phone" value="{{ c['contact_phone'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+              <td><input type="text" name="address" value="{{ c['address'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+              <td class="inline-form">
+                <button type="submit" form="customer-save-{{ c['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+                <button type="submit" form="customer-delete-{{ c['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete customer '{{ c['name'] }}'? This is blocked while any order still references them.">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><span class="icon">🏢</span>No customers yet. They're also created automatically the first time a planner types a new customer name on an order.</div>
+      {% endif %}
+
+      {% for c in customers %}
+      <form id="customer-save-{{ c['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="update_customer">
+        <input type="hidden" name="customer_id" value="{{ c['id'] }}">
+      </form>
+      <form id="customer-delete-{{ c['id'] }}" method="post" hidden>
+        <input type="hidden" name="action" value="delete_customer">
+        <input type="hidden" name="customer_id" value="{{ c['id'] }}">
+      </form>
+      {% endfor %}
     </section>
   </div>
 </div>

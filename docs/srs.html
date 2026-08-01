@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v6</title>
+  <title>RMS SRS v7</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v6</h1>
-    <p>Version: 0.6 | Date: 2026-08-01</p>
+    <h1>Resource Management System (RMS) - SRS v7</h1>
+    <p>Version: 0.7 | Date: 2026-08-01</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -23,7 +23,8 @@
         <li><strong>v0.3 (Phase 8-13):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
         <li><strong>v0.4 (Phase 14):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
         <li><strong>v0.5 (Phase 15):</strong> delivered the stretch goal renumbered above &mdash; FR-CON-3 (cross-site equipment warning), FR-CON-4 (planned-date facility overlap warning), and FR-RSC-2 (reschedule suggestions from a late prerequisite) are now all Delivered rather than Planned/stretch, building directly on Phase 14's dependency and planned-date data.</li>
-        <li><strong>v0.6 (Phase 16, this revision):</strong> added FR-USE-6, a single-page per-order workspace consolidating order creation/maintenance with everything that hangs off it (EUTs, test activities, dependencies, planned dates, resource allocations, milestones, visits, derived status) into one view, alongside the existing multi-tab Planner page.</li>
+        <li><strong>v0.6 (Phase 16):</strong> added FR-USE-6, a single-page per-order workspace consolidating order creation/maintenance with everything that hangs off it (EUTs, test activities, dependencies, planned dates, resource allocations, milestones, visits, derived status) into one view, alongside the existing multi-tab Planner page.</li>
+        <li><strong>v0.7 (Phases 17-18, this revision):</strong> implemented five planner-submitted proposals found in the live proposals queue. New BR-007/FR-PRJ-5/FR-PRJ-6 (Phase 17): a customer database a planner can pick from or add to inline when creating/editing an order, with incomplete profiles flagged to the admin without ever blocking the order. New FR-TP-7 (Phase 18): activities from one "apply template" action are grouped, individually removable or deletable as a whole, with drift detection and an additive sync when the source template changes. The remaining three proposals (preserve scroll position across Save/Add/Apply; grey out Save until a form is actually changed, with an unsaved-changes warning; inline confirmation for Apply Template/Add Activity) were Modern-UI usability fixes with no new requirement ID, since they don't change what the system does, only how it confirms/preserves state while doing it.</li>
       </ul>
     </section>
 
@@ -105,9 +106,12 @@ Project (customer_orders)
       <p><strong>BR-001:</strong> The laboratory needs one place to create and track a customer engagement instead of a row in Sprint.xls.</p>
       <ul>
         <li><strong>FR-PRJ-1</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on customer orders (order code, customer name, product name).</li>
-        <li><strong>FR-PRJ-2</strong> [Must, Planned - Phase 8]: A project shall be able to hold one or more EUTs (see 8.2), each with its own test activities.</li>
+        <li><strong>FR-PRJ-2</strong> [Must, Delivered - Phase 8]: A project shall be able to hold one or more EUTs (see 8.2), each with its own test activities.</li>
         <li><strong>FR-PRJ-3</strong> [Should, Delivered - Phase 11]: A project shall carry an overall status (Planned, In Progress, Reporting, Completed, or Waiting for Customer) and a free-text weekly note, replacing the equivalent Sprint.xls columns. Of these, only the weekly note and the "waiting for customer" flag are stored/manual &mdash; the status itself is derived (see FR-STA-2), since a second manually-typed copy of already-known information is exactly the duplication BR-001 exists to remove.</li>
         <li><strong>FR-PRJ-4</strong> [Could, Delivered - Phase 11]: Completed projects shall remain visible in a read-only project history view.</li>
+        <li><strong>BR-007</strong> [added Phase 17, from a planner-submitted proposal]: Retyping a customer's name on every new order risks the same name drifting into several slightly different spellings over time, with no single place to hold that customer's contact details.</li>
+        <li><strong>FR-PRJ-5</strong> [Should, Delivered - Phase 17]: The system shall let a planner pick an existing customer from a known-customer list when creating or editing a customer order, or type a new customer's name inline without it needing to already exist in that list.</li>
+        <li><strong>FR-PRJ-6</strong> [Should, Delivered - Phase 17]: A customer record created this way (name only) shall be flagged to the administrator as needing further contact information, without ever blocking the order itself from being placed or saved.</li>
       </ul>
 
       <h3>8.2 Test Plan and EUTs (FR-TP)</h3>
@@ -120,10 +124,12 @@ Project (customer_orders)
         <li><strong>FR-TP-4</strong> [Should, Delivered - Phase 10]: The system shall offer a reusable, ordered standard activity template (e.g. Kick-off, Testplan, EUT delivery, RE, RI, CI, CE, Burst, Surge, Voltage Dips, Power Frequency Magnetic Field, other tests, ESD, Report writing, Report review, Report to customer, EUT return) that a planner can apply to an order/EUT to bulk-create its activities in one step, then freely reorder, add to, or remove from per project.</li>
         <li><strong>FR-TP-5</strong> [Must, Delivered - Phase 14]: The system shall let a planner declare that a test activity depends on one or more other activities within the same project, and shall block starting or resuming its work order until every one of those prerequisites is completed.</li>
         <li><strong>FR-TP-6</strong> [Should, Delivered - Phase 14]: The system shall let a planner record an optional planned start and end date on a test activity, independent of its actual execution timestamps, so a plan can exist before any work begins.</li>
+        <li><strong>FR-TP-7</strong> [Could, Delivered - Phase 18]: The activities created by one "apply template" action (FR-TP-4) shall be grouped together, so the planner can delete or exclude individual members from the group as a unit; the group shall be flagged if the source template has since changed, offering to add whatever new template activities aren't already present.</li>
         <li><strong>AC-FR-TP-1.1:</strong> Given a project with 0 EUTs, when a planner adds an EUT and adds a test activity under it, then the activity is visible both on that EUT's test plan and, unfiltered, on the project's full activity list, without being entered twice.</li>
         <li><strong>AC-FR-TP-4.1:</strong> Given an EUT with no test activities, when a planner applies the "Standard EMC Test Sequence" template to it, then all of the template's activities are created in one step, in the template's order, each carrying over its template-defined required capability (if any); the planner can then move any one activity up or down within that EUT independently of the template.</li>
         <li><strong>AC-FR-TP-5.1:</strong> Given "Report writing" depends on "CE", when a technician attempts to start or resume the Report writing work order while CE's work order is not completed, then the system rejects the action and names which prerequisite activity is still outstanding; once CE is completed, the same action succeeds.</li>
         <li><strong>Design note (FR-TP-5 scope):</strong> a dependency is a same-project prerequisite relationship (many-to-one is not enough &mdash; an activity can have several prerequisites, e.g. a report depending on every test activity that precedes it), stored as its own row per prerequisite rather than a single foreign key, and validated against both self-reference and circular chains when created. The block applies at the start/resume transition, mirroring FR-CON-2's scoping rationale (the same point precision already exists in the workflow); it deliberately does not block creating or scheduling a work order ahead of time.</li>
+        <li><strong>Design note (FR-TP-7 scope):</strong> "the source template has since changed" is tracked as an integer version counter on the template (bumped on every item add/edit/delete/reorder), not a last-modified timestamp, since two changes landing in the same minute-resolution timestamp used elsewhere in this app would otherwise silently look simultaneous rather than out of order. Syncing a group only ever <em>adds</em> template activities missing from it (matched by name); it never removes or overwrites an activity already in the group, so a planner's own customizations to that activity are never silently lost.</li>
       </ul>
 
       <h3>8.3 Resources (FR-RES)</h3>
@@ -244,6 +250,8 @@ Project (customer_orders)
         <li>From Phase 14 (delivered): an optional planned start date and planned end date on each test activity; a same-project activity-dependency record (one row per prerequisite, so an activity can have more than one), validated against self-reference and circular chains at creation time.</li>
         <li>From Phase 15 (delivered): a dismissal record per (dependent activity, prerequisite) pair, so an ignored or already-applied reschedule suggestion is not repeated. No other new stored data &mdash; the cross-site and planned-overlap warnings are computed at read time from data Phase 9/14 already store (a resource's <code>site</code>, and an activity's planned dates).</li>
         <li>Phase 16 added no new stored data at all &mdash; the order workspace page is a new arrangement of the same order/EUT/activity/milestone/visit/status data the tabbed Planner page and Dashboard already read and write, through the exact same actions.</li>
+        <li>From Phase 17 (delivered): a customers table (name, optional contact name/email/phone/address, created-by/at); an optional customer_id on customer_orders linking to it, alongside the existing customer_name (kept as a denormalized snapshot so every existing display/report is unaffected).</li>
+        <li>From Phase 18 (delivered): a template_applications table (one row per "apply template" action: which template, order, optional EUT, when, and whether any member has since been individually changed) and an optional template_application_id on ordered_tests linking an activity back to the batch that created it; an integer version counter on activity_templates for drift detection.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -289,6 +297,8 @@ Project (customer_orders)
           <tr><td>14</td><td>Activity dependencies and planned dates</td><td>FR-TP-5..6, FR-PLN-4, FR-VIS-4</td><td>Delivered</td></tr>
           <tr><td>15</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Delivered</td></tr>
           <tr><td>16</td><td>Single-page customer order workspace</td><td>FR-USE-6</td><td>Delivered</td></tr>
+          <tr><td>17</td><td>Customer database</td><td>BR-007, FR-PRJ-5..6</td><td>Delivered</td></tr>
+          <tr><td>18</td><td>Template application grouping</td><td>FR-TP-7</td><td>Delivered</td></tr>
         </tbody>
       </table>
     </section>

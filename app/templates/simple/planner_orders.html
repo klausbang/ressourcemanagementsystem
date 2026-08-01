@@ -71,13 +71,23 @@
   {% if order_form_errors.get('order_code') %}
   <div class="field-error">{{ order_form_errors['order_code'] }}</div>
   {% endif %}
-  <label>Customer Name
-    <input type="text" name="customer_name" value="{{ order_form_values.get('customer_name', '') }}"
-           class="{{ 'invalid' if order_form_errors.get('customer_name') }}" required>
+  <label>Existing customer
+    <select name="customer_id">
+      <option value="">Add a new customer below&hellip;</option>
+      {% for c in customers %}
+      <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>New customer name
+    <input type="text" name="new_customer_name" value="{{ order_form_values.get('customer_name', '') }}"
+           class="{{ 'invalid' if order_form_errors.get('customer_name') }}"
+           placeholder="Only if not selecting an existing customer above">
   </label>
   {% if order_form_errors.get('customer_name') %}
   <div class="field-error">{{ order_form_errors['customer_name'] }}</div>
   {% endif %}
+  <p><em>New customers can be filled in with full contact details later on the Admin page's Customers section.</em></p>
   <label>Product Name
     <input type="text" name="product_name" value="{{ order_form_values.get('product_name', '') }}"
            class="{{ 'invalid' if order_form_errors.get('product_name') }}" required>

@@ -465,4 +465,57 @@
   <p><em>No proposals submitted yet.</em></p>
   {% endfor %}
 </section>
+
+<section>
+  <h3>Customers</h3>
+  <p><em>The known-customer list a planner can pick from when creating or editing a customer order. A customer created on the fly from an order (just a name) shows up here needing more information &mdash; filling it in is optional, never required to place an order.</em></p>
+
+  <h4>Add a Customer</h4>
+  <form method="post">
+    <input type="hidden" name="action" value="create_customer">
+    <label>Name <input type="text" name="name" required></label>
+    <label>Contact Name <input type="text" name="contact_name"></label>
+    <label>Contact Email <input type="email" name="contact_email"></label>
+    <label>Contact Phone <input type="text" name="contact_phone"></label>
+    <label>Address <input type="text" name="address"></label>
+    <button type="submit">Add Customer</button>
+  </form>
+
+  <h4>Existing Customers</h4>
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr><th>Name</th><th>Contact Name</th><th>Contact Email</th><th>Contact Phone</th><th>Address</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for c in customers %}
+      <tr class="{{ 'dup-row' if c['_dup'] }}">
+        <td>
+          <input type="text" name="name" value="{{ c['name'] }}" form="customer-save-{{ c['id'] }}">
+          {% if not c['is_complete'] %}[NEEDS INFO]{% endif %}
+        </td>
+        <td><input type="text" name="contact_name" value="{{ c['contact_name'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+        <td><input type="email" name="contact_email" value="{{ c['contact_email'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+        <td><input type="text" name="contact_phone" value="{{ c['contact_phone'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+        <td><input type="text" name="address" value="{{ c['address'] or '' }}" form="customer-save-{{ c['id'] }}"></td>
+        <td>
+          <button type="submit" form="customer-save-{{ c['id'] }}">Save</button>
+          <button type="submit" form="customer-delete-{{ c['id'] }}">Delete</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6"><em>No customers yet.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% for c in customers %}
+  <form id="customer-save-{{ c['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="update_customer">
+    <input type="hidden" name="customer_id" value="{{ c['id'] }}">
+  </form>
+  <form id="customer-delete-{{ c['id'] }}" method="post" hidden>
+    <input type="hidden" name="action" value="delete_customer">
+    <input type="hidden" name="customer_id" value="{{ c['id'] }}">
+  </form>
+  {% endfor %}
+</section>
 {% endblock %}

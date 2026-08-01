@@ -43,6 +43,11 @@ erDiagram
     ordered_tests ||--o{ activity_dependencies : "depends_on_ordered_test_id"
     ordered_tests ||--o{ reschedule_dismissals : "ordered_test_id"
     ordered_tests ||--o{ reschedule_dismissals : "depends_on_ordered_test_id"
+    customers ||--o{ customer_orders : "customer_id (optional)"
+    activity_templates ||--o{ template_applications : "template_id (optional)"
+    customer_orders ||--o{ template_applications : "order_id"
+    euts ||--o{ template_applications : "eut_id (optional)"
+    template_applications ||--o{ ordered_tests : "template_application_id (optional)"
 
     users {
         int id PK
@@ -83,13 +88,25 @@ erDiagram
         int capability_id PK "also FK -> capabilities.id"
     }
 
+    customers {
+        int id PK
+        string name UK
+        string contact_name "optional"
+        string contact_email "optional"
+        string contact_phone "optional"
+        string address "optional"
+        string created_at
+        int created_by_user_id FK "nullable"
+    }
+
     customer_orders {
         int id PK
         string order_code UK
-        string customer_name
+        string customer_name "denormalized snapshot of customers.name, kept so every existing display/report is unaffected"
         string product_name
         string weekly_note "manual; the only free-text project status field"
         bool waiting_for_customer "manual; the only externally-caused hold flag"
+        int customer_id FK "optional; also FK -> customers.id"
     }
 
     milestones {
@@ -144,6 +161,18 @@ erDiagram
         int sequence "display/reorder position, scoped per (order_id, eut_id)"
         string planned_start_date "optional; planner-set target window, independent of actual execution"
         string planned_end_date "optional; used to compute the dashboard's overdue flag"
+        int template_application_id "optional; also FK -> template_applications.id"
+    }
+
+    template_applications {
+        int id PK
+        int template_id FK "nullable, if the source template is later deleted"
+        string template_name "denormalized snapshot, survives template deletion/rename"
+        int order_id FK
+        int eut_id FK "optional"
+        string applied_at
+        int applied_template_version "the template's version at apply/last-sync time, for drift detection"
+        bool modified "set once any member activity is moved/deleted/ungrouped"
     }
 
     activity_dependencies {
@@ -163,6 +192,7 @@ erDiagram
         int id PK
         string name UK
         string notes
+        int version "bumped on every item add/edit/delete/reorder, for template_applications drift detection"
     }
 
     activity_template_items {
