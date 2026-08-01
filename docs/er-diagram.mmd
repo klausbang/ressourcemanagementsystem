@@ -39,6 +39,8 @@ erDiagram
     customer_orders ||--o{ customer_visits : "order_id"
     ordered_tests ||--o{ activity_history : "ordered_test_id"
     users ||--o{ activity_history : "user_id"
+    ordered_tests ||--o{ activity_dependencies : "ordered_test_id"
+    ordered_tests ||--o{ activity_dependencies : "depends_on_ordered_test_id"
 
     users {
         int id PK
@@ -138,6 +140,14 @@ erDiagram
         string test_name
         int required_capability_id FK
         int sequence "display/reorder position, scoped per (order_id, eut_id)"
+        string planned_start_date "optional; planner-set target window, independent of actual execution"
+        string planned_end_date "optional; used to compute the dashboard's overdue flag"
+    }
+
+    activity_dependencies {
+        int id PK
+        int ordered_test_id FK "the activity that has a prerequisite"
+        int depends_on_ordered_test_id FK "the prerequisite activity; also FK -> ordered_tests.id"
     }
 
     activity_templates {

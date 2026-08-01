@@ -6,7 +6,7 @@ from flask import Blueprint, flash, redirect, request, session, url_for
 from . import history
 from .db import get_db, init_db
 from .routes_common import render_ui, require_role
-from .scheduling import find_all_running_conflicts
+from .scheduling import find_all_running_conflicts, would_create_dependency_cycle
 from .table_utils import rows_with_meta
 
 bp = Blueprint("planner", __name__, url_prefix="/planner")
@@ -270,6 +270,8 @@ def _load_planner_context(db) -> dict:
             e.name AS eut_name,
             ot.test_name,
             ot.sequence,
+            ot.planned_start_date,
+            ot.planned_end_date,
             c.id AS capability_id,
             c.name AS capability_name,
             EXISTS(SELECT 1 FROM activity_history h WHERE h.ordered_test_id = ot.id) AS has_history
@@ -280,14 +282,6 @@ def _load_planner_context(db) -> dict:
         ORDER BY o.order_code, ot.eut_id, ot.sequence, ot.id
         """
     ).fetchall()
-
-    ordered_tests_rows = rows_with_meta(
-        raw_tests,
-        dup_keys=TEST_DUP_KEYS,
-        sort_key=request.args.get("tests_sort"),
-        sort_dir=request.args.get("tests_dir", "asc"),
-        sortable_keys=TEST_SORTABLE_KEYS,
-    )
 
     allocation_rows = db.execute(
         """
@@ -326,6 +320,41 @@ def _load_planner_context(db) -> dict:
     for row in candidates:
         by_capability.setdefault(row["capability_id"], []).append(row)
 
+    dependency_rows = db.execute(
+        """
+        SELECT
+            ad.id AS dependency_id,
+            ad.ordered_test_id,
+            ad.depends_on_ordered_test_id,
+            dep.test_name AS depends_on_test_name,
+            dep_o.order_code AS depends_on_order_code,
+            dep_wo.status AS depends_on_wo_status
+        FROM activity_dependencies ad
+        JOIN ordered_tests dep ON dep.id = ad.depends_on_ordered_test_id
+        JOIN customer_orders dep_o ON dep_o.id = dep.order_id
+        LEFT JOIN work_orders dep_wo ON dep_wo.ordered_test_id = dep.id
+        ORDER BY dep_o.order_code, dep.sequence, dep.id
+        """
+    ).fetchall()
+
+    dependencies_by_test: dict[int, list] = {}
+    dependency_ids_by_test: dict[int, set] = {}
+    for row in dependency_rows:
+        dependencies_by_test.setdefault(row["ordered_test_id"], []).append(
+            {
+                "dependency_id": row["dependency_id"],
+                "depends_on_ordered_test_id": row["depends_on_ordered_test_id"],
+                "test_name": row["depends_on_test_name"],
+                "order_code": row["depends_on_order_code"],
+                "is_met": row["depends_on_wo_status"] == "completed",
+            }
+        )
+        dependency_ids_by_test.setdefault(row["ordered_test_id"], set()).add(row["depends_on_ordered_test_id"])
+
+    tests_by_order: dict[int, list] = {}
+    for row in raw_tests:
+        tests_by_order.setdefault(row["order_id"], []).append(dict(row))
+
     tests_for_alloc = []
     for row in raw_tests:
         item = dict(row)
@@ -336,6 +365,18 @@ def _load_planner_context(db) -> dict:
         item["available_candidates"] = [
             c for c in by_capability.get(item["capability_id"], []) if c["resource_id"] not in assigned_ids
         ]
+
+        item["dependencies"] = dependencies_by_test.get(item["ordered_test_id"], [])
+        item["is_blocked"] = any(not d["is_met"] for d in item["dependencies"])
+        already = dependency_ids_by_test.get(item["ordered_test_id"], set())
+        item["dependency_candidates"] = [
+            other
+            for other in tests_by_order.get(item["order_id"], [])
+            if other["ordered_test_id"] != item["ordered_test_id"]
+            and other["ordered_test_id"] not in already
+            and not would_create_dependency_cycle(db, item["ordered_test_id"], other["ordered_test_id"])
+        ]
+
         tests_for_alloc.append(item)
 
     tests = rows_with_meta(
@@ -344,6 +385,14 @@ def _load_planner_context(db) -> dict:
         sort_key=request.args.get("alloc_sort"),
         sort_dir=request.args.get("alloc_dir", "asc"),
         sortable_keys=ALLOC_SORTABLE_KEYS,
+    )
+
+    ordered_tests_rows = rows_with_meta(
+        tests_for_alloc,
+        dup_keys=TEST_DUP_KEYS,
+        sort_key=request.args.get("tests_sort"),
+        sort_dir=request.args.get("tests_dir", "asc"),
+        sortable_keys=TEST_SORTABLE_KEYS,
     )
 
     orders = rows_with_meta(
@@ -600,6 +649,8 @@ def planner_orders():
             eut_id = request.form.get("eut_id", "").strip() or None
             test_name = request.form.get("test_name", "").strip()
             required_capability_id = request.form.get("required_capability_id", "").strip() or None
+            planned_start_date = request.form.get("planned_start_date", "").strip() or None
+            planned_end_date = request.form.get("planned_end_date", "").strip() or None
 
             if not (order_id and test_name):
                 flash("Order and test name are required.", "error")
@@ -609,10 +660,19 @@ def planner_orders():
                 "SELECT 1 FROM euts WHERE id = ? AND order_id = ?", (eut_id, order_id)
             ).fetchone() is None:
                 flash("Selected EUT does not belong to this order.", "error")
+            elif planned_start_date and planned_end_date and planned_end_date < planned_start_date:
+                flash("Planned end date cannot be before the planned start date.", "error")
             else:
                 db.execute(
-                    "INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence) VALUES (?, ?, ?, ?, ?)",
-                    (order_id, eut_id, test_name, required_capability_id, _next_sequence(db, order_id, eut_id)),
+                    """
+                    INSERT INTO ordered_tests
+                        (order_id, eut_id, test_name, required_capability_id, sequence, planned_start_date, planned_end_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        order_id, eut_id, test_name, required_capability_id,
+                        _next_sequence(db, order_id, eut_id), planned_start_date, planned_end_date,
+                    ),
                 )
                 db.commit()
                 flash(f"Test '{test_name}' added.", "info")
@@ -692,9 +752,12 @@ def planner_orders():
             eut_id = request.form.get("eut_id", "").strip() or None
             test_name = request.form.get("test_name", "").strip()
             required_capability_id = request.form.get("required_capability_id", "").strip() or None
+            planned_start_date = request.form.get("planned_start_date", "").strip() or None
+            planned_end_date = request.form.get("planned_end_date", "").strip() or None
 
             existing = db.execute(
-                "SELECT order_id, eut_id, sequence FROM ordered_tests WHERE id = ?", (ordered_test_id,)
+                "SELECT order_id, eut_id, sequence, planned_start_date, planned_end_date FROM ordered_tests WHERE id = ?",
+                (ordered_test_id,),
             ).fetchone()
 
             if not (ordered_test_id and test_name) or existing is None:
@@ -703,6 +766,8 @@ def planner_orders():
                 "SELECT 1 FROM euts WHERE id = ? AND order_id = ?", (eut_id, existing["order_id"])
             ).fetchone() is None:
                 flash("Selected EUT does not belong to this test's order.", "error")
+            elif planned_start_date and planned_end_date and planned_end_date < planned_start_date:
+                flash("Planned end date cannot be before the planned start date.", "error")
             else:
                 # Moving a test to a different EUT (or out of one) puts it at the end of
                 # its new scope's order, rather than keeping a sequence number that was
@@ -712,8 +777,13 @@ def planner_orders():
                 if eut_changed:
                     sequence = _next_sequence(db, existing["order_id"], eut_id)
                 db.execute(
-                    "UPDATE ordered_tests SET eut_id = ?, test_name = ?, required_capability_id = ?, sequence = ? WHERE id = ?",
-                    (eut_id, test_name, required_capability_id, sequence, ordered_test_id),
+                    """
+                    UPDATE ordered_tests
+                    SET eut_id = ?, test_name = ?, required_capability_id = ?, sequence = ?,
+                        planned_start_date = ?, planned_end_date = ?
+                    WHERE id = ?
+                    """,
+                    (eut_id, test_name, required_capability_id, sequence, planned_start_date, planned_end_date, ordered_test_id),
                 )
                 if eut_changed:
                     def _eut_label(eid):
@@ -726,6 +796,12 @@ def planner_orders():
                         "eut_changed",
                         f"Moved from {_eut_label(existing['eut_id'])} to {_eut_label(eut_id)}.",
                     )
+                if (planned_start_date, planned_end_date) != (existing["planned_start_date"], existing["planned_end_date"]):
+                    history.record(
+                        db, ordered_test_id, session.get("user_id"), session.get("username"),
+                        "planned_dates_changed",
+                        f"Planned dates set to {planned_start_date or '(none)'} - {planned_end_date or '(none)'}.",
+                    )
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")
 
@@ -736,6 +812,61 @@ def planner_orders():
             db.execute("DELETE FROM ordered_tests WHERE id = ?", (ordered_test_id,))
             db.commit()
             flash("Ordered test deleted, along with its allocation (if any).", "info")
+            return redirect(url_for("planner.planner_orders", tab="tests"))
+
+        if action == "add_dependency":
+            ordered_test_id = request.form.get("ordered_test_id", "").strip()
+            depends_on_id = request.form.get("depends_on_ordered_test_id", "").strip()
+
+            test = db.execute("SELECT order_id FROM ordered_tests WHERE id = ?", (ordered_test_id,)).fetchone()
+            dep = db.execute("SELECT order_id, test_name FROM ordered_tests WHERE id = ?", (depends_on_id,)).fetchone()
+
+            if not (ordered_test_id and depends_on_id) or test is None or dep is None:
+                flash("A valid test and prerequisite are required.", "error")
+            elif ordered_test_id == depends_on_id:
+                flash("A test cannot depend on itself.", "error")
+            elif test["order_id"] != dep["order_id"]:
+                flash("A dependency must be within the same order.", "error")
+            elif db.execute(
+                "SELECT 1 FROM activity_dependencies WHERE ordered_test_id = ? AND depends_on_ordered_test_id = ?",
+                (ordered_test_id, depends_on_id),
+            ).fetchone():
+                flash("That dependency already exists.", "error")
+            elif would_create_dependency_cycle(db, int(ordered_test_id), int(depends_on_id)):
+                flash("That would create a circular dependency.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO activity_dependencies (ordered_test_id, depends_on_ordered_test_id) VALUES (?, ?)",
+                    (ordered_test_id, depends_on_id),
+                )
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "dependency_added", f"Now depends on: {dep['test_name']}.",
+                )
+                db.commit()
+                flash("Dependency added.", "info")
+
+            return redirect(url_for("planner.planner_orders", tab="tests"))
+
+        if action == "remove_dependency":
+            dependency_id = request.form.get("dependency_id", "").strip()
+            row = db.execute(
+                """
+                SELECT ad.ordered_test_id, dep.test_name
+                FROM activity_dependencies ad
+                JOIN ordered_tests dep ON dep.id = ad.depends_on_ordered_test_id
+                WHERE ad.id = ?
+                """,
+                (dependency_id,),
+            ).fetchone()
+            db.execute("DELETE FROM activity_dependencies WHERE id = ?", (dependency_id,))
+            if row:
+                history.record(
+                    db, row["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "dependency_removed", f"No longer depends on: {row['test_name']}.",
+                )
+            db.commit()
+            flash("Dependency removed.", "info")
             return redirect(url_for("planner.planner_orders", tab="tests"))
 
         if action == "delete_allocation":
@@ -846,7 +977,7 @@ def _load_dashboard_context(db) -> dict:
         SELECT
             o.id AS order_id, o.order_code, o.customer_name, o.product_name,
             o.weekly_note, o.waiting_for_customer,
-            ot.id AS ordered_test_id, ot.test_name,
+            ot.id AS ordered_test_id, ot.test_name, ot.planned_end_date,
             c.discipline AS capability_discipline,
             wo.id AS work_order_id, wo.procedure_id, wo.status AS wo_status
         FROM customer_orders o
@@ -857,6 +988,7 @@ def _load_dashboard_context(db) -> dict:
         """
     ).fetchall()
 
+    today_iso = date.today().isoformat()
     projects: dict[int, dict] = {}
     for row in rows:
         proj = projects.setdefault(
@@ -871,6 +1003,7 @@ def _load_dashboard_context(db) -> dict:
                 "activities": [],
                 "unscheduled_count": 0,
                 "missing_procedure_count": 0,
+                "overdue_count": 0,
             },
         )
         if row["ordered_test_id"] is None:
@@ -881,6 +1014,8 @@ def _load_dashboard_context(db) -> dict:
             proj["unscheduled_count"] += 1
         elif row["procedure_id"] is None:
             proj["missing_procedure_count"] += 1
+        if row["planned_end_date"] and row["planned_end_date"] < today_iso and row["wo_status"] != "completed":
+            proj["overdue_count"] += 1
 
     conflicted_order_ids = set()
     for a, b in find_all_running_conflicts(db):
@@ -976,6 +1111,7 @@ def _load_dashboard_context(db) -> dict:
         }
         proj["total_activities"] = total
         proj["has_conflict"] = order_id in conflicted_order_ids
+        proj["has_overdue"] = proj["overdue_count"] > 0
         proj["milestones"] = milestones_by_order.get(order_id, [])
         proj["visits"] = visits_by_order.get(order_id, [])
         result_projects.append(proj)

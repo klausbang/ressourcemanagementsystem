@@ -14,6 +14,7 @@
   <div class="stat-tile"><div class="stat-value">{{ completed_projects|length }}</div><div class="stat-label">Completed projects</div></div>
   <div class="stat-tile"><div class="stat-value">{{ active_projects|selectattr('has_conflict')|list|length }}</div><div class="stat-label">Projects with a live conflict</div></div>
   <div class="stat-tile"><div class="stat-value">{{ active_projects|sum(attribute='unscheduled_count') }}</div><div class="stat-label">Activities not yet actioned</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ active_projects|selectattr('has_overdue')|list|length }}</div><div class="stat-label">Projects with an overdue activity</div></div>
 </div>
 
 {% if upcoming_absences %}
@@ -43,6 +44,7 @@
       {% else %}<span class="badge">{{ p.display_status }}</span>
       {% endif %}
       {% if p.has_conflict %}<span class="badge badge-danger" title="At least one currently in-progress activity conflicts with another">🚫 Conflict</span>{% endif %}
+      {% if p.has_overdue %}<span class="badge badge-danger" title="At least one activity's planned end date has passed without being completed">⏰ Overdue</span>{% endif %}
     </div>
   </div>
 
@@ -57,6 +59,7 @@
   <p class="section-help" style="margin:0 0 10px;">
     {{ p.unscheduled_count }} activit{{ 'y' if p.unscheduled_count == 1 else 'ies' }} not yet actioned by a technician
     &middot; {{ p.missing_procedure_count }} work order{{ '' if p.missing_procedure_count == 1 else 's' }} still missing a test procedure
+    {% if p.overdue_count %}&middot; {{ p.overdue_count }} activit{{ 'y' if p.overdue_count == 1 else 'ies' }} overdue{% endif %}
   </p>
 
   <form method="post" class="form-grid" style="margin-bottom:10px;">

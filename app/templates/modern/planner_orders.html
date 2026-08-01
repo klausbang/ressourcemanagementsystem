@@ -275,6 +275,14 @@
               {% endfor %}
             </select>
           </div>
+          <div class="field">
+            <label for="test-planned-start">Planned start (optional)</label>
+            <input type="date" id="test-planned-start" name="planned_start_date">
+          </div>
+          <div class="field">
+            <label for="test-planned-end">Planned end (optional)</label>
+            <input type="date" id="test-planned-end" name="planned_end_date">
+          </div>
           <div class="field"><button type="submit" class="btn btn-primary">Add test</button></div>
         </form>
       </div>
@@ -325,6 +333,9 @@
             {{ macros.sort_th('EUT', 'eut_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Test Name', 'test_name', 'tests', 'planner.planner_orders') }}
             {{ macros.sort_th('Required Capability', 'capability_name', 'tests', 'planner.planner_orders') }}
+            <th>Planned Start</th>
+            <th>Planned End</th>
+            <th>Depends On</th>
             <th>Reorder</th>
             <th>Actions</th>
           </tr></thead>
@@ -341,7 +352,10 @@
                   {% endfor %}
                 </select>
               </td>
-              <td><input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}"></td>
+              <td>
+                <input type="text" name="test_name" value="{{ t['test_name'] }}" form="test-save-{{ t['ordered_test_id'] }}">
+                {% if t['is_blocked'] %}<span title="Blocked: waiting on an unmet dependency" style="color:#a00;">⛔</span>{% endif %}
+              </td>
               <td>
                 <select name="required_capability_id" form="test-save-{{ t['ordered_test_id'] }}">
                   <option value="">None</option>
@@ -349,6 +363,37 @@
                   <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
                   {% endfor %}
                 </select>
+              </td>
+              <td><input type="date" name="planned_start_date" value="{{ t['planned_start_date'] or '' }}" form="test-save-{{ t['ordered_test_id'] }}" style="width:140px;"></td>
+              <td><input type="date" name="planned_end_date" value="{{ t['planned_end_date'] or '' }}" form="test-save-{{ t['ordered_test_id'] }}" style="width:140px;"></td>
+              <td>
+                {% if t['dependencies'] %}
+                <ul class="chip-list">
+                  {% for d in t['dependencies'] %}
+                  <li class="chip" title="{{ 'Completed' if d['is_met'] else 'Not yet completed' }}">
+                    {{ '✅' if d['is_met'] else '⏳' }} {{ d['test_name'] }}
+                    <form method="post" style="display:inline;">
+                      <input type="hidden" name="action" value="remove_dependency">
+                      <input type="hidden" name="dependency_id" value="{{ d['dependency_id'] }}">
+                      <button type="submit" title="Remove this dependency">✕</button>
+                    </form>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% if t['dependency_candidates'] %}
+                <form method="post" class="inline-form">
+                  <input type="hidden" name="action" value="add_dependency">
+                  <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+                  <select name="depends_on_ordered_test_id">
+                    <option value="">Depends on...</option>
+                    {% for c in t['dependency_candidates'] %}
+                    <option value="{{ c['ordered_test_id'] }}">{{ c['test_name'] }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-secondary btn-sm">➕</button>
+                </form>
+                {% endif %}
               </td>
               <td class="inline-form">
                 <form method="post"><input type="hidden" name="action" value="move_test"><input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}"><input type="hidden" name="direction" value="up"><button type="submit" class="btn btn-secondary btn-sm" title="Move up">▲</button></form>
@@ -564,13 +609,14 @@
       {% macro ov_test_table(order_tests) %}
         {% if order_tests %}
         <table class="modern-table">
-          <thead><tr><th>Activity</th><th>Required capability</th><th>Resources</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Activity</th><th>Required capability</th><th>Resources</th><th>Planned</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {% for t in order_tests %}
             <tr>
-              <td>{{ t['test_name'] }}</td>
+              <td>{{ t['test_name'] }}{% if t['is_blocked'] %} <span title="Blocked: waiting on an unmet dependency" style="color:#a00;">⛔</span>{% endif %}</td>
               <td>{{ t['capability_name'] or '—' }}</td>
               <td>{{ t['allocated_summary'] or '—' }}</td>
+              <td>{% if t['planned_start_date'] or t['planned_end_date'] %}{{ t['planned_start_date'] or '?' }} &rarr; {{ t['planned_end_date'] or '?' }}{% else %}—{% endif %}</td>
               <td><span class="badge">{{ t['status_label'] }}</span></td>
               <td>
                 {% if t['has_history'] %}

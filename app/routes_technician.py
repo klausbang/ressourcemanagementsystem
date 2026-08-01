@@ -5,7 +5,12 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 from . import history
 from .db import get_db, init_db
 from .routes_common import require_role
-from .scheduling import conflict_message, find_running_conflict
+from .scheduling import (
+    conflict_message,
+    find_running_conflict,
+    find_unmet_dependency,
+    unmet_dependency_message,
+)
 from .table_utils import rows_with_meta
 
 bp = Blueprint("technician", __name__, url_prefix="/technician")
@@ -27,9 +32,18 @@ def _linked_resource_id(db) -> int | None:
 
 
 def _next_work_order_code(db) -> str:
-    row = db.execute("SELECT MAX(id) AS max_id FROM work_orders").fetchone()
-    next_id = (row["max_id"] or 0) + 1
-    return f"WO-{next_id:04d}"
+    # Based on the numeric suffix of existing codes, not MAX(id): seed data's work order
+    # codes don't necessarily follow the id sequence, so an id-based next code can collide
+    # with an existing one that was assigned out of sequence.
+    max_num = 0
+    for row in db.execute("SELECT work_order_code FROM work_orders").fetchall():
+        code = row["work_order_code"] or ""
+        if code.startswith("WO-"):
+            try:
+                max_num = max(max_num, int(code[3:]))
+            except ValueError:
+                pass
+    return f"WO-{max_num + 1:04d}"
 
 
 def _load_technician_context(db) -> dict:
@@ -128,6 +142,11 @@ def _load_technician_context(db) -> dict:
         item["wo_status"] = work_order["status"] if work_order else "unassigned"
         item["report"] = reports_by_wo.get(work_order["id"]) if work_order else None
         item["available_procedures"] = procedures_by_capability.get(item["capability_id"], [])
+        item["blocked_by"] = (
+            find_unmet_dependency(db, item["ordered_test_id"])
+            if work_order and work_order["status"] in ("planned", "on_hold")
+            else None
+        )
         tests.append(item)
 
     tests = rows_with_meta(
@@ -194,8 +213,11 @@ def technician_dashboard():
             work_order_id = request.form.get("work_order_id", "").strip()
             wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
+            unmet_dependency = find_unmet_dependency(db, wo["ordered_test_id"]) if wo and not conflict else None
             if conflict:
                 flash(conflict_message(conflict), "error")
+            elif unmet_dependency:
+                flash(unmet_dependency_message(unmet_dependency), "error")
             else:
                 db.execute(
                     "UPDATE work_orders SET status = 'in_progress', started_at = ? WHERE id = ?",
@@ -226,8 +248,11 @@ def technician_dashboard():
             work_order_id = request.form.get("work_order_id", "").strip()
             wo = db.execute("SELECT ordered_test_id, work_order_code FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
             conflict = find_running_conflict(db, wo["ordered_test_id"], exclude_work_order_id=work_order_id) if wo else None
+            unmet_dependency = find_unmet_dependency(db, wo["ordered_test_id"]) if wo and not conflict else None
             if conflict:
                 flash(conflict_message(conflict), "error")
+            elif unmet_dependency:
+                flash(unmet_dependency_message(unmet_dependency), "error")
             else:
                 db.execute("UPDATE work_orders SET status = 'in_progress' WHERE id = ?", (work_order_id,))
                 history.record(

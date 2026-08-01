@@ -31,6 +31,9 @@
       <li><strong>[Medium]</strong> Is "Waiting for Customer" the only externally-caused project hold worth its own flag, or are there others (e.g. "waiting on a spare part", "lab closed") that should get the same treatment rather than living only in the free-text weekly note? (SRS FR-PRJ-3)</li>
       <li><strong>[Low]</strong> Phase 12's schedule banner only flags absences/visits for the single day being viewed, plus a 14-day-ahead list on the dashboard &mdash; is a "this week at a glance" view worth adding so a multi-day absence/visit is visible without navigating into it day by day? (SRS FR-CAL-3)</li>
       <li><strong>[Low]</strong> Phase 13's activity history only logs schedule-affecting changes (resource assignment, reordering, EUT reassignment, work order lifecycle) &mdash; should test name/required-capability edits be logged too, and would a project-wide history view (not just per-activity) be useful? (SRS FR-NTH-1)</li>
+      <li><strong>[Medium]</strong> Phase 14 scoped a dependency to within one project/order &mdash; is a cross-project dependency ever needed in practice? (SRS BR-006, FR-TP-5)</li>
+      <li><strong>[Medium]</strong> Should an activity template (Phase 10) be able to pre-declare its own standard dependencies (e.g. "Report writing" always depends on every non-Report item before it in the same template), so applying a template also wires up dependencies automatically? (SRS FR-TP-5)</li>
+      <li><strong>[Low]</strong> Phase 14's dependency block only fires at the work order start/resume transition, the same scoping rationale as FR-CON-2 &mdash; is a same-day, creation-time warning also wanted? (SRS FR-TP-5 design note)</li>
     </ul>
   </main>
 </body>

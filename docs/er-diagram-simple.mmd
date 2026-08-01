@@ -32,3 +32,5 @@ erDiagram
     customer_orders ||--o{ customer_visits : "on-site"
     ordered_tests ||--o{ activity_history : "logged"
     users ||--o{ activity_history : "acted"
+    ordered_tests ||--o{ activity_dependencies : "depends on"
+    ordered_tests ||--o{ activity_dependencies : "blocks"

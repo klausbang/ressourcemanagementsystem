@@ -118,3 +118,53 @@ def find_all_running_conflicts(db: sqlite3.Connection) -> list[tuple[dict, dict]
             if _conflicts(a_ids, b_ids):
                 conflicts.append((dict(a), dict(b)))
     return conflicts
+
+
+def find_unmet_dependency(db: sqlite3.Connection, ordered_test_id: int) -> dict | None:
+    """If ordered_test_id has a prerequisite (see Phase 14, activity_dependencies) whose
+    work order isn't completed yet, return details of the first one found. Otherwise None."""
+
+    row = db.execute(
+        """
+        SELECT o.order_code, ot.test_name, wo.status AS wo_status
+        FROM activity_dependencies ad
+        JOIN ordered_tests ot ON ot.id = ad.depends_on_ordered_test_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN work_orders wo ON wo.ordered_test_id = ot.id
+        WHERE ad.ordered_test_id = ?
+          AND (wo.status IS NULL OR wo.status != 'completed')
+        LIMIT 1
+        """,
+        (ordered_test_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def unmet_dependency_message(dep: dict) -> str:
+    status = dep["wo_status"] or "not started"
+    return (
+        f"Cannot start: this activity depends on {dep['test_name']} ({dep['order_code']}), "
+        f"which is not yet completed (currently {status})."
+    )
+
+
+def would_create_dependency_cycle(db: sqlite3.Connection, ordered_test_id: int, new_dependency_id: int) -> bool:
+    """True if making ordered_test_id depend on new_dependency_id would create a cycle,
+    i.e. new_dependency_id (transitively, via its own prerequisites) already depends on
+    ordered_test_id."""
+
+    visited: set[int] = set()
+    stack = [new_dependency_id]
+    while stack:
+        current = stack.pop()
+        if current == ordered_test_id:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        rows = db.execute(
+            "SELECT depends_on_ordered_test_id FROM activity_dependencies WHERE ordered_test_id = ?",
+            (current,),
+        ).fetchall()
+        stack.extend(row["depends_on_ordered_test_id"] for row in rows)
+    return False

@@ -103,9 +103,20 @@ CREATE TABLE IF NOT EXISTS ordered_tests (
     test_name TEXT NOT NULL,
     required_capability_id INTEGER,
     sequence INTEGER,
+    planned_start_date TEXT,
+    planned_end_date TEXT,
     FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (eut_id) REFERENCES euts(id) ON DELETE SET NULL,
     FOREIGN KEY (required_capability_id) REFERENCES capabilities(id)
+);
+
+CREATE TABLE IF NOT EXISTS activity_dependencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ordered_test_id INTEGER NOT NULL,
+    depends_on_ordered_test_id INTEGER NOT NULL,
+    FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (depends_on_ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    UNIQUE (ordered_test_id, depends_on_ordered_test_id)
 );
 
 CREATE TABLE IF NOT EXISTS activity_history (
@@ -436,6 +447,21 @@ def _migrate_customer_orders_table(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def _migrate_ordered_tests_planned_dates(db: sqlite3.Connection) -> None:
+    """Upgrade an ordered_tests table created before the optional planned date columns existed."""
+    if not _table_exists(db, "ordered_tests"):
+        return
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(ordered_tests)").fetchall()}
+    # Both new columns are nullable with no CHECK/FK/default, so a plain ADD COLUMN
+    # is enough for either, without a table rebuild.
+    if "planned_start_date" not in columns:
+        db.execute("ALTER TABLE ordered_tests ADD COLUMN planned_start_date TEXT")
+    if "planned_end_date" not in columns:
+        db.execute("ALTER TABLE ordered_tests ADD COLUMN planned_end_date TEXT")
+    db.commit()
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
@@ -445,6 +471,7 @@ def init_db() -> None:
     _migrate_ordered_tests_sequence(db)
     _migrate_capabilities_table(db)
     _migrate_customer_orders_table(db)
+    _migrate_ordered_tests_planned_dates(db)
     db.commit()
 
 
@@ -769,6 +796,36 @@ def init_demo_seed() -> None:
         JOIN euts e ON e.order_id = o.id AND e.name = 'Rev A'
         WHERE at.name = 'Standard EMC Test Sequence'
           AND NOT EXISTS (SELECT 1 FROM ordered_tests ot2 WHERE ot2.order_id = o.id AND ot2.eut_id = e.id)
+    """)
+
+    # Phase 14 demo: "Report writing" depends on "CE" being completed first (the
+    # customer's own literal rule), and CE carries a planned window already in the
+    # past (relative to the seeded "today") with no work order yet, so the demo shows
+    # both a blocked activity and the dashboard's overdue flag together.
+    db.execute("""
+        UPDATE ordered_tests
+        SET planned_start_date = '2026-07-20', planned_end_date = '2026-07-24'
+        WHERE planned_start_date IS NULL
+          AND id = (
+              SELECT ot.id FROM ordered_tests ot
+              JOIN customer_orders o ON o.id = ot.order_id
+              JOIN euts e ON e.id = ot.eut_id
+              WHERE o.order_code = 'ORD-2026-004' AND e.name = 'Rev A' AND ot.test_name = 'CE'
+          )
+    """)
+    db.execute("""
+        INSERT INTO activity_dependencies (ordered_test_id, depends_on_ordered_test_id)
+        SELECT report.id, ce.id
+        FROM ordered_tests report
+        JOIN ordered_tests ce ON ce.order_id = report.order_id AND ce.eut_id = report.eut_id
+        JOIN customer_orders o ON o.id = report.order_id
+        JOIN euts e ON e.id = report.eut_id
+        WHERE o.order_code = 'ORD-2026-004' AND e.name = 'Rev A'
+          AND report.test_name = 'Report writing' AND ce.test_name = 'CE'
+          AND NOT EXISTS (
+              SELECT 1 FROM activity_dependencies ad
+              WHERE ad.ordered_test_id = report.id AND ad.depends_on_ordered_test_id = ce.id
+          )
     """)
 
     _seed_procedure(

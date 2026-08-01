@@ -164,7 +164,11 @@
 
           {% if wo['status'] == 'planned' %}
           <div class="wo-actions">
+            {% if t['blocked_by'] %}
+            <span class="btn btn-primary btn-sm" aria-disabled="true" title="Depends on {{ t['blocked_by']['test_name'] }} ({{ t['blocked_by']['order_code'] }}), not yet completed" style="opacity:0.45; cursor:default; pointer-events:none;">▶ Start</span>
+            {% else %}
             <form method="post"><input type="hidden" name="action" value="start_work_order"><input type="hidden" name="work_order_id" value="{{ wo['id'] }}"><button type="submit" class="btn btn-primary btn-sm">▶ Start</button></form>
+            {% endif %}
           </div>
           <form method="post" class="inline-form" style="margin-top:10px;">
             <input type="hidden" name="action" value="update_notes">
@@ -198,7 +202,11 @@
 
           {% elif wo['status'] == 'on_hold' %}
           <div class="wo-actions">
+            {% if t['blocked_by'] %}
+            <span class="btn btn-primary btn-sm" aria-disabled="true" title="Depends on {{ t['blocked_by']['test_name'] }} ({{ t['blocked_by']['order_code'] }}), not yet completed" style="opacity:0.45; cursor:default; pointer-events:none;">▶ Resume</span>
+            {% else %}
             <form method="post"><input type="hidden" name="action" value="resume_work_order"><input type="hidden" name="work_order_id" value="{{ wo['id'] }}"><button type="submit" class="btn btn-primary btn-sm">▶ Resume</button></form>
+            {% endif %}
           </div>
           <form method="post" class="inline-form" style="margin-top:10px;">
             <input type="hidden" name="action" value="update_notes">

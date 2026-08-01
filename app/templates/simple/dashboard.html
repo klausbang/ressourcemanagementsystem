@@ -16,13 +16,13 @@
 {% if active_projects %}
 {% for p in active_projects %}
 <fieldset style="margin-bottom:14px;">
-  <legend>{{ p.order_code }} - {{ p.customer_name }} ({{ p.product_name }}) &mdash; <strong>{{ p.display_status }}</strong>{% if p.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}</legend>
+  <legend>{{ p.order_code }} - {{ p.customer_name }} ({{ p.product_name }}) &mdash; <strong>{{ p.display_status }}</strong>{% if p.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}{% if p.has_overdue %} &mdash; <strong>OVERDUE</strong>{% endif %}</legend>
 
   <p>
     Disciplines:
     {% for name, status in p.discipline_status.items() %}{{ name }}: {{ status }}{% if not loop.last %}, {% endif %}{% endfor %}
   </p>
-  <p>{{ p.unscheduled_count }} activities not yet actioned by a technician; {{ p.missing_procedure_count }} work orders missing a test procedure.</p>
+  <p>{{ p.unscheduled_count }} activities not yet actioned by a technician; {{ p.missing_procedure_count }} work orders missing a test procedure{% if p.overdue_count %}; {{ p.overdue_count }} activities overdue{% endif %}.</p>
 
   <form method="post">
     <input type="hidden" name="action" value="update_project_status">

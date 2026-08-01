@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v3</title>
+  <title>RMS SRS v4</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v3</h1>
-    <p>Version: 0.3 | Date: 2026-07-30</p>
+    <h1>Resource Management System (RMS) - SRS v4</h1>
+    <p>Version: 0.4 | Date: 2026-08-01</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -20,7 +20,8 @@
       <ul>
         <li><strong>v0.1 (Phase 3-4):</strong> resource/capability setup and customer order/resource allocation.</li>
         <li><strong>v0.2 (Phase 7):</strong> Test Technician role, work orders, test procedures, and test reports with review/approval.</li>
-        <li><strong>v0.3 (this revision):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
+        <li><strong>v0.3 (Phase 8-13):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
+        <li><strong>v0.4 (Phase 14, this revision):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
       </ul>
     </section>
 
@@ -109,13 +110,18 @@ Project (customer_orders)
 
       <h3>8.2 Test Plan and EUTs (FR-TP)</h3>
       <p><strong>BR-002:</strong> The laboratory needs to plan and track tests per physical unit under test, not only per project, since a project can involve several EUTs on independent schedules.</p>
+      <p><strong>BR-006</strong> [added Phase 14, from customer SRS v0.7 review]: An activity that requires another to finish first (the clearest customer example: a report can't be written before its test is complete) must be an enforced rule, not merely a suggested display order &mdash; the existing <code>sequence</code> field (Phase 10) only controls display/reorder position and does not block an out-of-order start.</p>
       <ul>
         <li><strong>FR-TP-1</strong> [Must, Planned - Phase 8]: The system shall let a planner record one or more EUTs per project, each with a name/description and an optional serial number.</li>
         <li><strong>FR-TP-2</strong> [Must, Planned - Phase 8]: The system shall let a test activity optionally reference the EUT it belongs to, so activities can be filtered and reported per EUT as well as per project. Existing activities created before this requirement, or created without selecting an EUT, remain valid (the reference is optional, not mandatory), preserving current behavior for simple single-EUT projects.</li>
         <li><strong>FR-TP-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners full CRUD on test activities within a project, each with a name and a required capability.</li>
         <li><strong>FR-TP-4</strong> [Should, Delivered - Phase 10]: The system shall offer a reusable, ordered standard activity template (e.g. Kick-off, Testplan, EUT delivery, RE, RI, CI, CE, Burst, Surge, Voltage Dips, Power Frequency Magnetic Field, other tests, ESD, Report writing, Report review, Report to customer, EUT return) that a planner can apply to an order/EUT to bulk-create its activities in one step, then freely reorder, add to, or remove from per project.</li>
+        <li><strong>FR-TP-5</strong> [Must, Delivered - Phase 14]: The system shall let a planner declare that a test activity depends on one or more other activities within the same project, and shall block starting or resuming its work order until every one of those prerequisites is completed.</li>
+        <li><strong>FR-TP-6</strong> [Should, Delivered - Phase 14]: The system shall let a planner record an optional planned start and end date on a test activity, independent of its actual execution timestamps, so a plan can exist before any work begins.</li>
         <li><strong>AC-FR-TP-1.1:</strong> Given a project with 0 EUTs, when a planner adds an EUT and adds a test activity under it, then the activity is visible both on that EUT's test plan and, unfiltered, on the project's full activity list, without being entered twice.</li>
         <li><strong>AC-FR-TP-4.1:</strong> Given an EUT with no test activities, when a planner applies the "Standard EMC Test Sequence" template to it, then all of the template's activities are created in one step, in the template's order, each carrying over its template-defined required capability (if any); the planner can then move any one activity up or down within that EUT independently of the template.</li>
+        <li><strong>AC-FR-TP-5.1:</strong> Given "Report writing" depends on "CE", when a technician attempts to start or resume the Report writing work order while CE's work order is not completed, then the system rejects the action and names which prerequisite activity is still outstanding; once CE is completed, the same action succeeds.</li>
+        <li><strong>Design note (FR-TP-5 scope):</strong> a dependency is a same-project prerequisite relationship (many-to-one is not enough &mdash; an activity can have several prerequisites, e.g. a report depending on every test activity that precedes it), stored as its own row per prerequisite rather than a single foreign key, and validated against both self-reference and circular chains when created. The block applies at the start/resume transition, mirroring FR-CON-2's scoping rationale (the same point precision already exists in the workflow); it deliberately does not block creating or scheduling a work order ahead of time.</li>
       </ul>
 
       <h3>8.3 Resources (FR-RES)</h3>
@@ -133,8 +139,8 @@ Project (customer_orders)
       <ul>
         <li><strong>FR-CON-1</strong> [Must, Delivered - Phase 9]: The system shall let an administrator define mutual-exclusion groups of facility resources (e.g. "CON chamber: CE/CI" and "SAC chamber: RE/RI") such that two activities in the same group are treated as sharing one physical resource for conflict purposes.</li>
         <li><strong>FR-CON-2</strong> [Must, Delivered - Phase 9]: The system shall block starting or resuming a work order if doing so would run it at the same time as another work order that is already in progress and shares a resource or exclusion group with it, and shall explain which work order/activity it conflicts with.</li>
-        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 14]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
-        <li><strong>FR-CON-4</strong> [Could, Planned - Phase 14]: The system shall let a facility reservation span multiple consecutive days (e.g. a multi-day climate-chamber soak) as a single booking rather than one row per day.</li>
+        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 15]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
+        <li><strong>FR-CON-4</strong> [Could, Planned - Phase 15]: The system shall let a facility reservation span multiple consecutive days (e.g. a multi-day climate-chamber soak) as a single booking rather than one row per day.</li>
         <li><strong>AC-FR-CON-2.1:</strong> Given RE's work order is in_progress in the SAC chamber, when a technician attempts to start or resume RI's work order (a different facility resource in the same "SAC Chamber (TLS)" exclusion group), then the system rejects the action and states which work order/activity it conflicts with.</li>
         <li><strong>Design note (scope of FR-CON-2):</strong> a work order's scheduled_date carries no time-of-day, so the block is applied at the point precision actually exists &mdash; the transition into "in progress" &mdash; rather than at creation-time scheduling, which would only support coarse same-day checks. The planner's Schedule/Gantt view (FR-PLN-3) additionally flags overlaps that arise after the fact (e.g. a test overrunning into the next one's actual start), as a passive check the hard block at start-time can't catch.</li>
       </ul>
@@ -161,6 +167,7 @@ Project (customer_orders)
         <li><strong>FR-PLN-1</strong> [Must, Delivered - Phase 3]: Every test activity shall be plannable by assigning it resources (equipment, facility, procedure, technician).</li>
         <li><strong>FR-PLN-2</strong> [Should, Delivered - Phase 7 (WIP)]: The system shall provide a day-view production schedule showing each work order as a time-blocked bar against the resources/technician assigned to it, navigable by day.</li>
         <li><strong>FR-PLN-3</strong> [Should, Delivered - Phase 9]: The schedule view shall display constraint conflicts (see 8.4) inline rather than requiring a separate check.</li>
+        <li><strong>FR-PLN-4</strong> [Should, Delivered - Phase 14]: See FR-TP-6 (planned start/end date on a test activity).</li>
         <li><strong>Design note:</strong> the customer's spreadsheet plans in 2-hour blocks because that suits Excel's grid. RMS stores actual start/end timestamps internally (minute resolution) and only uses fixed blocks for the visual grid, so finer-grained scheduling is possible later without a data model change.</li>
       </ul>
 
@@ -168,7 +175,7 @@ Project (customer_orders)
       <p><strong>BR-005:</strong> When a test overruns, fails, is interrupted, or the customer sends replacement hardware, the remaining plan must be adjustable without manually touching many unrelated fields &mdash; the customer's consultant called this "the core of the system."</p>
       <ul>
         <li><strong>FR-RSC-1</strong> [Must, Delivered - Phase 3/7]: Moving, reassigning, or changing the result of one test activity shall not require manually editing any other activity's stored data (each activity's schedule/resources/result are independent rows, not spreadsheet formulas referencing each other).</li>
-        <li><strong>FR-RSC-2</strong> [Could, Planned - Phase 14]: When an activity is delayed, failed, or its EUT is replaced, the system shall suggest how directly dependent downstream activities (per FR-TP-4 template ordering) could shift, for the planner to accept or ignore. Full automatic optimization/conflict auto-resolution is explicitly out of scope (Section 11) &mdash; this is assisted rescheduling, not automatic rescheduling.</li>
+        <li><strong>FR-RSC-2</strong> [Could, Planned - Phase 15]: When an activity is delayed, failed, or its EUT is replaced, the system shall suggest how directly dependent downstream activities (per FR-TP-5 dependencies, now that they're a real, enforced relationship rather than just template ordering) could shift, for the planner to accept or ignore. Full automatic optimization/conflict auto-resolution is explicitly out of scope (Section 11) &mdash; this is assisted rescheduling, not automatic rescheduling.</li>
       </ul>
 
       <h3>8.9 Visualization and Dashboard (FR-VIS)</h3>
@@ -177,6 +184,7 @@ Project (customer_orders)
         <li><strong>FR-VIS-1</strong> [Should, Delivered - Phase 11]: The system shall provide a dashboard listing active projects with overall status, per-discipline status, and upcoming milestones, plus a read-only completed-project history view (FR-PRJ-4).</li>
         <li><strong>FR-VIS-2</strong> [Should, Delivered - Phase 11]: The dashboard shall surface, per project: whether any of its currently in-progress activities has a live resource/exclusion-group conflict (8.4) with another project's activity, how many activities have no work order yet, and how many work orders are missing a test procedure.</li>
         <li><strong>FR-VIS-3</strong> [Must, Delivered - Phase 7 (WIP)]: See FR-PLN-2 (production schedule chart).</li>
+        <li><strong>FR-VIS-4</strong> [Should, Delivered - Phase 14]: The dashboard shall flag, per project, whether any activity's planned end date (FR-TP-6) has passed without its work order being completed ("overdue"), as a derived flag alongside the existing conflict flag &mdash; not a replacement for the project's own computed status (FR-STA-2), since a project can be In Progress and overdue at the same time.</li>
       </ul>
 
       <h3>8.10 Reporting (FR-RPT)</h3>
@@ -227,6 +235,7 @@ Project (customer_orders)
         <li>From Phase 11 (delivered): an optional discipline field on capabilities; a weekly note and a waiting-for-customer flag on each project (the only two manually-entered project-status fields); milestones per project (title, optional target date, optional notes).</li>
         <li>From Phase 12 (delivered): staff absences per technician resource (start/end date, optional reason), admin-managed; customer on-site visits per project (start/end date, optional notes), planner-managed.</li>
         <li>From Phase 13 (delivered): an append-only change history per test activity (when, who, a system-generated description of what changed, and an optional why), covering resource assignment/removal, reordering, EUT reassignment, and the work order lifecycle.</li>
+        <li>From Phase 14 (delivered): an optional planned start date and planned end date on each test activity; a same-project activity-dependency record (one row per prerequisite, so an activity can have more than one), validated against self-reference and circular chains at creation time.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -269,7 +278,8 @@ Project (customer_orders)
           <tr><td>11</td><td>Project/discipline dashboard</td><td>FR-PRJ-3..4, FR-STA-2, FR-VIS-1..2</td><td>Delivered</td></tr>
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Delivered</td></tr>
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Delivered</td></tr>
-          <tr><td>14</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
+          <tr><td>14</td><td>Activity dependencies and planned dates</td><td>FR-TP-5..6, FR-PLN-4, FR-VIS-4</td><td>Delivered</td></tr>
+          <tr><td>15</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
         </tbody>
       </table>
     </section>
@@ -287,6 +297,9 @@ Project (customer_orders)
         <li>Open (Phase 11): is "Waiting for Customer" the only manually-flagged project state needed, or are there other externally-caused holds (e.g. "waiting on a spare part", "lab closed") that deserve their own flag rather than being folded into the free-text weekly note?</li>
         <li>Open (Phase 12): the schedule's absence/visit banner only checks the single day being viewed; a multi-day absence/visit is otherwise invisible until you navigate to a day inside it. Is a compact "this week at a glance" strip worth adding, or is per-day plus the dashboard's 14-day absence list enough?</li>
         <li>Open (Phase 13): should test activity edits (name/required capability changes, not just EUT/sequence) also be logged, or is the current schedule-affecting-only scope the right line? Should a project-level history view (across all its activities at once) be added, or is per-activity enough?</li>
+        <li>Assumed (Phase 14): a dependency is scoped to within one project (order), not across projects &mdash; no customer example so far crosses that boundary. Revisit if a real cross-project dependency need surfaces.</li>
+        <li>Open (Phase 14): the dependency block only fires at the work-order start/resume transition (mirroring FR-CON-2); is a same-day, creation-time warning also wanted, the way it was raised for FR-CON-2 above?</li>
+        <li>Open (Phase 14): should an activity template (FR-TP-4) be able to pre-declare its own standard dependencies (e.g. "Report writing" template item always depends on every non-Report item before it), so applying a template also wires up dependencies automatically instead of the planner adding them by hand each time?</li>
       </ul>
     </section>
   </main>
