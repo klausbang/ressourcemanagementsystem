@@ -523,6 +523,19 @@ def _migrate_ordered_tests_template_application(db: sqlite3.Connection) -> None:
         db.commit()
 
 
+def _migrate_template_applications_table(db: sqlite3.Connection) -> None:
+    """Upgrade a template_applications table created before applied_template_version/modified
+    existed. Both are nullable-or-defaulted with no CHECK/FK, so a plain ADD COLUMN is enough."""
+    if not _table_exists(db, "template_applications"):
+        return
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(template_applications)").fetchall()}
+    if "applied_template_version" not in columns:
+        db.execute("ALTER TABLE template_applications ADD COLUMN applied_template_version INTEGER")
+    if "modified" not in columns:
+        db.execute("ALTER TABLE template_applications ADD COLUMN modified INTEGER NOT NULL DEFAULT 0")
+    db.commit()
+
+
 def _migrate_activity_templates_version(db: sqlite3.Connection) -> None:
     """Upgrade an activity_templates table created before the optional version column
     existed. An integer counter (bumped on every item add/edit/delete/reorder) rather than
@@ -548,6 +561,7 @@ def init_db() -> None:
     _migrate_customer_orders_table(db)
     _migrate_ordered_tests_planned_dates(db)
     _migrate_ordered_tests_template_application(db)
+    _migrate_template_applications_table(db)
     _migrate_activity_templates_version(db)
     db.commit()
 
