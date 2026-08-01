@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -567,7 +568,20 @@ def init_db() -> None:
 
 
 def init_demo_seed() -> None:
+    """Seed a demonstrator dataset. Dates are computed relative to today (not hardcoded
+    calendar dates) so the demo - especially the Phase 19 Day/Week/Month schedule scales -
+    stays relevant no matter when the app is actually opened, rather than drifting into
+    the past the way a fixed-date seed would. Refreshed wholesale per a planner proposal
+    (see PROJECT_PLAN.md Phase 20) asking for a clean, curated demo dataset after this dev
+    database had accumulated a lot of ad-hoc test data over many phases."""
     db = get_db()
+    today = date.today()
+
+    def d(offset_days: int) -> str:
+        return (today + timedelta(days=offset_days)).isoformat()
+
+    def dt(offset_days: int, hour: int, minute: int = 0) -> str:
+        return f"{d(offset_days)} {hour:02d}:{minute:02d}"
 
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('admin.demo', 'admin')")
     db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('planner.demo', 'planner')")
@@ -608,10 +622,24 @@ def init_demo_seed() -> None:
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-011", "CON Chamber - CI Setup", "facility", "available", "TLC"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-012", "SAC Chamber - RE Setup", "facility", "available", "TLS"))
     db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)", ("FAC-013", "SAC Chamber - RI Setup", "facility", "available", "TLS"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("EQ-030", "Shared Spectrum Analyzer", "equipment", "available"))
 
-    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-001", "Acme Instruments", "Multimeter"))
-    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype"))
-    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-003", "Contoso Labs", "IoT Gateway"))
+    _seed_customer(db, "Acme Instruments", contact_name="Priya Shah", contact_email="priya.shah@acmeinstruments.example", contact_phone="+1-555-0101", address="500 Precision Way, Springfield")
+    _seed_customer(db, "Nova Mobile", contact_name="Daniel Osei", contact_email="daniel.osei@novamobile.example", contact_phone="+1-555-0110", address="12 Harbor Bridge Road, Rivertown")
+    # Deliberately left incomplete (no contact info yet) - demonstrates the admin "needs info" flag (Phase 17).
+    _seed_customer(db, "Contoso Labs")
+    _seed_customer(db, "Helios Devices", contact_name="Ines Larsen", contact_email="ines.larsen@heliosdevices.example", contact_phone="+45-70-123456", address="Solvej 14, Aarhus")
+
+    _seed_order(db, "ORD-2026-001", "Acme Instruments", "Multimeter")
+    _seed_order(db, "ORD-2026-002", "Nova Mobile", "Mobile Phone Prototype")
+    _seed_order(db, "ORD-2026-003", "Contoso Labs", "IoT Gateway")
+
+    # Backfill: link any pre-existing order whose customer_id is unset to the customers
+    # row of the same name (covers a dev database that had orders from before Phase 17).
+    db.execute("""
+        UPDATE customer_orders SET customer_id = (SELECT id FROM customers WHERE name = customer_orders.customer_name)
+        WHERE customer_id IS NULL
+    """)
 
     db.execute("""
         UPDATE customer_orders SET weekly_note = ?
@@ -622,11 +650,11 @@ def init_demo_seed() -> None:
         WHERE order_code = 'ORD-2026-003' AND weekly_note IS NULL
     """, ("Blocked: waiting on customer to confirm which CE/CI limit class applies before we sign off the report.",))
 
-    _seed_milestone(db, "ORD-2026-002", "Draft report to customer", "2026-08-10")
-    _seed_milestone(db, "ORD-2026-003", "Final report due", "2026-08-05")
+    _seed_milestone(db, "ORD-2026-002", "Draft report to customer", d(9))
+    _seed_milestone(db, "ORD-2026-003", "Final report due", d(4))
 
-    _seed_staff_absence(db, "TECH-102", "2026-08-04", "2026-08-06", "Summer vacation")
-    _seed_customer_visit(db, "ORD-2026-003", "2026-08-03", "2026-08-03", "Customer on-site to observe CE/CI testing.")
+    _seed_staff_absence(db, "TECH-102", d(3), d(5), "Planned time off")
+    _seed_customer_visit(db, "ORD-2026-003", d(2), d(2), "Customer on-site to observe CE/CI testing.")
 
     _seed_eut(db, "ORD-2026-002", "Prototype Unit A", "SN-88213-004")
     _seed_eut(db, "ORD-2026-002", "Prototype Unit B", "SN-88213-005")
@@ -806,20 +834,21 @@ def init_demo_seed() -> None:
     # seeded directly rather than through the app's own conflict-checked routes, to
     # demonstrate the inline conflict flag on the planner's Schedule tab: a schedule
     # can still drift into conflict after the fact (e.g. a test overruns), not just
-    # at the moment a technician schedules it.
+    # at the moment a technician schedules it. Placed a couple of days out (not today),
+    # so the Day/Week/Month scales (Phase 19) each show activity on a different day.
     db.execute("""
         INSERT INTO work_orders
             (work_order_code, ordered_test_id, technician_user_id, status,
              scheduled_date, started_at, completed_at, notes)
         SELECT
             'WO-0005', ot.id, u.id, 'in_progress',
-            '2026-08-03', '2026-08-03 09:00', NULL, 'CE scan running long.'
+            ?, ?, NULL, 'CE scan running long.'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u ON u.username = 'technician2.demo'
         WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'CE'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
-    """)
+    """, (d(2), dt(2, 9, 0)))
 
     db.execute("""
         INSERT INTO work_orders
@@ -827,22 +856,18 @@ def init_demo_seed() -> None:
              scheduled_date, started_at, completed_at, notes)
         SELECT
             'WO-0006', ot.id, u.id, 'in_progress',
-            '2026-08-03', '2026-08-03 09:30', NULL, 'CI setup started before checking the CON chamber was free.'
+            ?, ?, NULL, 'CI setup started before checking the CON chamber was free.'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u ON u.username = 'technician2.demo'
         WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'CI'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
-    """)
+    """, (d(2), dt(2, 9, 30)))
 
     # Phase 15 demo (FR-CON-3, cross-site equipment warning): a shared spectrum analyzer
     # used at TLC in the morning and TLS in the afternoon of the same day, on ORD-2026-003
     # alongside its existing CE/CI hard-conflict demo, so the Schedule tab shows both a
     # blocking conflict and a non-blocking cross-site warning as distinct signals.
-    db.execute(
-        "INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)",
-        ("EQ-030", "Shared Spectrum Analyzer", "equipment", "available"),
-    )
     db.execute("""
         INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
         SELECT o.id, ?, c.id
@@ -873,26 +898,26 @@ def init_demo_seed() -> None:
              scheduled_date, started_at, completed_at, result)
         SELECT
             'WO-0009', ot.id, u.id, 'completed',
-            '2026-08-03', '2026-08-03 09:00', '2026-08-03 10:00', 'pass'
+            ?, ?, ?, 'pass'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u ON u.username = 'technician2.demo'
         WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'Spectrum Sweep'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
-    """)
+    """, (d(2), dt(2, 9, 0), dt(2, 10, 0)))
     db.execute("""
         INSERT INTO work_orders
             (work_order_code, ordered_test_id, technician_user_id, status,
              scheduled_date, started_at, completed_at, result)
         SELECT
             'WO-0010', ot.id, u.id, 'completed',
-            '2026-08-03', '2026-08-03 13:00', '2026-08-03 14:00', 'pass'
+            ?, ?, ?, 'pass'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u ON u.username = 'technician2.demo'
         WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'RE'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
-    """)
+    """, (d(2), dt(2, 13, 0), dt(2, 14, 0)))
 
     db.execute("""
         UPDATE users SET linked_resource_id = (SELECT id FROM resources WHERE code = 'TECH-102')
@@ -929,32 +954,60 @@ def init_demo_seed() -> None:
         ],
     )
 
-    db.execute("INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)", ("ORD-2026-004", "Helios Devices", "Smart Thermostat"))
-    _seed_milestone(db, "ORD-2026-004", "EUT delivery expected", "2026-08-01")
+    _seed_order(db, "ORD-2026-004", "Helios Devices", "Smart Thermostat")
+    _seed_milestone(db, "ORD-2026-004", "EUT delivery expected", d(1))
     _seed_eut(db, "ORD-2026-004", "Rev A", "SN-71100-001")
     _seed_eut(db, "ORD-2026-004", "Rev B", "SN-71100-002")
 
-    # Rev A: bulk-created directly from the template items, mirroring what the planner's
-    # "Apply Template" action produces, so the demo shows an already-applied EUT. Rev B is
-    # left with no activities on purpose, so the same action can be demonstrated live.
+    # Rev A: created via a real template_applications row (not just a bulk copy of the
+    # template's items), so the demo also exercises Phase 18's grouping/drift-detection UI
+    # out of the box - a "🗂️ from template" group ready to be synced or ungrouped. Rev B is
+    # left with no activities on purpose, so "Apply Template" can be demonstrated live too.
+    _seed_apply_template(db, "ORD-2026-004", "Rev A", "Standard EMC Test Sequence")
+
+    # A handful of Rev A's activities get actual work orders, spread across different
+    # weeks of the current month (not clustered on one day), so the Week/Month schedule
+    # scales (Phase 19) both show a realistic spread rather than everything on one bar.
+    for offset, code, test_name in (
+        (-9, "WO-0011", "Kick-off"),
+        (-8, "WO-0012", "Testplan"),
+        (-7, "WO-0013", "EUT delivery"),
+    ):
+        db.execute("""
+            INSERT INTO work_orders
+                (work_order_code, ordered_test_id, technician_user_id, status,
+                 scheduled_date, started_at, completed_at, result)
+            SELECT
+                ?, ot.id, u.id, 'completed', ?, ?, ?, 'pass'
+            FROM ordered_tests ot
+            JOIN customer_orders o ON o.id = ot.order_id
+            JOIN euts e ON e.id = ot.eut_id AND e.name = 'Rev A'
+            JOIN users u ON u.username = 'technician.demo'
+            WHERE o.order_code = 'ORD-2026-004' AND ot.test_name = ?
+              AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+        """, (code, d(offset), dt(offset, 8, 0), dt(offset, 8, 30), test_name))
+
+    # A "planned" work order a couple of weeks out, so Month view (and "Next week" from
+    # Week view) has something to show beyond the current week too.
     db.execute("""
-        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id, sequence)
-        SELECT o.id, e.id, ati.activity_name, ati.required_capability_id, ati.step_number
-        FROM activity_templates at
-        JOIN activity_template_items ati ON ati.template_id = at.id
-        JOIN customer_orders o ON o.order_code = 'ORD-2026-004'
-        JOIN euts e ON e.order_id = o.id AND e.name = 'Rev A'
-        WHERE at.name = 'Standard EMC Test Sequence'
-          AND NOT EXISTS (SELECT 1 FROM ordered_tests ot2 WHERE ot2.order_id = o.id AND ot2.eut_id = e.id)
-    """)
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status, scheduled_date)
+        SELECT 'WO-0014', ot.id, u.id, 'planned', ?
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN euts e ON e.id = ot.eut_id AND e.name = 'Rev A'
+        JOIN users u ON u.username = 'technician.demo'
+        WHERE o.order_code = 'ORD-2026-004' AND ot.test_name = 'RI'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """, (d(16),))
 
     # Phase 14 demo: "Report writing" depends on "CE" being completed first (the
     # customer's own literal rule), and CE carries a planned window already in the
-    # past (relative to the seeded "today") with no work order yet, so the demo shows
-    # both a blocked activity and the dashboard's overdue flag together.
+    # past with no work order yet, so the demo shows both a blocked activity and the
+    # dashboard's overdue flag together.
     db.execute("""
         UPDATE ordered_tests
-        SET planned_start_date = '2026-07-20', planned_end_date = '2026-07-24'
+        SET planned_start_date = ?, planned_end_date = ?
         WHERE planned_start_date IS NULL
           AND id = (
               SELECT ot.id FROM ordered_tests ot
@@ -962,7 +1015,7 @@ def init_demo_seed() -> None:
               JOIN euts e ON e.id = ot.eut_id
               WHERE o.order_code = 'ORD-2026-004' AND e.name = 'Rev A' AND ot.test_name = 'CE'
           )
-    """)
+    """, (d(-12), d(-9)))
     db.execute("""
         INSERT INTO activity_dependencies (ordered_test_id, depends_on_ordered_test_id)
         SELECT report.id, ce.id
@@ -1080,7 +1133,7 @@ def init_demo_seed() -> None:
              scheduled_date, started_at, completed_at, result, notes)
         SELECT
             'WO-0001', ot.id, u.id, p.id, 'completed',
-            '2026-07-20', '2026-07-20 09:00', '2026-07-20 11:30', 'pass',
+            ?, ?, ?, 'pass',
             'Unit passed the random vibration profile per Test Method 514.7. No anomalies observed on functional monitoring; no visible damage on post-test inspection.'
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
@@ -1089,7 +1142,25 @@ def init_demo_seed() -> None:
         JOIN test_procedures p ON p.title = 'Random Vibration Test Procedure (Test Method 514.7)'
         WHERE o.order_code = 'ORD-2026-002' AND ot.test_name = 'Vibration Test'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
-    """)
+    """, (d(-6), dt(-6, 9, 0), dt(-6, 11, 30)))
+
+    # Humidity Test (same EUT) is left running today - no completion yet - so the Day
+    # schedule scale (Phase 19) always has something visible on "today" regardless of
+    # when the app is opened, alongside the historical Vibration Test above.
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, notes)
+        SELECT
+            'WO-0002', ot.id, u.id, 'in_progress', ?, ?,
+            '96-hour soak in progress.'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN euts e ON e.id = ot.eut_id AND e.name = 'Prototype Unit A'
+        JOIN users u ON u.username = 'technician.demo'
+        WHERE o.order_code = 'ORD-2026-002' AND ot.test_name = 'Humidity Test'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """, (d(0), dt(0, 8, 0)))
 
     db.execute("""
         INSERT INTO test_reports
@@ -1098,22 +1169,22 @@ def init_demo_seed() -> None:
              reviewer_user_id, reviewer_decision, reviewer_comment, reviewer_signed_at, created_at)
         SELECT
             'RPT-0001', wo.id, wo.ordered_test_id, wo.procedure_id, o.product_name, 'SN-88213-004',
-            wo.technician_user_id, 'approved', '2026-07-20 11:25', 'pass',
+            wo.technician_user_id, 'approved', ?, 'pass',
             'Unit passed the random vibration profile per Test Method 514.7. No anomalies observed.',
-            u2.id, 'approved', 'Reviewed traces and photos, agree with pass result.', '2026-07-20 15:40', '2026-07-20 09:00'
+            u2.id, 'approved', 'Reviewed traces and photos, agree with pass result.', ?, ?
         FROM work_orders wo
         JOIN ordered_tests ot ON ot.id = wo.ordered_test_id
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u2 ON u2.username = 'technician2.demo'
         WHERE wo.work_order_code = 'WO-0001'
           AND NOT EXISTS (SELECT 1 FROM test_reports tr WHERE tr.work_order_id = wo.id)
-    """)
+    """, (dt(-6, 11, 25), dt(-6, 15, 40), dt(-6, 9, 0)))
 
-    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-19 14:00", "planner.demo", "resource_assigned", "Resource EQ-020 (Vibration Tester V-9) assigned.")
-    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-19 14:01", "planner.demo", "resource_assigned", "Resource TECH-102 (Maya Jensen) assigned.")
-    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 09:00", "technician.demo", "work_order_created", "Work order WO-0001 created.")
-    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 09:00", "technician.demo", "work_order_started", "Work order WO-0001 started.")
-    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", "2026-07-20 11:30", "technician.demo", "work_order_completed", "Work order WO-0001 completed with result: pass.", reason="No anomalies observed on functional monitoring; no visible damage on post-test inspection.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", dt(-7, 14, 0), "planner.demo", "resource_assigned", "Resource EQ-020 (Vibration Tester V-9) assigned.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", dt(-7, 14, 1), "planner.demo", "resource_assigned", "Resource TECH-102 (Maya Jensen) assigned.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", dt(-6, 9, 0), "technician.demo", "work_order_created", "Work order WO-0001 created.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", dt(-6, 9, 0), "technician.demo", "work_order_started", "Work order WO-0001 started.")
+    _seed_history_entry(db, "ORD-2026-002", "Vibration Test", "Prototype Unit A", dt(-6, 11, 30), "technician.demo", "work_order_completed", "Work order WO-0001 completed with result: pass.", reason="No anomalies observed on functional monitoring; no visible damage on post-test inspection.")
 
     db.execute("""
         INSERT INTO report_steps (report_id, step_number, description, expected_value, actual_value, result)
@@ -1308,3 +1379,76 @@ def _seed_allocation(
         """,
         (resource_code, order_code, test_name, eut_name, eut_name),
     )
+
+
+def _seed_customer(
+    db: sqlite3.Connection,
+    name: str,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    contact_phone: str | None = None,
+    address: str | None = None,
+) -> None:
+    db.execute(
+        """
+        INSERT OR IGNORE INTO customers (name, contact_name, contact_email, contact_phone, address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (name, contact_name, contact_email, contact_phone, address, datetime.now().strftime("%Y-%m-%d %H:%M")),
+    )
+
+
+def _seed_order(db: sqlite3.Connection, order_code: str, customer_name: str, product_name: str) -> None:
+    db.execute(
+        """
+        INSERT OR IGNORE INTO customer_orders (order_code, customer_name, product_name, customer_id)
+        VALUES (?, ?, ?, (SELECT id FROM customers WHERE name = ?))
+        """,
+        (order_code, customer_name, product_name, customer_name),
+    )
+
+
+def _seed_apply_template(db: sqlite3.Connection, order_code: str, eut_name: str, template_name: str) -> None:
+    """Bulk-create an EUT's activities from a template through a real template_applications
+    row (not just a plain copy of the template's items), mirroring exactly what the
+    planner's own "Apply Template" action does - so the seeded demo also shows a real
+    Phase 18 template group (syncable/ungroupable/deletable) out of the box."""
+    order = db.execute("SELECT id FROM customer_orders WHERE order_code = ?", (order_code,)).fetchone()
+    eut = db.execute("SELECT id FROM euts WHERE order_id = ? AND name = ?", (order["id"], eut_name)).fetchone()
+    template = db.execute(
+        "SELECT id, name, version FROM activity_templates WHERE name = ?", (template_name,)
+    ).fetchone()
+    if order is None or eut is None or template is None:
+        return
+    if db.execute(
+        "SELECT 1 FROM template_applications WHERE order_id = ? AND eut_id = ?", (order["id"], eut["id"])
+    ).fetchone():
+        return
+    if db.execute("SELECT 1 FROM ordered_tests WHERE eut_id = ?", (eut["id"],)).fetchone():
+        return  # EUT already has activities (e.g. from an older, pre-Phase-18 seed) - don't double them up
+    items = db.execute(
+        "SELECT activity_name, required_capability_id FROM activity_template_items WHERE template_id = ? ORDER BY step_number",
+        (template["id"],),
+    ).fetchall()
+    if not items:
+        return
+    cur = db.execute(
+        """
+        INSERT INTO template_applications (template_id, template_name, order_id, eut_id, applied_at, applied_template_version)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            template["id"], template["name"], order["id"], eut["id"],
+            datetime.now().strftime("%Y-%m-%d %H:%M"), template["version"],
+        ),
+    )
+    application_id = cur.lastrowid
+    for step_number, item in enumerate(items, start=1):
+        db.execute(
+            """
+            INSERT INTO ordered_tests
+                (order_id, eut_id, test_name, required_capability_id, sequence, template_application_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (order["id"], eut["id"], item["activity_name"], item["required_capability_id"], step_number, application_id),
+        )
