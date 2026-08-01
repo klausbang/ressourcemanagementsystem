@@ -530,6 +530,7 @@ table.gantt-table th, table.gantt-table td { padding: 4px; text-align: center; }
 .gantt-bar.status-on_hold { background: var(--color-warning); }
 .gantt-bar.status-completed { background: var(--color-success); }
 .gantt-bar.gantt-conflict { outline: 2px solid var(--color-danger); outline-offset: -2px; }
+.gantt-bar.gantt-cross-site { outline: 2px dashed var(--color-warning); outline-offset: -2px; }
 
 .legend-swatch.status-planned { background: var(--color-text-faint); }
 .legend-swatch.status-in_progress { background: var(--color-info); }

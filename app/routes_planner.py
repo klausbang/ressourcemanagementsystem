@@ -6,7 +6,12 @@ from flask import Blueprint, flash, redirect, request, session, url_for
 from . import history
 from .db import get_db, init_db
 from .routes_common import render_ui, require_role
-from .scheduling import find_all_running_conflicts, would_create_dependency_cycle
+from .scheduling import (
+    find_all_running_conflicts,
+    find_planned_facility_overlaps,
+    find_reschedule_suggestions,
+    would_create_dependency_cycle,
+)
 from .table_utils import rows_with_meta
 
 bp = Blueprint("planner", __name__, url_prefix="/planner")
@@ -90,7 +95,7 @@ def _load_schedule_context(db) -> dict:
 
     allocation_rows = db.execute(
         """
-        SELECT a.ordered_test_id, r.id AS resource_id, r.code, r.name, r.resource_type
+        SELECT a.ordered_test_id, r.id AS resource_id, r.code, r.name, r.resource_type, r.site
         FROM allocations a
         JOIN resources r ON r.id = a.resource_id
         ORDER BY a.ordered_test_id, r.code
@@ -99,6 +104,12 @@ def _load_schedule_context(db) -> dict:
     resources_by_test: dict[int, list] = {}
     for row in allocation_rows:
         resources_by_test.setdefault(row["ordered_test_id"], []).append(dict(row))
+
+    def _activity_site(resources: list) -> str | None:
+        for r in resources:
+            if r["resource_type"] == "facility" and r["site"]:
+                return r["site"]
+        return None
 
     groups_by_resource: dict[int, set] = {}
     for row in db.execute("SELECT group_id, resource_id FROM exclusion_group_resources").fetchall():
@@ -117,6 +128,7 @@ def _load_schedule_context(db) -> dict:
     for row in raw:
         item = dict(row)
         item["assigned_resources"] = resources_by_test.get(item["ordered_test_id"], [])
+        item["activity_site"] = _activity_site(item["assigned_resources"])
 
         if not item["work_order_id"]:
             unscheduled.append(item)
@@ -180,6 +192,30 @@ def _load_schedule_context(db) -> dict:
             if a["_bar_start"] < b["_bar_end"] and b["_bar_start"] < a["_bar_end"]:
                 conflicts.append(b)
         a["conflicts_with"] = conflicts
+
+    # Flag cross-site equipment use (Phase 15, FR-CON-3): the same shared equipment
+    # resource used by two different activities visible today whose facility puts them
+    # at different sites, with no transit time modeled between them. This only warns
+    # (doesn't block) and is skipped when the pair is already flagged as a hard
+    # resource conflict above, since same-equipment + overlapping time is already
+    # covered there - this is about the non-overlapping, back-to-back case instead.
+    for a in visible_rows:
+        if not a["activity_site"]:
+            continue
+        a_equipment_ids = {r["resource_id"] for r in a["assigned_resources"] if r["resource_type"] == "equipment"}
+        if not a_equipment_ids:
+            a["cross_site_with"] = []
+            continue
+        cross_site = []
+        for b in visible_rows:
+            if b["ordered_test_id"] == a["ordered_test_id"] or b in a["conflicts_with"]:
+                continue
+            if not b["activity_site"] or b["activity_site"] == a["activity_site"]:
+                continue
+            b_equipment_ids = {r["resource_id"] for r in b["assigned_resources"] if r["resource_type"] == "equipment"}
+            if a_equipment_ids & b_equipment_ids:
+                cross_site.append(b)
+        a["cross_site_with"] = cross_site
 
     view_day_iso = view_day.isoformat()
     absences_today = [
@@ -1022,6 +1058,11 @@ def _load_dashboard_context(db) -> dict:
         conflicted_order_ids.add(a["order_id"])
         conflicted_order_ids.add(b["order_id"])
 
+    planned_overlaps_by_order: dict[int, list] = {}
+    for a, b in find_planned_facility_overlaps(db):
+        planned_overlaps_by_order.setdefault(a["order_id"], []).append(b)
+        planned_overlaps_by_order.setdefault(b["order_id"], []).append(a)
+
     milestone_rows = db.execute(
         """
         SELECT m.id, m.order_id, m.title, m.target_date, m.notes, o.order_code
@@ -1112,6 +1153,8 @@ def _load_dashboard_context(db) -> dict:
         proj["total_activities"] = total
         proj["has_conflict"] = order_id in conflicted_order_ids
         proj["has_overdue"] = proj["overdue_count"] > 0
+        proj["planned_overlaps"] = planned_overlaps_by_order.get(order_id, [])
+        proj["has_planned_overlap"] = bool(proj["planned_overlaps"])
         proj["milestones"] = milestones_by_order.get(order_id, [])
         proj["visits"] = visits_by_order.get(order_id, [])
         result_projects.append(proj)
@@ -1124,6 +1167,7 @@ def _load_dashboard_context(db) -> dict:
         "active_projects": active_projects,
         "completed_projects": completed_projects,
         "upcoming_absences": upcoming_absences,
+        "reschedule_suggestions": find_reschedule_suggestions(db),
     }
 
 
@@ -1196,6 +1240,59 @@ def dashboard():
             db.execute("DELETE FROM customer_visits WHERE id = ?", (visit_id,))
             db.commit()
             flash("Customer visit deleted.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "accept_reschedule_suggestion":
+            dependency_id = request.form.get("dependency_id", "").strip()
+            new_start = request.form.get("suggested_planned_start", "").strip()
+            new_end = request.form.get("suggested_planned_end", "").strip()
+            dep = db.execute(
+                "SELECT ordered_test_id, depends_on_ordered_test_id FROM activity_dependencies WHERE id = ?",
+                (dependency_id,),
+            ).fetchone()
+            if not (dep and new_start and new_end):
+                flash("Cannot apply that suggestion.", "error")
+            else:
+                db.execute(
+                    "UPDATE ordered_tests SET planned_start_date = ?, planned_end_date = ? WHERE id = ?",
+                    (new_start, new_end, dep["ordered_test_id"]),
+                )
+                # The prerequisite's delay is a fixed fact once suggested; without this,
+                # the same delay would immediately generate a fresh suggestion shifting
+                # the just-applied dates again, since the pair would still qualify.
+                db.execute(
+                    """
+                    INSERT OR IGNORE INTO reschedule_dismissals
+                        (ordered_test_id, depends_on_ordered_test_id, dismissed_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (dep["ordered_test_id"], dep["depends_on_ordered_test_id"], datetime.now().strftime("%Y-%m-%d %H:%M")),
+                )
+                history.record(
+                    db, dep["ordered_test_id"], session.get("user_id"), session.get("username"),
+                    "planned_dates_changed",
+                    f"Planned dates shifted to {new_start} - {new_end} (accepted reschedule suggestion).",
+                )
+                db.commit()
+                flash("Reschedule suggestion applied.", "info")
+            return redirect(url_for("planner.dashboard"))
+
+        if action == "ignore_reschedule_suggestion":
+            dependency_id = request.form.get("dependency_id", "").strip()
+            dep = db.execute(
+                "SELECT ordered_test_id, depends_on_ordered_test_id FROM activity_dependencies WHERE id = ?",
+                (dependency_id,),
+            ).fetchone()
+            if dep and not db.execute(
+                "SELECT 1 FROM reschedule_dismissals WHERE ordered_test_id = ? AND depends_on_ordered_test_id = ?",
+                (dep["ordered_test_id"], dep["depends_on_ordered_test_id"]),
+            ).fetchone():
+                db.execute(
+                    "INSERT INTO reschedule_dismissals (ordered_test_id, depends_on_ordered_test_id, dismissed_at) VALUES (?, ?, ?)",
+                    (dep["ordered_test_id"], dep["depends_on_ordered_test_id"], datetime.now().strftime("%Y-%m-%d %H:%M")),
+                )
+                db.commit()
+            flash("Suggestion dismissed.", "info")
             return redirect(url_for("planner.dashboard"))
 
     context = _load_dashboard_context(db)

@@ -34,3 +34,5 @@ erDiagram
     users ||--o{ activity_history : "acted"
     ordered_tests ||--o{ activity_dependencies : "depends on"
     ordered_tests ||--o{ activity_dependencies : "blocks"
+    ordered_tests ||--o{ reschedule_dismissals : "suggestion for"
+    ordered_tests ||--o{ reschedule_dismissals : "cause of"

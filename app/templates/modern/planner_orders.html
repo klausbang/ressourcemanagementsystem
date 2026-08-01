@@ -515,6 +515,7 @@
         <span class="legend-item"><span class="legend-swatch status-on_hold"></span>On hold</span>
         <span class="legend-item"><span class="legend-swatch status-completed"></span>Completed</span>
         <span class="legend-item">🚫 Conflict &mdash; overlaps another activity sharing a facility/exclusion group</span>
+        <span class="legend-item">🔀 Cross-site &mdash; shares a piece of equipment with an activity at a different site, with no transit time modeled between them</span>
       </div>
 
       {% if schedule_rows %}
@@ -539,13 +540,16 @@
                   {% if item.conflicts_with %}
                   <span title="Conflicts with: {% for c in item.conflicts_with %}{{ c.work_order_code }} ({{ c.order_code }} / {{ c.test_name }}){% if not loop.last %}, {% endif %}{% endfor %}">🚫</span>
                   {% endif %}
+                  {% if item.cross_site_with %}
+                  <span title="Shares equipment with an activity at a different site: {% for c in item.cross_site_with %}{{ c.work_order_code }} ({{ c.order_code }} / {{ c.test_name }}, {{ c.activity_site }}){% if not loop.last %}, {% endif %}{% endfor %}">🔀</span>
+                  {% endif %}
                 </div>
                 <div class="test-card-meta">{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}</div>
               </td>
               {% for i in range(item.col_offset) %}<td></td>{% endfor %}
-              <td colspan="{{ item.col_span }}" class="gantt-bar status-{{ item.wo_status }} {{ 'gantt-conflict' if item.conflicts_with }}"
-                  title="{{ item.work_order_code }} - {{ item.wo_status }}{% if item.result %} ({{ item.result }}){% endif %}{% if item.conflicts_with %} &mdash; CONFLICT with {% for c in item.conflicts_with %}{{ c.work_order_code }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}">
-                {{ item.work_order_code }}{% if item.clipped_before %} &laquo;{% endif %}{% if item.clipped_after %} &raquo;{% endif %}{% if item.conflicts_with %} 🚫{% endif %}
+              <td colspan="{{ item.col_span }}" class="gantt-bar status-{{ item.wo_status }} {{ 'gantt-conflict' if item.conflicts_with }} {{ 'gantt-cross-site' if item.cross_site_with and not item.conflicts_with }}"
+                  title="{{ item.work_order_code }} - {{ item.wo_status }}{% if item.result %} ({{ item.result }}){% endif %}{% if item.conflicts_with %} &mdash; CONFLICT with {% for c in item.conflicts_with %}{{ c.work_order_code }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}{% if item.cross_site_with %} &mdash; CROSS-SITE with {% for c in item.cross_site_with %}{{ c.work_order_code }} ({{ c.activity_site }}){% if not loop.last %}, {% endif %}{% endfor %}{% endif %}">
+                {{ item.work_order_code }}{% if item.clipped_before %} &laquo;{% endif %}{% if item.clipped_after %} &raquo;{% endif %}{% if item.conflicts_with %} 🚫{% endif %}{% if item.cross_site_with %} 🔀{% endif %}
               </td>
               {% for i in range(window_slot_count - item.col_offset - item.col_span) %}<td></td>{% endfor %}
             </tr>

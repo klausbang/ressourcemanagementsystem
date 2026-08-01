@@ -81,7 +81,7 @@
     letter-spacing: 0.08em;
     color: var(--primary-dark);
     font-weight: 800;
-    margin: 11px 0 6px;
+    margin: 7px 0 5px;
     border-bottom: 1px solid var(--line);
     padding-bottom: 3px;
   }
@@ -97,27 +97,27 @@
   .feature-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 7px;
+    gap: 5px;
     margin-bottom: 2px;
   }
   .feature {
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 6px 9px;
+    border-radius: 7px;
+    padding: 5px 8px;
     background: var(--bg-soft);
   }
-  .feature .f-icon { font-size: 0.95rem; }
+  .feature .f-icon { font-size: 0.88rem; }
   .feature h3 {
-    font-size: 0.78rem;
-    margin: 2px 0 2px;
+    font-size: 0.73rem;
+    margin: 1px 0 1px;
     font-weight: 700;
     color: var(--ink);
   }
   .feature p {
-    font-size: 0.68rem;
+    font-size: 0.63rem;
     color: var(--muted);
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.25;
   }
 
   /* Workflow strip */
@@ -226,7 +226,7 @@
     <div class="hero-tagline">From customer order<br>to approved test report,<br>in one system.</div>
   </div>
 
-  <p class="lede">RMS is a lightweight, web-based system for test labs and service providers: it tracks every resource you test with — equipment, facilities, procedures, and technicians — and carries a customer's order all the way through planning, execution, and a reviewed, printable test report.</p>
+  <p class="lede">RMS is a lightweight, web-based system for test labs and service providers: it tracks every resource you test with — equipment, facilities, procedures, and technicians — and carries a customer's order all the way through dependency-aware planning, execution, and a reviewed, printable test report, with status, conflicts, and delays always generated from the data, never re-typed.</p>
 
   <h2 class="section-title">What RMS Does</h2>
   <div class="feature-grid">
@@ -237,13 +237,33 @@
     </div>
     <div class="feature">
       <div class="f-icon">🧾</div>
-      <h3>Customer Orders &amp; Ordered Tests</h3>
-      <p>Capture each customer order and the specific tests requested under it, with the capability each test requires.</p>
+      <h3>Orders, EUTs &amp; Test Plans</h3>
+      <p>Capture each customer order, its unit(s) under test, and the specific tests requested, with the capability each test requires.</p>
     </div>
     <div class="feature">
       <div class="f-icon">🔧</div>
       <h3>Multi-Resource Allocation</h3>
       <p>Assign equipment, facility, and technician together to one test — only capability-matched resources are offered.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon">🔗</div>
+      <h3>Enforced Activity Dependencies</h3>
+      <p>Declare that a test depends on others (e.g. a report can't start before its tests finish) — work can't be started out of order.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon">🚫</div>
+      <h3>Conflict &amp; Cross-Site Detection</h3>
+      <p>Shared labs and equipment are automatically checked for double-booking, including equipment moving between sites.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon">🔄</div>
+      <h3>Planned Dates &amp; Assisted Rescheduling</h3>
+      <p>Plan target windows per activity; overdue work is flagged automatically, and a late prerequisite suggests a downstream reschedule.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon">📊</div>
+      <h3>Live Project Dashboard</h3>
+      <p>Every project's status, per-discipline progress, milestones, and conflicts are generated from the underlying activities — never typed twice.</p>
     </div>
     <div class="feature">
       <div class="f-icon">🧰</div>
@@ -257,23 +277,18 @@
     </div>
     <div class="feature">
       <div class="f-icon">📄</div>
-      <h3>Digital Test Reports</h3>
-      <p>Auto-generated, fillable report per work order — actual values, pass/fail, unit serial number, notes — signed and reviewed.</p>
+      <h3>Digital, Print-Ready Test Reports</h3>
+      <p>Auto-generated per work order, reviewed and signed off by a second technician or planner, and printable as a clean A4 page.</p>
     </div>
     <div class="feature">
-      <div class="f-icon">✅</div>
-      <h3>Review &amp; Approval</h3>
-      <p>A second technician or a planner approves or rejects every report before it's final — full accountability, no self-sign-off.</p>
+      <div class="f-icon">🗓️</div>
+      <h3>Staff &amp; Customer Calendar</h3>
+      <p>Technician absences and customer on-site visits are tracked and surfaced right on the schedule and dashboard.</p>
     </div>
     <div class="feature">
-      <div class="f-icon">🖨️</div>
-      <h3>Print-Ready A4 Reports</h3>
-      <p>Every report doubles as a clean A4 page — printable blank during the test, or complete and signed afterward.</p>
-    </div>
-    <div class="feature">
-      <div class="f-icon">🖥️</div>
-      <h3>Two Interfaces, One System</h3>
-      <p>A plain zero-dependency view and a modern styled view render the exact same data — switch anytime.</p>
+      <div class="f-icon">🕘</div>
+      <h3>Full Change History</h3>
+      <p>Every schedule-affecting change to a test activity is logged automatically — who, when, what, and why.</p>
     </div>
   </div>
 
@@ -322,8 +337,10 @@
       <h2 class="section-title">Why Teams Choose RMS</h2>
       <ul class="checklist">
         <li>One record per order — no spreadsheets, no email threads to reconstruct what was tested.</li>
+        <li>Status, delays, and conflicts are generated from the data — never a second, driftable copy.</li>
+        <li>Work can't start out of order — dependencies and shared-resource conflicts are enforced, not just documented.</li>
         <li>Nothing gets assigned without the right capability — validated automatically.</li>
-        <li>Every test report carries an audit trail: who tested it, who reviewed it, when.</li>
+        <li>Every test report and every schedule change carries an audit trail: who, what, when.</li>
         <li>Referential integrity is enforced — you can't silently orphan a report or an order.</li>
         <li>Runs locally today; the same design migrates cleanly to cloud hosting tomorrow.</li>
       </ul>

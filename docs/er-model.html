@@ -72,6 +72,8 @@ erDiagram
     users ||--o{ activity_history : "acted"
     ordered_tests ||--o{ activity_dependencies : "depends on"
     ordered_tests ||--o{ activity_dependencies : "blocks"
+    ordered_tests ||--o{ reschedule_dismissals : "suggestion for"
+    ordered_tests ||--o{ reschedule_dismissals : "cause of"
         </pre>
       </div>
       <p>Source: <a href="er-diagram-simple.mmd">er-diagram-simple.mmd</a>. A static image can still be regenerated (e.g. for offline printing) with:</p>
@@ -119,6 +121,8 @@ erDiagram
     users ||--o{ activity_history : "user_id"
     ordered_tests ||--o{ activity_dependencies : "ordered_test_id"
     ordered_tests ||--o{ activity_dependencies : "depends_on_ordered_test_id"
+    ordered_tests ||--o{ reschedule_dismissals : "ordered_test_id"
+    ordered_tests ||--o{ reschedule_dismissals : "depends_on_ordered_test_id"
 
     users {
         int id PK
@@ -226,6 +230,13 @@ erDiagram
         int id PK
         int ordered_test_id FK "the activity that has a prerequisite"
         int depends_on_ordered_test_id FK "the prerequisite activity; also FK -> ordered_tests.id"
+    }
+
+    reschedule_dismissals {
+        int id PK
+        int ordered_test_id FK "the dependent activity"
+        int depends_on_ordered_test_id FK "the prerequisite activity; also FK -> ordered_tests.id"
+        string dismissed_at
     }
 
     activity_templates {
@@ -457,7 +468,8 @@ erDiagram
       staff_absences: "A technician's vacation/absence date range.",
       customer_visits: "A customer's on-site date range for a project.",
       activity_history: "An append-only log of who changed a test activity, when, and why.",
-      activity_dependencies: "Which test activities must finish before another one can start."
+      activity_dependencies: "Which test activities must finish before another one can start.",
+      reschedule_dismissals: "A reschedule suggestion the planner accepted or ignored, so it isn't repeated."
     };
 
     var RELATIONSHIP_TOOLTIPS = {
@@ -486,6 +498,8 @@ erDiagram
       "acted": "The user who performed the logged change.",
       "depends on": "This activity requires another activity to finish first.",
       "blocks": "This activity must finish before a dependent one can start.",
+      "suggestion for": "A reschedule suggestion computed for this (dependent) activity.",
+      "cause of": "The late prerequisite that triggered a reschedule suggestion.",
       "planner_user_id": "Foreign key: which planner user assigned this resource.",
       "resource_id": "Foreign key: references resources.id (see Section 6 for cascade rules).",
       "ordered_test_id": "Foreign key: references ordered_tests.id (see Section 6 for cascade rules).",

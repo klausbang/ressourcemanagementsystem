@@ -119,6 +119,16 @@ CREATE TABLE IF NOT EXISTS activity_dependencies (
     UNIQUE (ordered_test_id, depends_on_ordered_test_id)
 );
 
+CREATE TABLE IF NOT EXISTS reschedule_dismissals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ordered_test_id INTEGER NOT NULL,
+    depends_on_ordered_test_id INTEGER NOT NULL,
+    dismissed_at TEXT NOT NULL,
+    FOREIGN KEY (ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (depends_on_ordered_test_id) REFERENCES ordered_tests(id) ON DELETE CASCADE,
+    UNIQUE (ordered_test_id, depends_on_ordered_test_id)
+);
+
 CREATE TABLE IF NOT EXISTS activity_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ordered_test_id INTEGER NOT NULL,
@@ -741,6 +751,65 @@ def init_demo_seed() -> None:
         JOIN customer_orders o ON o.id = ot.order_id
         JOIN users u ON u.username = 'technician2.demo'
         WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'CI'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """)
+
+    # Phase 15 demo (FR-CON-3, cross-site equipment warning): a shared spectrum analyzer
+    # used at TLC in the morning and TLS in the afternoon of the same day, on ORD-2026-003
+    # alongside its existing CE/CI hard-conflict demo, so the Schedule tab shows both a
+    # blocking conflict and a non-blocking cross-site warning as distinct signals.
+    db.execute(
+        "INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)",
+        ("EQ-030", "Shared Spectrum Analyzer", "equipment", "available"),
+    )
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, test_name, required_capability_id)
+        SELECT o.id, ?, c.id
+        FROM customer_orders o
+        JOIN capabilities c ON c.name = ?
+        WHERE o.order_code = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM ordered_tests ot
+              WHERE ot.order_id = o.id AND ot.test_name = ? AND ot.required_capability_id = c.id
+          )
+    """, ("RE", "RE", "ORD-2026-003", "RE"))
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, test_name)
+        SELECT o.id, ?
+        FROM customer_orders o
+        WHERE o.order_code = ?
+          AND NOT EXISTS (SELECT 1 FROM ordered_tests ot WHERE ot.order_id = o.id AND ot.test_name = ?)
+    """, ("Spectrum Sweep", "ORD-2026-003", "Spectrum Sweep"))
+
+    _seed_allocation(db, "ORD-2026-003", "RE", "FAC-012")
+    _seed_allocation(db, "ORD-2026-003", "RE", "EQ-030")
+    _seed_allocation(db, "ORD-2026-003", "Spectrum Sweep", "FAC-010")
+    _seed_allocation(db, "ORD-2026-003", "Spectrum Sweep", "EQ-030")
+
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, result)
+        SELECT
+            'WO-0009', ot.id, u.id, 'completed',
+            '2026-08-03', '2026-08-03 09:00', '2026-08-03 10:00', 'pass'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'technician2.demo'
+        WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'Spectrum Sweep'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """)
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, result)
+        SELECT
+            'WO-0010', ot.id, u.id, 'completed',
+            '2026-08-03', '2026-08-03 13:00', '2026-08-03 14:00', 'pass'
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'technician2.demo'
+        WHERE o.order_code = 'ORD-2026-003' AND ot.test_name = 'RE'
           AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
     """)
 

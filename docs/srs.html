@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v4</title>
+  <title>RMS SRS v5</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v4</h1>
-    <p>Version: 0.4 | Date: 2026-08-01</p>
+    <h1>Resource Management System (RMS) - SRS v5</h1>
+    <p>Version: 0.5 | Date: 2026-08-01</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -21,7 +21,8 @@
         <li><strong>v0.1 (Phase 3-4):</strong> resource/capability setup and customer order/resource allocation.</li>
         <li><strong>v0.2 (Phase 7):</strong> Test Technician role, work orders, test procedures, and test reports with review/approval.</li>
         <li><strong>v0.3 (Phase 8-13):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
-        <li><strong>v0.4 (Phase 14, this revision):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
+        <li><strong>v0.4 (Phase 14):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
+        <li><strong>v0.5 (Phase 15, this revision):</strong> delivered the stretch goal renumbered above &mdash; FR-CON-3 (cross-site equipment warning), FR-CON-4 (planned-date facility overlap warning), and FR-RSC-2 (reschedule suggestions from a late prerequisite) are now all Delivered rather than Planned/stretch, building directly on Phase 14's dependency and planned-date data.</li>
       </ul>
     </section>
 
@@ -139,8 +140,10 @@ Project (customer_orders)
       <ul>
         <li><strong>FR-CON-1</strong> [Must, Delivered - Phase 9]: The system shall let an administrator define mutual-exclusion groups of facility resources (e.g. "CON chamber: CE/CI" and "SAC chamber: RE/RI") such that two activities in the same group are treated as sharing one physical resource for conflict purposes.</li>
         <li><strong>FR-CON-2</strong> [Must, Delivered - Phase 9]: The system shall block starting or resuming a work order if doing so would run it at the same time as another work order that is already in progress and shares a resource or exclusion group with it, and shall explain which work order/activity it conflicts with.</li>
-        <li><strong>FR-CON-3</strong> [Should, Planned - Phase 15]: The system shall warn (not necessarily block) when a shared piece of equipment is booked at both sites (TLC and TLS) in overlapping windows, since moving it between sites also takes time not currently modeled.</li>
-        <li><strong>FR-CON-4</strong> [Could, Planned - Phase 15]: The system shall let a facility reservation span multiple consecutive days (e.g. a multi-day climate-chamber soak) as a single booking rather than one row per day.</li>
+        <li><strong>FR-CON-3</strong> [Should, Delivered - Phase 15]: The Schedule view shall warn (not block) when the same shared equipment is used by two activities visible on the same day whose facilities put them at different sites, since moving equipment between sites also takes time not currently modeled.</li>
+        <li><strong>FR-CON-4</strong> [Could, Delivered - Phase 15]: The system shall let a facility reservation span multiple consecutive days as a single booking rather than one row per day, and shall warn when two such bookings on the same facility (or exclusion group) have overlapping planned windows.</li>
+        <li><strong>Design note (FR-CON-3 scope):</strong> "overlapping windows" is already the existing hard-block/passive-conflict case (8.4), which treats same-equipment as an automatic collision regardless of site; FR-CON-3 is deliberately the complementary, non-overlapping case &mdash; the same equipment used at TLC then TLS (or vice versa) later the <em>same day</em>, with no explicit transit-time buffer modeled (see the matching open question in <a href="ai-questions.html">AI Questions</a>). A pair already flagged as a hard conflict is not also flagged cross-site, to avoid two icons describing what is really one collision.</li>
+        <li><strong>Design note (FR-CON-4 scope):</strong> a work order's actual start/complete timestamps, and (since Phase 14) an activity's planned start/end dates, are already each a single row spanning however many days they need &mdash; there was never a "one row per day" structure to eliminate. What was missing, and is now delivered, is a check that two <em>planned</em> (not yet started) bookings on the same facility/exclusion group don't silently overlap, since the existing conflict checks (8.4) only look at actual/inferred execution time, not the planner's forward-looking planned dates.</li>
         <li><strong>AC-FR-CON-2.1:</strong> Given RE's work order is in_progress in the SAC chamber, when a technician attempts to start or resume RI's work order (a different facility resource in the same "SAC Chamber (TLS)" exclusion group), then the system rejects the action and states which work order/activity it conflicts with.</li>
         <li><strong>Design note (scope of FR-CON-2):</strong> a work order's scheduled_date carries no time-of-day, so the block is applied at the point precision actually exists &mdash; the transition into "in progress" &mdash; rather than at creation-time scheduling, which would only support coarse same-day checks. The planner's Schedule/Gantt view (FR-PLN-3) additionally flags overlaps that arise after the fact (e.g. a test overrunning into the next one's actual start), as a passive check the hard block at start-time can't catch.</li>
       </ul>
@@ -175,7 +178,8 @@ Project (customer_orders)
       <p><strong>BR-005:</strong> When a test overruns, fails, is interrupted, or the customer sends replacement hardware, the remaining plan must be adjustable without manually touching many unrelated fields &mdash; the customer's consultant called this "the core of the system."</p>
       <ul>
         <li><strong>FR-RSC-1</strong> [Must, Delivered - Phase 3/7]: Moving, reassigning, or changing the result of one test activity shall not require manually editing any other activity's stored data (each activity's schedule/resources/result are independent rows, not spreadsheet formulas referencing each other).</li>
-        <li><strong>FR-RSC-2</strong> [Could, Planned - Phase 15]: When an activity is delayed, failed, or its EUT is replaced, the system shall suggest how directly dependent downstream activities (per FR-TP-5 dependencies, now that they're a real, enforced relationship rather than just template ordering) could shift, for the planner to accept or ignore. Full automatic optimization/conflict auto-resolution is explicitly out of scope (Section 11) &mdash; this is assisted rescheduling, not automatic rescheduling.</li>
+        <li><strong>FR-RSC-2</strong> [Could, Delivered - Phase 15]: When a prerequisite activity (per FR-TP-5) finishes late, or is still incomplete past its planned end date, the system shall suggest shifting its dependent activity's planned window by the same number of days, for the planner to accept (applying the shift) or ignore (dismissing the suggestion). Full automatic optimization/conflict auto-resolution is explicitly out of scope (Section 11) &mdash; this is assisted rescheduling, not automatic rescheduling.</li>
+        <li><strong>Design note (FR-RSC-2 scope):</strong> "EUT replaced" is not implemented as a distinct trigger, since replacing an EUT isn't a distinct action anywhere in the system (only an EUT's own name/serial can be edited) &mdash; the delivered scope covers "delayed" (prerequisite still open past its planned end) and "late-finished" (prerequisite completed after its planned end), which are the cases with concrete data behind them. Once a suggestion is accepted or ignored, that specific prerequisite/dependent pair is not re-suggested (a small <code>reschedule_dismissals</code> table records this) &mdash; without it, an already-fixed historical delay would keep generating a fresh shift suggestion on top of the last one, since the prerequisite's lateness doesn't change after the fact.</li>
       </ul>
 
       <h3>8.9 Visualization and Dashboard (FR-VIS)</h3>
@@ -236,6 +240,7 @@ Project (customer_orders)
         <li>From Phase 12 (delivered): staff absences per technician resource (start/end date, optional reason), admin-managed; customer on-site visits per project (start/end date, optional notes), planner-managed.</li>
         <li>From Phase 13 (delivered): an append-only change history per test activity (when, who, a system-generated description of what changed, and an optional why), covering resource assignment/removal, reordering, EUT reassignment, and the work order lifecycle.</li>
         <li>From Phase 14 (delivered): an optional planned start date and planned end date on each test activity; a same-project activity-dependency record (one row per prerequisite, so an activity can have more than one), validated against self-reference and circular chains at creation time.</li>
+        <li>From Phase 15 (delivered): a dismissal record per (dependent activity, prerequisite) pair, so an ignored or already-applied reschedule suggestion is not repeated. No other new stored data &mdash; the cross-site and planned-overlap warnings are computed at read time from data Phase 9/14 already store (a resource's <code>site</code>, and an activity's planned dates).</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -279,7 +284,7 @@ Project (customer_orders)
           <tr><td>12</td><td>Staff/customer calendar</td><td>FR-CAL-1..3</td><td>Delivered</td></tr>
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Delivered</td></tr>
           <tr><td>14</td><td>Activity dependencies and planned dates</td><td>FR-TP-5..6, FR-PLN-4, FR-VIS-4</td><td>Delivered</td></tr>
-          <tr><td>15</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Planned (stretch)</td></tr>
+          <tr><td>15</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Delivered</td></tr>
         </tbody>
       </table>
     </section>
@@ -300,6 +305,9 @@ Project (customer_orders)
         <li>Assumed (Phase 14): a dependency is scoped to within one project (order), not across projects &mdash; no customer example so far crosses that boundary. Revisit if a real cross-project dependency need surfaces.</li>
         <li>Open (Phase 14): the dependency block only fires at the work-order start/resume transition (mirroring FR-CON-2); is a same-day, creation-time warning also wanted, the way it was raised for FR-CON-2 above?</li>
         <li>Open (Phase 14): should an activity template (FR-TP-4) be able to pre-declare its own standard dependencies (e.g. "Report writing" template item always depends on every non-Report item before it), so applying a template also wires up dependencies automatically instead of the planner adding them by hand each time?</li>
+        <li>Partially answered (Phase 15): the cross-site warning (FR-CON-3) uses same-calendar-day as its transit-time proxy (any two activities visible on the same Schedule day, sharing equipment, at different sites) rather than a specific minimum transit/setup duration, since that number is still unconfirmed (see the existing Phase 9 open question above) &mdash; if a real transit time is confirmed later, the same-day check could be tightened to a precise buffer window instead.</li>
+        <li>Open (Phase 15): reschedule suggestions (FR-RSC-2) only trigger from a <em>completed</em> prerequisite that finished late, or an <em>incomplete</em> one already overdue - is a suggestion also wanted the moment a prerequisite's work order is marked <code>on_hold</code> or <code>fail</code>ed, ahead of its planned end date passing?</li>
+        <li>Open (Phase 15): once a reschedule suggestion is accepted or ignored, that exact (dependent, prerequisite) pair is never re-suggested, even if the prerequisite's delay later changes (e.g. it's fixed after being on hold, or a different prerequisite also becomes late). Is a way to reset/re-trigger a dismissed suggestion needed, or is manually editing the planned dates enough?</li>
       </ul>
     </section>
   </main>

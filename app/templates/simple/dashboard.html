@@ -12,11 +12,35 @@
 (manage on the Admin page)</p>
 {% endif %}
 
+{% if reschedule_suggestions %}
+<h3>Reschedule Suggestions</h3>
+<p><em>A prerequisite activity is late; here's how its dependent activity's planned window could shift by the same amount. Assisted, not automatic &mdash; nothing changes until you accept a suggestion.</em></p>
+{% for s in reschedule_suggestions %}
+<fieldset style="margin-bottom:14px;">
+  <legend>{{ s.order_code }} - {{ s.test_name }}</legend>
+  <p>Depends on "{{ s.prerequisite_test_name }}" ({{ s.prerequisite_order_code }}), which is {{ s.delay_days }} day{{ '' if s.delay_days == 1 else 's' }} late.</p>
+  <p>Current plan: {{ s.current_planned_start }} to {{ s.current_planned_end }}. Suggested: {{ s.suggested_planned_start }} to {{ s.suggested_planned_end }}.</p>
+  <form method="post" style="display:inline">
+    <input type="hidden" name="action" value="accept_reschedule_suggestion">
+    <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+    <input type="hidden" name="suggested_planned_start" value="{{ s.suggested_planned_start }}">
+    <input type="hidden" name="suggested_planned_end" value="{{ s.suggested_planned_end }}">
+    <button type="submit">Accept</button>
+  </form>
+  <form method="post" style="display:inline">
+    <input type="hidden" name="action" value="ignore_reschedule_suggestion">
+    <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+    <button type="submit">Ignore</button>
+  </form>
+</fieldset>
+{% endfor %}
+{% endif %}
+
 <h3>Active Projects</h3>
 {% if active_projects %}
 {% for p in active_projects %}
 <fieldset style="margin-bottom:14px;">
-  <legend>{{ p.order_code }} - {{ p.customer_name }} ({{ p.product_name }}) &mdash; <strong>{{ p.display_status }}</strong>{% if p.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}{% if p.has_overdue %} &mdash; <strong>OVERDUE</strong>{% endif %}</legend>
+  <legend>{{ p.order_code }} - {{ p.customer_name }} ({{ p.product_name }}) &mdash; <strong>{{ p.display_status }}</strong>{% if p.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}{% if p.has_overdue %} &mdash; <strong>OVERDUE</strong>{% endif %}{% if p.has_planned_overlap %} &mdash; <strong>PLANNED CLASH</strong>{% endif %}</legend>
 
   <p>
     Disciplines:

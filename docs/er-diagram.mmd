@@ -41,6 +41,8 @@ erDiagram
     users ||--o{ activity_history : "user_id"
     ordered_tests ||--o{ activity_dependencies : "ordered_test_id"
     ordered_tests ||--o{ activity_dependencies : "depends_on_ordered_test_id"
+    ordered_tests ||--o{ reschedule_dismissals : "ordered_test_id"
+    ordered_tests ||--o{ reschedule_dismissals : "depends_on_ordered_test_id"
 
     users {
         int id PK
@@ -148,6 +150,13 @@ erDiagram
         int id PK
         int ordered_test_id FK "the activity that has a prerequisite"
         int depends_on_ordered_test_id FK "the prerequisite activity; also FK -> ordered_tests.id"
+    }
+
+    reschedule_dismissals {
+        int id PK
+        int ordered_test_id FK "the dependent activity"
+        int depends_on_ordered_test_id FK "the prerequisite activity; also FK -> ordered_tests.id"
+        string dismissed_at
     }
 
     activity_templates {

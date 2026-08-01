@@ -24,7 +24,7 @@
     <ul>
       <li><strong>[Medium]</strong> Should an EUT reference ever become mandatory on a test activity, or should it stay optional indefinitely for small single-EUT projects? (SRS FR-TP-2)</li>
       <li><strong>[Medium]</strong> Phase 9 seeded the two mutual-exclusion groups mentioned so far (CON: CE/CI, SAC: RE/RI) &mdash; is this the complete list, and are there equipment-level (not just facility-level) exclusions too? (SRS FR-CON-1)</li>
-      <li><strong>[Medium]</strong> When shared equipment moves between TLC and TLS, is there a known minimum transit/setup time that should block back-to-back bookings at different sites? (SRS FR-CON-3)</li>
+      <li><strong>[Medium]</strong> When shared equipment moves between TLC and TLS, is there a known minimum transit/setup time that should block back-to-back bookings at different sites? Phase 15 delivered a same-calendar-day warning as a coarse stand-in, not a precise buffer &mdash; would a real number let the check be tightened? (SRS FR-CON-3)</li>
       <li><strong>[Low]</strong> Is a spreadsheet/PDF export of a project's activities/results (FR-INT-1) actually needed by any external party, or does reporting stay inside RMS?</li>
       <li><strong>[Medium]</strong> Phase 10 seeded one standard activity template ("Standard EMC Test Sequence") covering the customer's example workflow &mdash; is more than one standard sequence needed (e.g. per product category or site), and should a template record which EUT/product types it applies to? (SRS FR-TP-4)</li>
       <li><strong>[Medium]</strong> Phase 11 seeded three disciplines from existing capabilities (Calibration, Environmental, EMC) plus two name-based fallback buckets ("Report" and "Project Management" for activities with no capability) &mdash; what is the confirmed full discipline list (the customer mentioned EMC, Radio, Safety, Report as seen in Sprint.xls), and should Radio/Safety be added once matching capabilities exist? (SRS FR-VIS-1, FR-STA-2 design note)</li>
@@ -34,6 +34,8 @@
       <li><strong>[Medium]</strong> Phase 14 scoped a dependency to within one project/order &mdash; is a cross-project dependency ever needed in practice? (SRS BR-006, FR-TP-5)</li>
       <li><strong>[Medium]</strong> Should an activity template (Phase 10) be able to pre-declare its own standard dependencies (e.g. "Report writing" always depends on every non-Report item before it in the same template), so applying a template also wires up dependencies automatically? (SRS FR-TP-5)</li>
       <li><strong>[Low]</strong> Phase 14's dependency block only fires at the work order start/resume transition, the same scoping rationale as FR-CON-2 &mdash; is a same-day, creation-time warning also wanted? (SRS FR-TP-5 design note)</li>
+      <li><strong>[Medium]</strong> Phase 15's reschedule suggestions only trigger from a completed-late or currently-overdue prerequisite &mdash; is a suggestion also wanted the moment a prerequisite's work order is put on hold or marked failed, ahead of its planned end date actually passing? (SRS FR-RSC-2)</li>
+      <li><strong>[Low]</strong> Phase 15 never re-suggests a reschedule for a (dependent, prerequisite) pair once accepted or ignored, even if the delay changes later &mdash; is a way to reset a dismissed suggestion needed, or is editing the planned dates by hand enough? (SRS FR-RSC-2 design note)</li>
     </ul>
   </main>
 </body>

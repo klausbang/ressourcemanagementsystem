@@ -15,6 +15,7 @@
   <div class="stat-tile"><div class="stat-value">{{ active_projects|selectattr('has_conflict')|list|length }}</div><div class="stat-label">Projects with a live conflict</div></div>
   <div class="stat-tile"><div class="stat-value">{{ active_projects|sum(attribute='unscheduled_count') }}</div><div class="stat-label">Activities not yet actioned</div></div>
   <div class="stat-tile"><div class="stat-value">{{ active_projects|selectattr('has_overdue')|list|length }}</div><div class="stat-label">Projects with an overdue activity</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ reschedule_suggestions|length }}</div><div class="stat-label">Reschedule suggestions</div></div>
 </div>
 
 {% if upcoming_absences %}
@@ -25,6 +26,39 @@
   {% endfor %}
   <span class="section-help" style="margin:4px 0 0;">Manage absences on Admin &rarr; Staff absences.</span>
 </div>
+{% endif %}
+
+{% if reschedule_suggestions %}
+<div class="section-head"><h2>🔄 Reschedule suggestions</h2></div>
+<p class="section-help">A prerequisite activity is late; here's how its dependent activity's planned window could shift by the same amount. Assisted, not automatic — nothing changes until you accept a suggestion.</p>
+{% for s in reschedule_suggestions %}
+<div class="test-card">
+  <div class="test-card-head">
+    <div>
+      <div class="test-card-title">{{ s.order_code }} &middot; {{ s.test_name }}</div>
+      <div class="test-card-meta">Depends on "{{ s.prerequisite_test_name }}" ({{ s.prerequisite_order_code }}), which is {{ s.delay_days }} day{{ '' if s.delay_days == 1 else 's' }} late</div>
+    </div>
+  </div>
+  <p class="section-help" style="margin:0 0 10px;">
+    Current plan: {{ s.current_planned_start }} &rarr; {{ s.current_planned_end }} &middot;
+    Suggested: <strong>{{ s.suggested_planned_start }} &rarr; {{ s.suggested_planned_end }}</strong>
+  </p>
+  <div class="inline-form">
+    <form method="post">
+      <input type="hidden" name="action" value="accept_reschedule_suggestion">
+      <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+      <input type="hidden" name="suggested_planned_start" value="{{ s.suggested_planned_start }}">
+      <input type="hidden" name="suggested_planned_end" value="{{ s.suggested_planned_end }}">
+      <button type="submit" class="btn btn-primary btn-sm">✅ Accept</button>
+    </form>
+    <form method="post">
+      <input type="hidden" name="action" value="ignore_reschedule_suggestion">
+      <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+      <button type="submit" class="btn btn-secondary btn-sm">✕ Ignore</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
 {% endif %}
 
 <div class="section-head"><h2>Active projects</h2></div>
@@ -45,6 +79,9 @@
       {% endif %}
       {% if p.has_conflict %}<span class="badge badge-danger" title="At least one currently in-progress activity conflicts with another">🚫 Conflict</span>{% endif %}
       {% if p.has_overdue %}<span class="badge badge-danger" title="At least one activity's planned end date has passed without being completed">⏰ Overdue</span>{% endif %}
+      {% if p.has_planned_overlap %}
+      <span class="badge badge-danger" title="Planned window overlaps a facility already planned/booked for: {% for o in p.planned_overlaps %}{{ o.order_code }} ({{ o.test_name }}, {{ o.planned_start_date }}–{{ o.planned_end_date }}){% if not loop.last %}, {% endif %}{% endfor %}">📅 Planned clash</span>
+      {% endif %}
     </div>
   </div>
 
