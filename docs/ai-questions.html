@@ -36,6 +36,8 @@
       <li><strong>[Low]</strong> Phase 14's dependency block only fires at the work order start/resume transition, the same scoping rationale as FR-CON-2 &mdash; is a same-day, creation-time warning also wanted? (SRS FR-TP-5 design note)</li>
       <li><strong>[Medium]</strong> Phase 15's reschedule suggestions only trigger from a completed-late or currently-overdue prerequisite &mdash; is a suggestion also wanted the moment a prerequisite's work order is put on hold or marked failed, ahead of its planned end date actually passing? (SRS FR-RSC-2)</li>
       <li><strong>[Low]</strong> Phase 15 never re-suggests a reschedule for a (dependent, prerequisite) pair once accepted or ignored, even if the delay changes later &mdash; is a way to reset a dismissed suggestion needed, or is editing the planned dates by hand enough? (SRS FR-RSC-2 design note)</li>
+      <li><strong>[Medium]</strong> Phase 16's order workspace deliberately excludes the day-view Schedule/Gantt tab (it's cross-order, not scoped to one order) and links out to the tabbed Planner page for it &mdash; is a per-order timeline strip worth adding directly to the workspace? (SRS FR-USE-6)</li>
+      <li><strong>[Low]</strong> Should the tabbed Planner page's five tabs eventually be retired in favor of the order workspace plus the Orders Overview tab's portfolio-level List/Kanban/Master-detail views, or do both belong side by side for different working styles? (SRS FR-USE-6)</li>
     </ul>
   </main>
 </body>

@@ -105,6 +105,7 @@
       <td><input type="text" name="customer_name" value="{{ o['customer_name'] }}" form="order-save-{{ o['id'] }}"></td>
       <td><input type="text" name="product_name" value="{{ o['product_name'] }}" form="order-save-{{ o['id'] }}"></td>
       <td>
+        <a href="{{ url_for('planner.order_workspace', order_id=o['id']) }}">Workspace</a>
         <button type="submit" form="order-save-{{ o['id'] }}">Save</button>
         <button type="submit" form="order-delete-{{ o['id'] }}">Delete</button>
       </td>

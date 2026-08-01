@@ -260,6 +260,18 @@ def _load_schedule_context(db) -> dict:
     }
 
 
+def _redirect_after(fallback_endpoint: str, **fallback_kwargs):
+    """Where a POST action sends the browser afterward. Every action-handling form on the
+    single-order workspace page (Phase 16) carries a hidden return_to=order/return_order_id
+    pair so the same actions used elsewhere (Ordered Tests tab, Dashboard) land back on the
+    workspace instead, without duplicating any of the actions themselves."""
+    if request.form.get("return_to") == "order":
+        order_id = request.form.get("return_order_id", "").strip()
+        if order_id:
+            return redirect(url_for("planner.order_workspace", order_id=order_id))
+    return redirect(url_for(fallback_endpoint, **fallback_kwargs))
+
+
 def _next_sequence(db, order_id, eut_id) -> int:
     """Next free sequence number for ordered_tests within one (order_id, eut_id) scope."""
     if eut_id:
@@ -581,6 +593,10 @@ def planner_orders():
                 order_form_errors["product_name"] = "Product name is required."
 
             if order_form_errors:
+                if request.form.get("return_to") == "order_new":
+                    for msg in order_form_errors.values():
+                        flash(msg, "error")
+                    return redirect(url_for("planner.order_workspace_new"))
                 return _render_planner_orders(
                     db,
                     order_form_values={
@@ -591,13 +607,15 @@ def planner_orders():
                     order_form_errors=order_form_errors,
                 )
 
-            db.execute(
+            cur = db.execute(
                 "INSERT INTO customer_orders (order_code, customer_name, product_name) VALUES (?, ?, ?)",
                 (order_code, customer_name, product_name),
             )
             db.commit()
             flash(f"Order {order_code} created.", "info")
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            if request.form.get("return_to") == "order_new":
+                return redirect(url_for("planner.order_workspace", order_id=cur.lastrowid))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "update_order":
             order_id = request.form.get("order_id", "").strip()
@@ -619,14 +637,14 @@ def planner_orders():
                 db.commit()
                 flash(f"Order {order_code} updated.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "delete_order":
             order_id = request.form.get("order_id", "").strip()
             db.execute("DELETE FROM customer_orders WHERE id = ?", (order_id,))
             db.commit()
             flash("Order deleted, along with its ordered tests and allocations.", "info")
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "create_eut":
             order_id = request.form.get("order_id", "").strip()
@@ -642,6 +660,10 @@ def planner_orders():
                 eut_form_errors["name"] = "EUT name is required."
 
             if eut_form_errors:
+                if request.form.get("return_to") == "order":
+                    for msg in eut_form_errors.values():
+                        flash(msg, "error")
+                    return _redirect_after("planner.planner_orders", tab="orders")
                 return _render_planner_orders(
                     db,
                     eut_form_values={"order_id": order_id, "name": name, "serial_number": serial_number or ""},
@@ -654,7 +676,7 @@ def planner_orders():
             )
             db.commit()
             flash(f"EUT '{name}' added.", "info")
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "update_eut":
             eut_id = request.form.get("eut_id", "").strip()
@@ -671,14 +693,14 @@ def planner_orders():
                 db.commit()
                 flash(f"EUT '{name}' updated.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "delete_eut":
             eut_id = request.form.get("eut_id", "").strip()
             db.execute("DELETE FROM euts WHERE id = ?", (eut_id,))
             db.commit()
             flash("EUT deleted. Its test activities remain, now unlinked from an EUT.", "info")
-            return redirect(url_for("planner.planner_orders", tab="orders"))
+            return _redirect_after("planner.planner_orders", tab="orders")
 
         if action == "add_test":
             order_id = request.form.get("order_id", "").strip()
@@ -713,7 +735,7 @@ def planner_orders():
                 db.commit()
                 flash(f"Test '{test_name}' added.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "apply_template":
             order_id = request.form.get("order_id", "").strip()
@@ -745,7 +767,7 @@ def planner_orders():
                     db.commit()
                     flash(f"Applied template: {len(items)} activities added.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "move_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -781,7 +803,7 @@ def planner_orders():
                     db.commit()
                     flash("Test reordered.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "update_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -841,14 +863,14 @@ def planner_orders():
                 db.commit()
                 flash(f"Test '{test_name}' updated.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "delete_test":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
             db.execute("DELETE FROM ordered_tests WHERE id = ?", (ordered_test_id,))
             db.commit()
             flash("Ordered test deleted, along with its allocation (if any).", "info")
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "add_dependency":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -882,7 +904,7 @@ def planner_orders():
                 db.commit()
                 flash("Dependency added.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "remove_dependency":
             dependency_id = request.form.get("dependency_id", "").strip()
@@ -903,7 +925,7 @@ def planner_orders():
                 )
             db.commit()
             flash("Dependency removed.", "info")
-            return redirect(url_for("planner.planner_orders", tab="tests"))
+            return _redirect_after("planner.planner_orders", tab="tests")
 
         if action == "delete_allocation":
             allocation_id = request.form.get("allocation_id", "").strip()
@@ -924,7 +946,7 @@ def planner_orders():
                 )
             db.commit()
             flash("Resource unassigned from test.", "info")
-            return redirect(url_for("planner.planner_orders", tab="assign"))
+            return _redirect_after("planner.planner_orders", tab="assign")
 
         if action == "assign_resource":
             ordered_test_id = request.form.get("ordered_test_id", "").strip()
@@ -932,7 +954,7 @@ def planner_orders():
 
             if not (ordered_test_id and resource_id):
                 flash("Ordered test and resource are required.", "error")
-                return redirect(url_for("planner.planner_orders", tab="assign"))
+                return _redirect_after("planner.planner_orders", tab="assign")
 
             valid = db.execute(
                 """
@@ -970,7 +992,7 @@ def planner_orders():
                 db.commit()
                 flash("Resource assigned to test.", "info")
 
-            return redirect(url_for("planner.planner_orders", tab="assign"))
+            return _redirect_after("planner.planner_orders", tab="assign")
 
     return _render_planner_orders(db)
 
@@ -1171,6 +1193,66 @@ def _load_dashboard_context(db) -> dict:
     }
 
 
+def _load_order_workspace_context(db, order_id: int) -> dict | None:
+    """Phase 16: everything that hangs off one customer order (see
+    docs/customer-order-data-overview.html section 2), on one page. Reuses the exact same
+    derivation logic as the Dashboard (status/conflict/overdue/planned-overlap/milestones/
+    visits) and the tabbed Planner page (EUTs, ordered tests with their dependencies/
+    planned dates/allocations), filtered down to this one order, rather than re-deriving
+    any of it - so this page can never show a fact that disagrees with the tabbed page or
+    the Dashboard."""
+
+    order = db.execute("SELECT * FROM customer_orders WHERE id = ?", (order_id,)).fetchone()
+    if order is None:
+        return None
+    order = dict(order)
+
+    dashboard_ctx = _load_dashboard_context(db)
+    project = next(
+        (p for p in dashboard_ctx["active_projects"] + dashboard_ctx["completed_projects"] if p["order_id"] == order_id),
+        None,
+    )
+    reschedule_suggestions = [
+        s for s in dashboard_ctx["reschedule_suggestions"] if s["order_code"] == order["order_code"]
+    ]
+
+    full_ctx = _load_planner_context(db)
+    euts = [e for e in full_ctx["euts"] if e["order_id"] == order_id]
+    ordered_tests_rows = [t for t in full_ctx["ordered_tests_rows"] if t["order_id"] == order_id]
+
+    return {
+        "order": order,
+        "project": project,
+        "euts": euts,
+        "ordered_tests_rows": ordered_tests_rows,
+        "capabilities": full_ctx["capabilities"],
+        "templates": full_ctx["templates"],
+        "reschedule_suggestions": reschedule_suggestions,
+    }
+
+
+@bp.route("/order/new", methods=["GET"])
+@require_role("planner")
+def order_workspace_new():
+    init_db()
+    db = get_db()
+    return render_ui("order_workspace_new.html")
+
+
+@bp.route("/order/<int:order_id>", methods=["GET"])
+@require_role("planner")
+def order_workspace(order_id):
+    init_db()
+    db = get_db()
+    context = _load_order_workspace_context(db, order_id)
+    if context is None:
+        flash("That order no longer exists.", "error")
+        return redirect(url_for("planner.planner_orders"))
+    all_orders = db.execute("SELECT id, order_code, customer_name FROM customer_orders ORDER BY order_code").fetchall()
+    context["all_orders"] = all_orders
+    return render_ui("order_workspace.html", **context)
+
+
 @bp.route("/dashboard", methods=["GET", "POST"])
 @require_role("planner")
 def dashboard():
@@ -1190,7 +1272,7 @@ def dashboard():
             )
             db.commit()
             flash("Project status updated.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "create_milestone":
             order_id = request.form.get("order_id", "").strip()
@@ -1207,14 +1289,14 @@ def dashboard():
                 )
                 db.commit()
                 flash(f"Milestone '{title}' added.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "delete_milestone":
             milestone_id = request.form.get("milestone_id", "").strip()
             db.execute("DELETE FROM milestones WHERE id = ?", (milestone_id,))
             db.commit()
             flash("Milestone deleted.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "create_visit":
             order_id = request.form.get("order_id", "").strip()
@@ -1233,14 +1315,14 @@ def dashboard():
                 )
                 db.commit()
                 flash("Customer visit recorded.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "delete_visit":
             visit_id = request.form.get("visit_id", "").strip()
             db.execute("DELETE FROM customer_visits WHERE id = ?", (visit_id,))
             db.commit()
             flash("Customer visit deleted.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "accept_reschedule_suggestion":
             dependency_id = request.form.get("dependency_id", "").strip()
@@ -1275,7 +1357,7 @@ def dashboard():
                 )
                 db.commit()
                 flash("Reschedule suggestion applied.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
         if action == "ignore_reschedule_suggestion":
             dependency_id = request.form.get("dependency_id", "").strip()
@@ -1293,7 +1375,7 @@ def dashboard():
                 )
                 db.commit()
             flash("Suggestion dismissed.", "info")
-            return redirect(url_for("planner.dashboard"))
+            return _redirect_after("planner.dashboard")
 
     context = _load_dashboard_context(db)
     orders = db.execute("SELECT id, order_code FROM customer_orders ORDER BY order_code").fetchall()
@@ -1309,7 +1391,7 @@ def activity_history(ordered_test_id):
 
     activity = db.execute(
         """
-        SELECT ot.id, ot.test_name, o.order_code, o.customer_name, e.name AS eut_name
+        SELECT ot.id, ot.order_id, ot.test_name, o.order_code, o.customer_name, e.name AS eut_name
         FROM ordered_tests ot
         JOIN customer_orders o ON o.id = ot.order_id
         LEFT JOIN euts e ON e.id = ot.eut_id

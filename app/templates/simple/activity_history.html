@@ -5,7 +5,7 @@
 {% block content %}
 <h2>History: {{ activity.test_name }}</h2>
 <p>{{ activity.order_code }} - {{ activity.customer_name }}{% if activity.eut_name %} - EUT: {{ activity.eut_name }}{% endif %}</p>
-<p><a href="{{ url_for('planner.planner_orders') }}">&larr; Back to Planner</a></p>
+<p><a href="{{ url_for('planner.order_workspace', order_id=activity.order_id) }}">&larr; Back to Order Workspace</a></p>
 
 {% if entries %}
 <table border="1" cellpadding="6">

@@ -7,7 +7,7 @@
   <div class="eyebrow">Planner &middot; History</div>
   <h1>{{ activity.test_name }}</h1>
   <p class="lead">{{ activity.order_code }} &middot; {{ activity.customer_name }}{% if activity.eut_name %} &middot; EUT: {{ activity.eut_name }}{% endif %}</p>
-  <a href="{{ url_for('planner.planner_orders') }}" class="btn btn-secondary btn-sm">&larr; Back to Planner</a>
+  <a href="{{ url_for('planner.order_workspace', order_id=activity.order_id) }}" class="btn btn-secondary btn-sm">&larr; Back to Order Workspace</a>
 </div>
 
 {% if entries %}

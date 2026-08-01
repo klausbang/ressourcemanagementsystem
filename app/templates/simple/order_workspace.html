@@ -1,0 +1,353 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}{{ order['order_code'] }}{% endblock %}
+
+{% block content %}
+<h2>Order Workspace: {{ order['order_code'] }} - {{ order['customer_name'] }} ({{ order['product_name'] }})</h2>
+<p><em>Everything that belongs to this order in one place &mdash; EUTs, test activities, resources, dependencies, milestones, and visits.</em></p>
+
+<p>
+  Switch order:
+  {% for o in all_orders %}
+  {% if o['id'] == order['id'] %}<strong>{{ o['order_code'] }}</strong>{% else %}<a href="{{ url_for('planner.order_workspace', order_id=o['id']) }}">{{ o['order_code'] }}</a>{% endif %}{% if not loop.last %} &middot; {% endif %}
+  {% endfor %}
+  &middot; <a href="{{ url_for('planner.order_workspace_new') }}">+ New order</a>
+  &middot; <a href="{{ url_for('planner.planner_orders') }}">Classic tabbed view</a>
+</p>
+
+{% if project %}
+<h3>Status</h3>
+<p>
+  <strong>{{ project.display_status }}</strong>
+  {% if project.has_conflict %} &mdash; <strong>CONFLICT</strong>{% endif %}
+  {% if project.has_overdue %} &mdash; <strong>OVERDUE</strong>{% endif %}
+  {% if project.has_planned_overlap %} &mdash; <strong>PLANNED CLASH</strong>{% endif %}
+</p>
+<p>
+  Disciplines:
+  {% for name, status in project.discipline_status.items() %}{{ name }}: {{ status }}{% if not loop.last %}, {% endif %}{% endfor %}
+</p>
+<p>{{ project.total_activities }} activities; {{ project.unscheduled_count }} not yet actioned; {{ project.missing_procedure_count }} missing a test procedure.</p>
+{% endif %}
+
+{% if reschedule_suggestions %}
+<h3>Reschedule Suggestions</h3>
+{% for s in reschedule_suggestions %}
+<fieldset style="margin-bottom:14px;">
+  <legend>{{ s.test_name }}</legend>
+  <p>Depends on "{{ s.prerequisite_test_name }}" ({{ s.prerequisite_order_code }}), which is {{ s.delay_days }} day{{ '' if s.delay_days == 1 else 's' }} late.</p>
+  <p>Current plan: {{ s.current_planned_start }} to {{ s.current_planned_end }}. Suggested: {{ s.suggested_planned_start }} to {{ s.suggested_planned_end }}.</p>
+  <form method="post" action="{{ url_for('planner.dashboard') }}" style="display:inline">
+    <input type="hidden" name="action" value="accept_reschedule_suggestion">
+    <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+    <input type="hidden" name="suggested_planned_start" value="{{ s.suggested_planned_start }}">
+    <input type="hidden" name="suggested_planned_end" value="{{ s.suggested_planned_end }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <button type="submit">Accept</button>
+  </form>
+  <form method="post" action="{{ url_for('planner.dashboard') }}" style="display:inline">
+    <input type="hidden" name="action" value="ignore_reschedule_suggestion">
+    <input type="hidden" name="dependency_id" value="{{ s.dependency_id }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <button type="submit">Ignore</button>
+  </form>
+</fieldset>
+{% endfor %}
+{% endif %}
+
+<h3>Order Details</h3>
+<form method="post" action="{{ url_for('planner.planner_orders') }}">
+  <input type="hidden" name="action" value="update_order">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>Order Code <input type="text" name="order_code" value="{{ order['order_code'] }}" required></label>
+  <label>Customer Name <input type="text" name="customer_name" value="{{ order['customer_name'] }}" required></label>
+  <label>Product Name <input type="text" name="product_name" value="{{ order['product_name'] }}" required></label>
+  <button type="submit">Save</button>
+</form>
+
+{% if project %}
+<form method="post" action="{{ url_for('planner.dashboard') }}">
+  <input type="hidden" name="action" value="update_project_status">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>Weekly note <input type="text" name="weekly_note" value="{{ project.weekly_note or '' }}" size="50"></label>
+  <label><input type="checkbox" name="waiting_for_customer" value="1" {% if project.waiting_for_customer %}checked{% endif %}> Waiting for customer</label>
+  <button type="submit">Save</button>
+</form>
+
+<h3>Milestones</h3>
+<ul>
+  {% for m in project.milestones %}
+  <li>
+    {{ m.title }}{% if m.target_date %} - {{ m.target_date }}{% endif %}
+    <form method="post" action="{{ url_for('planner.dashboard') }}" style="display:inline">
+      <input type="hidden" name="action" value="delete_milestone">
+      <input type="hidden" name="milestone_id" value="{{ m.id }}">
+      <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+      <button type="submit">Remove</button>
+    </form>
+  </li>
+  {% else %}
+  <li><em>None yet.</em></li>
+  {% endfor %}
+</ul>
+<form method="post" action="{{ url_for('planner.dashboard') }}">
+  <input type="hidden" name="action" value="create_milestone">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>Title <input type="text" name="title" required></label>
+  <label>Target date <input type="date" name="target_date"></label>
+  <button type="submit">Add Milestone</button>
+</form>
+
+<h3>Customer Visits</h3>
+<ul>
+  {% for v in project.visits %}
+  <li>
+    {{ v.start_date }}{% if v.end_date and v.end_date != v.start_date %} to {{ v.end_date }}{% endif %}{% if v.notes %} - {{ v.notes }}{% endif %}
+    <form method="post" action="{{ url_for('planner.dashboard') }}" style="display:inline">
+      <input type="hidden" name="action" value="delete_visit">
+      <input type="hidden" name="visit_id" value="{{ v.id }}">
+      <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+      <button type="submit">Remove</button>
+    </form>
+  </li>
+  {% else %}
+  <li><em>None yet.</em></li>
+  {% endfor %}
+</ul>
+<form method="post" action="{{ url_for('planner.dashboard') }}">
+  <input type="hidden" name="action" value="create_visit">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>Start date <input type="date" name="start_date" required></label>
+  <label>End date <input type="date" name="end_date"></label>
+  <label>Notes <input type="text" name="notes"></label>
+  <button type="submit">Add Visit</button>
+</form>
+{% endif %}
+
+<h3>EUTs (Units Under Test)</h3>
+<table border="1" cellpadding="6">
+  <thead><tr><th>Name</th><th>Serial Number</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for e in euts %}
+    <tr>
+      <td><input type="text" name="name" value="{{ e['name'] }}" form="eut-save-{{ e['id'] }}"></td>
+      <td><input type="text" name="serial_number" value="{{ e['serial_number'] or '' }}" form="eut-save-{{ e['id'] }}"></td>
+      <td>
+        <button type="submit" form="eut-save-{{ e['id'] }}">Save</button>
+        <button type="submit" form="eut-delete-{{ e['id'] }}">Delete</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3"><em>No EUTs yet.</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% for e in euts %}
+<form id="eut-save-{{ e['id'] }}" method="post" action="{{ url_for('planner.planner_orders') }}" hidden>
+  <input type="hidden" name="action" value="update_eut">
+  <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+</form>
+<form id="eut-delete-{{ e['id'] }}" method="post" action="{{ url_for('planner.planner_orders') }}" hidden>
+  <input type="hidden" name="action" value="delete_eut">
+  <input type="hidden" name="eut_id" value="{{ e['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+</form>
+{% endfor %}
+<form method="post" action="{{ url_for('planner.planner_orders') }}">
+  <input type="hidden" name="action" value="create_eut">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>EUT Name <input type="text" name="name" required></label>
+  <label>Serial Number <input type="text" name="serial_number"></label>
+  <button type="submit">Add EUT</button>
+</form>
+
+<h3>Apply an Activity Template</h3>
+<form method="post" action="{{ url_for('planner.planner_orders') }}">
+  <input type="hidden" name="action" value="apply_template">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>EUT (optional)
+    <select name="eut_id">
+      <option value="">None / whole order</option>
+      {% for e in euts %}
+      <option value="{{ e['id'] }}">{{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Template
+    <select name="template_id" required>
+      <option value="">Select</option>
+      {% for tpl in templates %}
+      <option value="{{ tpl['id'] }}">{{ tpl['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Apply Template</button>
+</form>
+
+<h3>Add a Test Activity</h3>
+<form method="post" action="{{ url_for('planner.planner_orders') }}">
+  <input type="hidden" name="action" value="add_test">
+  <input type="hidden" name="order_id" value="{{ order['id'] }}">
+  <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  <label>EUT (optional)
+    <select name="eut_id">
+      <option value="">None / whole order</option>
+      {% for e in euts %}
+      <option value="{{ e['id'] }}">{{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Test Name <input type="text" name="test_name" required></label>
+  <label>Required Capability
+    <select name="required_capability_id">
+      <option value="">None</option>
+      {% for c in capabilities %}
+      <option value="{{ c['id'] }}">{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Planned Start <input type="date" name="planned_start_date"></label>
+  <label>Planned End <input type="date" name="planned_end_date"></label>
+  <button type="submit">Add Activity</button>
+</form>
+
+<h3>Test Activities</h3>
+{% macro ow_test_block(t) %}
+<fieldset style="margin-bottom:14px;" class="{{ 'dup-row' if t['_dup'] }}">
+  <legend>{{ t['sequence'] if t['sequence'] is not none else '-' }}. {{ t['test_name'] }}{% if t['is_blocked'] %} [BLOCKED]{% endif %}</legend>
+
+  <form method="post" action="{{ url_for('planner.planner_orders') }}">
+    <input type="hidden" name="action" value="update_test">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <label>Name <input type="text" name="test_name" value="{{ t['test_name'] }}"></label>
+    <label>EUT
+      <select name="eut_id">
+        <option value="">None / whole order</option>
+        {% for e in euts %}
+        <option value="{{ e['id'] }}" {% if t['eut_id'] == e['id'] %}selected{% endif %}>{{ e['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Capability
+      <select name="required_capability_id">
+        <option value="">None</option>
+        {% for c in capabilities %}
+        <option value="{{ c['id'] }}" {% if t['capability_id'] == c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Planned Start <input type="date" name="planned_start_date" value="{{ t['planned_start_date'] or '' }}"></label>
+    <label>Planned End <input type="date" name="planned_end_date" value="{{ t['planned_end_date'] or '' }}"></label>
+    <button type="submit">Save</button>
+    <button type="submit" form="test-delete-{{ t['ordered_test_id'] }}">Delete</button>
+    <button type="submit" form="test-up-{{ t['ordered_test_id'] }}">Up</button>
+    <button type="submit" form="test-down-{{ t['ordered_test_id'] }}">Down</button>
+    {% if t['has_history'] %}
+    <a href="{{ url_for('planner.activity_history', ordered_test_id=t['ordered_test_id']) }}">History</a>
+    {% else %}
+    <span style="color:#999;" title="No recorded changes yet for this activity">History</span>
+    {% endif %}
+  </form>
+  <form id="test-delete-{{ t['ordered_test_id'] }}" method="post" action="{{ url_for('planner.planner_orders') }}" hidden>
+    <input type="hidden" name="action" value="delete_test">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  </form>
+  <form id="test-up-{{ t['ordered_test_id'] }}" method="post" action="{{ url_for('planner.planner_orders') }}" hidden>
+    <input type="hidden" name="action" value="move_test">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="direction" value="up">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  </form>
+  <form id="test-down-{{ t['ordered_test_id'] }}" method="post" action="{{ url_for('planner.planner_orders') }}" hidden>
+    <input type="hidden" name="action" value="move_test">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="direction" value="down">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+  </form>
+
+  <p><strong>Depends on:</strong>
+  {% for d in t['dependencies'] %}
+    {{ 'OK' if d['is_met'] else 'waiting' }}: {{ d['test_name'] }}
+    <form method="post" action="{{ url_for('planner.planner_orders') }}" style="display:inline">
+      <input type="hidden" name="action" value="remove_dependency">
+      <input type="hidden" name="dependency_id" value="{{ d['dependency_id'] }}">
+      <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+      <button type="submit">Remove</button>
+    </form>
+    {% if not loop.last %}; {% endif %}
+  {% else %}
+    <em>none</em>
+  {% endfor %}
+  </p>
+  {% if t['dependency_candidates'] %}
+  <form method="post" action="{{ url_for('planner.planner_orders') }}">
+    <input type="hidden" name="action" value="add_dependency">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <select name="depends_on_ordered_test_id">
+      <option value="">Select</option>
+      {% for c in t['dependency_candidates'] %}
+      <option value="{{ c['ordered_test_id'] }}">{{ c['test_name'] }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Add dependency</button>
+  </form>
+  {% endif %}
+
+  <p><strong>Resources:</strong>
+  {% for a in t['allocated_resources'] %}
+    {{ a['resource_code'] }} - {{ a['resource_name'] }} ({{ a['resource_type'] }})
+    <form method="post" action="{{ url_for('planner.planner_orders') }}" style="display:inline">
+      <input type="hidden" name="action" value="delete_allocation">
+      <input type="hidden" name="allocation_id" value="{{ a['allocation_id'] }}">
+      <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+      <button type="submit">Remove</button>
+    </form>
+    {% if not loop.last %}; {% endif %}
+  {% else %}
+    <em>none</em>
+  {% endfor %}
+  </p>
+  {% if t['available_candidates'] %}
+  <form method="post" action="{{ url_for('planner.planner_orders') }}">
+    <input type="hidden" name="action" value="assign_resource">
+    <input type="hidden" name="ordered_test_id" value="{{ t['ordered_test_id'] }}">
+    <input type="hidden" name="return_to" value="order"><input type="hidden" name="return_order_id" value="{{ order['id'] }}">
+    <select name="resource_id" required>
+      <option value="">Select</option>
+      {% for c in t['available_candidates'] %}
+      <option value="{{ c['resource_id'] }}">{{ c['code'] }} - {{ c['name'] }} ({{ c['status'] }})</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Add</button>
+  </form>
+  {% endif %}
+</fieldset>
+{% endmacro %}
+
+{% if ordered_tests_rows %}
+  {% set direct_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', none)|list %}
+  {% for e in euts %}
+    {% set eut_tests = ordered_tests_rows|selectattr('eut_id', 'equalto', e['id'])|list %}
+    <h4>📦 {{ e['name'] }}{% if e['serial_number'] %} ({{ e['serial_number'] }}){% endif %}</h4>
+    {% for t in eut_tests %}{{ ow_test_block(t) }}{% else %}<p><em>No activities on this EUT yet.</em></p>{% endfor %}
+  {% endfor %}
+  {% if direct_tests or not euts %}
+    {% if euts %}<h4>Activities not tied to a specific EUT</h4>{% endif %}
+    {% for t in direct_tests %}{{ ow_test_block(t) }}{% endfor %}
+  {% endif %}
+{% else %}
+<p><em>No test activities yet.</em></p>
+{% endif %}
+
+<p><em>For the day-by-day production schedule across every order, use the Schedule tab on the <a href="{{ url_for('planner.planner_orders') }}">classic tabbed view</a>.</em></p>
+{% endblock %}

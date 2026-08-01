@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v5</title>
+  <title>RMS SRS v6</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v5</h1>
-    <p>Version: 0.5 | Date: 2026-08-01</p>
+    <h1>Resource Management System (RMS) - SRS v6</h1>
+    <p>Version: 0.6 | Date: 2026-08-01</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -22,7 +22,8 @@
         <li><strong>v0.2 (Phase 7):</strong> Test Technician role, work orders, test procedures, and test reports with review/approval.</li>
         <li><strong>v0.3 (Phase 8-13):</strong> restructured around customer discovery input (see <code>Jens_chatgpt_historic.md</code>) into the chapter set the customer's own consultant proposed &mdash; Projects, Test Plan, Resources, Constraints, Calendar, Status Management, Planning, Rescheduling, Visualization, Reporting, Integrations, Usability, Nice-to-have &mdash; with Must/Should/Could priority on every new requirement, and a Business/Functional/Acceptance-Criteria (BR/FR/AC) split. Existing v0.1/v0.2 requirements are carried forward unchanged in meaning, re-numbered into this structure, and marked Delivered.</li>
         <li><strong>v0.4 (Phase 14):</strong> added enforced activity dependencies and planned start/end dates (FR-TP-5/6, FR-PLN-4, FR-VIS-4, new BR-006), following a review of the customer's own formal SRS v0.7 and development plan (see <a href="jens-v0.7-review.html">that review</a>) which flagged dependency enforcement as a Must-priority gap. The former Phase 14 (cross-site warning, multi-day facility reservation, assisted-rescheduling suggestions) is renumbered Phase 15 and remains a stretch goal, now better positioned to build on real dependency data.</li>
-        <li><strong>v0.5 (Phase 15, this revision):</strong> delivered the stretch goal renumbered above &mdash; FR-CON-3 (cross-site equipment warning), FR-CON-4 (planned-date facility overlap warning), and FR-RSC-2 (reschedule suggestions from a late prerequisite) are now all Delivered rather than Planned/stretch, building directly on Phase 14's dependency and planned-date data.</li>
+        <li><strong>v0.5 (Phase 15):</strong> delivered the stretch goal renumbered above &mdash; FR-CON-3 (cross-site equipment warning), FR-CON-4 (planned-date facility overlap warning), and FR-RSC-2 (reschedule suggestions from a late prerequisite) are now all Delivered rather than Planned/stretch, building directly on Phase 14's dependency and planned-date data.</li>
+        <li><strong>v0.6 (Phase 16, this revision):</strong> added FR-USE-6, a single-page per-order workspace consolidating order creation/maintenance with everything that hangs off it (EUTs, test activities, dependencies, planned dates, resource allocations, milestones, visits, derived status) into one view, alongside the existing multi-tab Planner page.</li>
       </ul>
     </section>
 
@@ -214,6 +215,7 @@ Project (customer_orders)
         <li><strong>FR-USE-3</strong> [Must, Delivered - Phase 7]: The test report page shall render as a single A4 page with print-specific styling.</li>
         <li><strong>FR-USE-4</strong> [Must, Delivered - Phase 8]: An anonymous visitor shall see a public landing page explaining RMS and prompting login, not the resource catalog or any other operational data; the resource catalog requires a signed-in admin, planner, or technician.</li>
         <li><strong>FR-USE-5</strong> [Must, Delivered - Phase 8]: On login, and whenever a signed-in user visits <code>/</code>, the system shall route them directly to their own role's workspace (Admin, Planner, or Technician dashboard) rather than a shared landing/catalog page. The resource catalog remains implemented but is currently unlinked from navigation in every interface, pending a confirmed need for it.</li>
+        <li><strong>FR-USE-6</strong> [Should, Delivered - Phase 16]: The system shall provide a single-page, per-order workspace for creating and maintaining a customer order and everything directly attached to it &mdash; EUTs, test activities (with their dependencies, planned dates, and resource allocations), milestones, customer visits, and derived status &mdash; as an alternative to the multi-tab Planner page, so a planner working deeply on one order doesn't need to switch tabs to touch every part of it.</li>
       </ul>
 
       <h3>8.13 Nice-to-have (FR-NTH)</h3>
@@ -241,6 +243,7 @@ Project (customer_orders)
         <li>From Phase 13 (delivered): an append-only change history per test activity (when, who, a system-generated description of what changed, and an optional why), covering resource assignment/removal, reordering, EUT reassignment, and the work order lifecycle.</li>
         <li>From Phase 14 (delivered): an optional planned start date and planned end date on each test activity; a same-project activity-dependency record (one row per prerequisite, so an activity can have more than one), validated against self-reference and circular chains at creation time.</li>
         <li>From Phase 15 (delivered): a dismissal record per (dependent activity, prerequisite) pair, so an ignored or already-applied reschedule suggestion is not repeated. No other new stored data &mdash; the cross-site and planned-overlap warnings are computed at read time from data Phase 9/14 already store (a resource's <code>site</code>, and an activity's planned dates).</li>
+        <li>Phase 16 added no new stored data at all &mdash; the order workspace page is a new arrangement of the same order/EUT/activity/milestone/visit/status data the tabbed Planner page and Dashboard already read and write, through the exact same actions.</li>
         <li>From Phase 12: staff absence periods and customer on-site day records.</li>
         <li>From Phase 13: an append-only history/audit record for schedule-affecting changes.</li>
       </ul>
@@ -285,6 +288,7 @@ Project (customer_orders)
           <tr><td>13</td><td>Change history/audit trail</td><td>FR-NTH-1</td><td>Delivered</td></tr>
           <tr><td>14</td><td>Activity dependencies and planned dates</td><td>FR-TP-5..6, FR-PLN-4, FR-VIS-4</td><td>Delivered</td></tr>
           <tr><td>15</td><td>Dynamic rescheduling assistant (stretch)</td><td>FR-CON-3..4, FR-RSC-2</td><td>Delivered</td></tr>
+          <tr><td>16</td><td>Single-page customer order workspace</td><td>FR-USE-6</td><td>Delivered</td></tr>
         </tbody>
       </table>
     </section>
@@ -308,6 +312,8 @@ Project (customer_orders)
         <li>Partially answered (Phase 15): the cross-site warning (FR-CON-3) uses same-calendar-day as its transit-time proxy (any two activities visible on the same Schedule day, sharing equipment, at different sites) rather than a specific minimum transit/setup duration, since that number is still unconfirmed (see the existing Phase 9 open question above) &mdash; if a real transit time is confirmed later, the same-day check could be tightened to a precise buffer window instead.</li>
         <li>Open (Phase 15): reschedule suggestions (FR-RSC-2) only trigger from a <em>completed</em> prerequisite that finished late, or an <em>incomplete</em> one already overdue - is a suggestion also wanted the moment a prerequisite's work order is marked <code>on_hold</code> or <code>fail</code>ed, ahead of its planned end date passing?</li>
         <li>Open (Phase 15): once a reschedule suggestion is accepted or ignored, that exact (dependent, prerequisite) pair is never re-suggested, even if the prerequisite's delay later changes (e.g. it's fixed after being on hold, or a different prerequisite also becomes late). Is a way to reset/re-trigger a dismissed suggestion needed, or is manually editing the planned dates enough?</li>
+        <li>Open (Phase 16): the order workspace deliberately excludes the day-view Schedule/Gantt tab (it's cross-order by nature - it shows a whole day across every order, not one order's own timeline) and links out to the tabbed Planner page for it instead. Is a per-order timeline strip (just this order's activities, across whichever days they touch) worth adding to the workspace directly?</li>
+        <li>Open (Phase 16): should the tabbed Planner page's five tabs eventually be retired in favor of the workspace plus a portfolio-level list/board (the existing Orders Overview tab already covers that), or do both belong side by side long-term for different working styles?</li>
       </ul>
     </section>
   </main>

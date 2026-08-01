@@ -1,0 +1,19 @@
+{% extends 'simple/base.html' %}
+
+{% block title %}New Order{% endblock %}
+
+{% block content %}
+<h2>Create a New Customer Order</h2>
+<p><em>Save the order header first &mdash; you'll land on its workspace page to add EUTs, test activities, resources, milestones, and visits, all in one place.</em></p>
+
+<form method="post" action="{{ url_for('planner.planner_orders') }}">
+  <input type="hidden" name="action" value="create_order">
+  <input type="hidden" name="return_to" value="order_new">
+  <label>Order Code <input type="text" name="order_code" required></label>
+  <label>Customer Name <input type="text" name="customer_name" required></label>
+  <label>Product Name <input type="text" name="product_name" required></label>
+  <button type="submit">Create &amp; Open Workspace</button>
+</form>
+
+<p><a href="{{ url_for('planner.planner_orders') }}">Prefer the classic tabbed view? Go to Planner</a></p>
+{% endblock %}

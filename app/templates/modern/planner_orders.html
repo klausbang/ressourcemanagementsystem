@@ -143,6 +143,7 @@
               <td><input type="text" name="customer_name" value="{{ o['customer_name'] }}" form="order-save-{{ o['id'] }}"></td>
               <td><input type="text" name="product_name" value="{{ o['product_name'] }}" form="order-save-{{ o['id'] }}"></td>
               <td class="inline-form">
+                <a href="{{ url_for('planner.order_workspace', order_id=o['id']) }}" class="btn btn-secondary btn-sm" title="Open this order's one-page workspace">🗂️ Workspace</a>
                 <button type="submit" form="order-save-{{ o['id'] }}" class="btn btn-secondary btn-sm">Save</button>
                 <button type="submit" form="order-delete-{{ o['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete order '{{ o['order_code'] }}'? This also deletes its ordered tests and allocations.">Delete</button>
               </td>
