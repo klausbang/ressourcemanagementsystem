@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS Page &amp; Functionality Overview</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin: 14px 0 28px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 0.92rem; }
+    th { background: #f2f2f2; }
+    code { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RMS Page &amp; Functionality Overview</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>A single reference table listing every distinct page in RMS and what it does, for anyone getting oriented in the system without reading the SRS or the code. Requested directly by a proposal filed from the Admin page (id 19). Two pages - Admin Manage and Planner Orders - are internally tabbed, so section 3 breaks each of those pages' tabs out individually, since that's where the real functional differences live.</p>
+      <p>Column definitions used throughout: <strong>View-only or editable</strong> means whether the page has any form that writes data (a filter form doesn't count). <strong>Function buttons</strong> lists the distinct actions available, not every button instance. <strong>Sortable</strong> means the page's table(s) have clickable, server-side sortable column headers (<code>app/table_utils.py:rows_with_meta</code>). <strong>UI mode</strong> notes where a page differs from the norm - most pages exist in both Simple (plain HTML, no JS) and Modern (styled, JS-enabled) interfaces over identical routes and data (see <a href="dual-ui.html">Dual Interface: Simple and Modern</a>); a few (Technician Dashboard, Test Reports) exist only in Modern.</p>
+    </section>
+
+    <section>
+      <h2>2. All Pages</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Path</th>
+            <th>Intended user group</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>View-only or editable</th>
+            <th>Function buttons</th>
+            <th>Sortable</th>
+            <th>UI mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Landing page</td>
+            <td><code>/</code></td>
+            <td>Public (anonymous)</td>
+            <td>Public info page</td>
+            <td>Explains RMS and prompts login; a signed-in user hitting this path is redirected straight to their own role's workspace instead of seeing it.</td>
+            <td>View-only</td>
+            <td>Log in (link)</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Login</td>
+            <td><code>/login</code></td>
+            <td>Public (anonymous)</td>
+            <td>Auth form</td>
+            <td>Username + role login. Demonstrator only - no passwords, role alone controls access.</td>
+            <td>Editable (one field)</td>
+            <td>Sign in</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Resource Catalog</td>
+            <td><code>/catalog</code></td>
+            <td>Any signed-in role</td>
+            <td>Read-only filterable list</td>
+            <td>Browse every resource and its assigned capabilities. Implemented but currently unlinked from navigation in both interfaces, pending a confirmed need for it (reachable only by direct URL).</td>
+            <td>View-only</td>
+            <td>Apply filters</td>
+            <td>Yes</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Help</td>
+            <td><code>/help</code></td>
+            <td>Any signed-in role</td>
+            <td>Reference/info page</td>
+            <td>Role- and workflow-specific explanations of what each part of the system is for.</td>
+            <td>View-only</td>
+            <td>&mdash;</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Admin Manage</td>
+            <td><code>/admin/</code></td>
+            <td>Admin</td>
+            <td>Tabbed CRUD workspace (9 tabs)</td>
+            <td>Manage users, capabilities, resources, capability assignments, exclusion groups, activity templates, staff absences, customers, and review submitted proposals. See section 3 for a per-tab breakdown.</td>
+            <td>Editable</td>
+            <td>Varies by tab - see section 3</td>
+            <td>Yes (every tab)</td>
+            <td>Both (Modern adds a collapsible stat strip, clickable workflow tiles, and per-tab attention counts; Simple shows all 9 sections stacked, no tabs)</td>
+          </tr>
+          <tr>
+            <td>Planner Orders</td>
+            <td><code>/planner/</code></td>
+            <td>Planner</td>
+            <td>Tabbed CRUD workspace (5 tabs)</td>
+            <td>Create/manage customer orders, EUTs, test activities, and resource assignments; visualize the production schedule; browse all orders three ways. See section 3 for a per-tab breakdown.</td>
+            <td>Editable (Schedule and Orders overview tabs are view-only)</td>
+            <td>Varies by tab - see section 3</td>
+            <td>Yes (Customer orders / Ordered tests / Resource assignment tabs)</td>
+            <td>Both (Schedule tab is Modern-only)</td>
+          </tr>
+          <tr>
+            <td>Order Workspace (new)</td>
+            <td><code>/planner/order/new</code></td>
+            <td>Planner</td>
+            <td>Single-page create form</td>
+            <td>Create a new customer order, landing directly on that order's own workspace afterward instead of the tabbed page.</td>
+            <td>Editable</td>
+            <td>Create &amp; open workspace</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Order Workspace</td>
+            <td><code>/planner/order/&lt;id&gt;</code></td>
+            <td>Planner</td>
+            <td>Single-page CRUD workspace</td>
+            <td>Everything attached to one order on one page - EUTs, test activities (with dependencies, planned dates, resource allocations, and template groups), milestones, customer visits, and derived status - reusing the same actions as the tabbed page and Dashboard.</td>
+            <td>Editable</td>
+            <td>Save / Add / Delete / Apply template / Sync group / Ungroup / Assign resource / Accept or ignore reschedule suggestion</td>
+            <td>No (card-based, not tables)</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Dashboard</td>
+            <td><code>/planner/dashboard</code></td>
+            <td>Planner</td>
+            <td>Mixed dashboard</td>
+            <td>Active projects with derived status, per-discipline breakdown, conflict/overdue/planned-clash flags, milestones, customer visits, and reschedule suggestions, plus a read-only completed-projects history.</td>
+            <td>Editable (weekly note, milestones, visits, reschedule decisions)</td>
+            <td>Save / Add / Remove / Accept / Ignore</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Activity History</td>
+            <td><code>/planner/activity/&lt;id&gt;/history</code></td>
+            <td>Planner</td>
+            <td>Read-only detail</td>
+            <td>One test activity's full change history - who changed it, when, what changed, and why (where a reason was collected).</td>
+            <td>View-only</td>
+            <td>&mdash;</td>
+            <td>No</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Technician Dashboard</td>
+            <td><code>/technician/</code></td>
+            <td>Technician</td>
+            <td>Mixed dashboard</td>
+            <td>Tests allocated to the technician's own linked resource, with co-allocated equipment/facility, blocked-on-dependency status, and the full work order lifecycle.</td>
+            <td>Editable</td>
+            <td>Create work order / Set procedure / Start / Hold / Resume / Complete / Save notes / Create test report</td>
+            <td>No</td>
+            <td>Modern only</td>
+          </tr>
+          <tr>
+            <td>Test Reports Queue</td>
+            <td><code>/reports/</code></td>
+            <td>Technician + Planner</td>
+            <td>Read-only list</td>
+            <td>Reports awaiting the current user's review, plus the full report history, each linking to Report Detail.</td>
+            <td>View-only</td>
+            <td>&mdash; (links out to Report Detail)</td>
+            <td>No</td>
+            <td>Modern only</td>
+          </tr>
+          <tr>
+            <td>Report Detail</td>
+            <td><code>/reports/&lt;id&gt;</code></td>
+            <td>Technician + Planner</td>
+            <td>Form + printable document</td>
+            <td>The fillable/printable A4 test report itself, moving through draft &rarr; submitted &rarr; approved/rejected &rarr; (reopened), pre-loaded with test/order/equipment identification and one row per procedure check-item.</td>
+            <td>Editable while draft or rejected; read-only once submitted/approved (until reopened)</td>
+            <td>Save draft / Submit for review / Approve / Reject / Reopen / Print</td>
+            <td>No</td>
+            <td>Modern only</td>
+          </tr>
+          <tr>
+            <td>Submit Proposal</td>
+            <td><code>/proposals/new</code></td>
+            <td>Any signed-in role</td>
+            <td>Form</td>
+            <td>Report a bug or suggest an enhancement against a specific page, auto-recording which page it was opened from. In Modern UI this is also embedded as a draggable dialog behind a floating "P" button on every page.</td>
+            <td>Editable</td>
+            <td>Submit</td>
+            <td>No</td>
+            <td>Both (Modern: dialog; Simple: dedicated page/nav link)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Tab Breakdown for the Two Multi-Tab Pages</h2>
+      <p>Admin Manage and Planner Orders are each one route rendering several tabs from the same page load (a CSS-only radio/label mechanism, no JS). The table above describes them as a whole; these two tables describe each tab the same way the pages above are described.</p>
+
+      <h3>3.1 Admin Manage (<code>/admin/</code>)</h3>
+      <table>
+        <thead>
+          <tr><th>Tab</th><th>Description</th><th>View-only or editable</th><th>Function buttons</th><th>Sortable</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Users</td><td>Create/edit/delete user accounts; assign role and (for technicians) a linked resource.</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
+          <tr><td>Capabilities</td><td>Create/edit/delete capabilities (skills a resource can perform).</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
+          <tr><td>Resources</td><td>Create/edit/delete resources (equipment, facility, technician, or procedure), including which site a facility/equipment resource is at.</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
+          <tr><td>Capability assignments</td><td>Assign or remove which resources have which capabilities.</td><td>Editable</td><td>Assign / Remove</td><td>Yes</td></tr>
+          <tr><td>Exclusion groups</td><td>Define mutual-exclusion facility groups (e.g. a shared test chamber only one setup can use at a time) and their membership.</td><td>Editable</td><td>Save / Delete / Assign / Remove</td><td>Yes</td></tr>
+          <tr><td>Activity templates</td><td>Maintain reusable, ordered standard activity templates and their items.</td><td>Editable</td><td>Save / Delete / Add item / Move item up-down</td><td>Yes</td></tr>
+          <tr><td>Staff absences</td><td>Record a technician's absence/vacation periods.</td><td>Editable</td><td>Add / Delete</td><td>Yes</td></tr>
+          <tr><td>Proposals</td><td>Review and triage enhancement/bug proposals submitted by any signed-in role from anywhere in the app.</td><td>Editable (status and comment)</td><td>Update status / Delete</td><td>Yes</td></tr>
+          <tr><td>Customers</td><td>Full CRUD on the customer list; flags any profile missing required contact info for follow-up.</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3.2 Planner Orders (<code>/planner/</code>)</h3>
+      <table>
+        <thead>
+          <tr><th>Tab</th><th>Description</th><th>View-only or editable</th><th>Function buttons</th><th>Sortable</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Customer orders</td><td>Create/edit/delete customer orders; pick an existing customer or add a new one inline.</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
+          <tr><td>Ordered tests</td><td>Add/edit/delete/reorder test activities per order/EUT; apply an activity template (creating a syncable group); manage dependencies and planned dates.</td><td>Editable</td><td>Save / Delete / Apply template / Move / Add or remove dependency / Sync or delete template group</td><td>Yes</td></tr>
+          <tr><td>Resource assignment</td><td>Assign or remove resources (equipment, facility, procedure, technician) on a test activity.</td><td>Editable</td><td>Assign / Remove</td><td>Yes</td></tr>
+          <tr><td>Schedule</td><td>A production-schedule Gantt chart with Day (hourly), Week, Month, and combined "All" scales, flagging resource conflicts and cross-site equipment use.</td><td>View-only (visualization)</td><td>Previous/Next/Today navigation, weeks/months-shown selector, scale switcher</td><td>No</td></tr>
+          <tr><td>Orders overview</td><td>The same order data presented three ways - List (expandable), Kanban (by status), Master-detail - for a portfolio-level read.</td><td>View-only</td><td>View switcher only</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
