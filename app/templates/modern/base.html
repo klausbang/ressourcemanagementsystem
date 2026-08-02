@@ -68,7 +68,7 @@
   </footer>
 
   {% if session.get('username') %}
-  {% set path = request.path %}
+  {% set path = request.path + ('?' + request.query_string.decode('utf-8') if request.query_string else '') %}
   {% set form_id = 'dialog' %}
   {% set form_values = {} %}
   <button type="button" id="proposalOpenBtn" title="Suggest an enhancement or report a bug"

@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RMS SRS v9</title>
+  <title>RMS SRS v10</title>
 </head>
 <body>
   <header>
-    <h1>Resource Management System (RMS) - SRS v9</h1>
-    <p>Version: 0.9 | Date: 2026-08-02</p>
+    <h1>Resource Management System (RMS) - SRS v10</h1>
+    <p>Version: 0.10 | Date: 2026-08-02</p>
     <p><a href="index.html">Back to Documentation Home</a></p>
   </header>
 
@@ -26,7 +26,8 @@
         <li><strong>v0.6 (Phase 16):</strong> added FR-USE-6, a single-page per-order workspace consolidating order creation/maintenance with everything that hangs off it (EUTs, test activities, dependencies, planned dates, resource allocations, milestones, visits, derived status) into one view, alongside the existing multi-tab Planner page.</li>
         <li><strong>v0.7 (Phases 17-18):</strong> implemented five planner-submitted proposals found in the live proposals queue. New BR-007/FR-PRJ-5/FR-PRJ-6 (Phase 17): a customer database a planner can pick from or add to inline when creating/editing an order, with incomplete profiles flagged to the admin without ever blocking the order. New FR-TP-7 (Phase 18): activities from one "apply template" action are grouped, individually removable or deletable as a whole, with drift detection and an additive sync when the source template changes. The remaining three proposals (preserve scroll position across Save/Add/Apply; grey out Save until a form is actually changed, with an unsaved-changes warning; inline confirmation for Apply Template/Add Activity) were Modern-UI usability fixes with no new requirement ID, since they don't change what the system does, only how it confirms/preserves state while doing it.</li>
         <li><strong>v0.8 (Phase 19):</strong> new FR-PLN-5, from a planner-submitted proposal: the production schedule chart (FR-PLN-2) gains selectable Week and Month scales (day-column Gantt grids, 1-8 weeks or 1-6 months wide) alongside the existing Day scale, plus an "All" mode showing Day/Week/Month stacked together, all pivoting around the same viewed date. No new stored data - purely a new way of visualizing the same work-order/ordered-test records the Day chart already reads.</li>
-        <li><strong>v0.9 (Phase 20, this revision):</strong> implemented four admin-submitted proposals. New FR-USE-7: the Admin landing page's entity-count strip collapses behind a small expand control by default, its workflow explainer's steps are now clickable jump-links to the matching tab, and every tab label shows its entity's count with a highlighted "(N!)" suffix when N need attention. New FR-RES-6: a resource's type is now restricted (server-side, not just in the picker) to the fixed set already in use - equipment, facility, technician. Two further proposals got no new requirement ID, matching the precedent set in v0.7 for pure UX fixes: the Admin page's tab selection is now preserved across a Save/Add/Delete round trip exactly like the Planner page already does (a bug fix, not a new capability), and the floating proposal-report dialog can now be dragged by its title bar so it can be moved off whatever part of the page it's reporting on.</li>
+        <li><strong>v0.9 (Phase 20):</strong> implemented four admin-submitted proposals. New FR-USE-7: the Admin landing page's entity-count strip collapses behind a small expand control by default, its workflow explainer's steps are now clickable jump-links to the matching tab, and every tab label shows its entity's count with a highlighted "(N!)" suffix when N need attention. New FR-RES-6: a resource's type is now restricted (server-side, not just in the picker) to the fixed set already in use - equipment, facility, technician. Two further proposals got no new requirement ID, matching the precedent set in v0.7 for pure UX fixes: the Admin page's tab selection is now preserved across a Save/Add/Delete round trip exactly like the Planner page already does (a bug fix, not a new capability), and the floating proposal-report dialog can now be dragged by its title bar so it can be moved off whatever part of the page it's reporting on.</li>
+        <li><strong>v0.10 (Phase 21, this revision):</strong> implemented three more admin-submitted proposals (one, id 16, filed with just a title and no description, answering the open question v0.9 itself raised about a fourth resource type). FR-RES-6 extended: "procedure" is now a fourth allowed resource type, alongside equipment/facility/technician, matching wording the Resources card's own subtitle already used ("Resources include equipment, facilities, procedures, and technicians") before the type was actually accepted. Two further proposals got no new requirement ID, both bug fixes rather than new capabilities: the proposal-submission dialog's hidden "reporting against" path now captures the full URL including its query string, so submitting a proposal from the Admin page returns to the same tab it was opened from instead of resetting to Users; and creating a resource with a code that's already in use now re-renders the create-resource form with everything the admin typed still filled in (previously the form silently went blank on any validation error, which read as "the save did nothing").</li>
       </ul>
     </section>
 
@@ -142,7 +143,7 @@ Project (customer_orders)
         <li><strong>FR-RES-3</strong> [Must, Delivered - Phase 3]: The system shall allow planners to assign multiple resources to the same test activity (e.g. equipment, facility, procedure, and technician together), provided each has the activity's required capability, and to unassign any one independently.</li>
         <li><strong>FR-RES-4</strong> [Must, Delivered - Phase 3]: The system shall prevent the same resource being assigned twice to the same test activity, and prevent deletion of a capability/resource/user still referenced elsewhere, reporting a clear reason.</li>
         <li><strong>FR-RES-5</strong> [Should, Delivered - Phase 9]: A facility/equipment resource shall be able to record which site (TLC or TLS) it is at.</li>
-        <li><strong>FR-RES-6</strong> [Should, Delivered - Phase 20]: A resource's type shall be restricted to the fixed set already in use (equipment, facility, technician), on both create and update, rather than accepted as free text - enforced server-side, not just as a UI picker.</li>
+        <li><strong>FR-RES-6</strong> [Should, Delivered - Phase 20, extended Phase 21]: A resource's type shall be restricted to a fixed set (equipment, facility, technician, and - since Phase 21 - procedure), on both create and update, rather than accepted as free text - enforced server-side, not just as a UI picker.</li>
       </ul>
 
       <h3>8.4 Constraints (FR-CON)</h3>
@@ -308,6 +309,7 @@ Project (customer_orders)
           <tr><td>18</td><td>Template application grouping</td><td>FR-TP-7</td><td>Delivered</td></tr>
           <tr><td>19</td><td>Week/Month schedule scales</td><td>FR-PLN-5</td><td>Delivered</td></tr>
           <tr><td>20</td><td>Admin landing page redesign, resource type restriction</td><td>FR-USE-7, FR-RES-6</td><td>Delivered</td></tr>
+          <tr><td>21</td><td>Procedure resource type, proposal-tab fix, resource form fix</td><td>FR-RES-6</td><td>Delivered</td></tr>
         </tbody>
       </table>
     </section>

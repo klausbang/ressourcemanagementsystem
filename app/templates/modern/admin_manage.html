@@ -264,26 +264,26 @@
           <input type="hidden" name="action" value="create_resource">
           <div class="field">
             <label for="new-res-code">Code</label>
-            <input type="text" id="new-res-code" name="code" required>
+            <input type="text" id="new-res-code" name="code" value="{{ resource_form_values.code if resource_form_values }}" required>
           </div>
           <div class="field">
             <label for="new-res-name">Name</label>
-            <input type="text" id="new-res-name" name="name" required>
+            <input type="text" id="new-res-name" name="name" value="{{ resource_form_values.name if resource_form_values }}" required>
           </div>
           <div class="field">
             <label for="new-res-type">Type</label>
             <select id="new-res-type" name="resource_type" required>
-              <option value="" disabled selected>Choose a type&hellip;</option>
-              {% for t in resource_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+              <option value="" disabled {{ 'selected' if not resource_form_values }}>Choose a type&hellip;</option>
+              {% for t in resource_types %}<option value="{{ t }}" {{ 'selected' if resource_form_values and resource_form_values.resource_type == t }}>{{ t }}</option>{% endfor %}
             </select>
           </div>
           <div class="field">
             <label for="new-res-status">Status</label>
-            <input type="text" id="new-res-status" name="status" placeholder="available">
+            <input type="text" id="new-res-status" name="status" value="{{ resource_form_values.status if resource_form_values }}" placeholder="available">
           </div>
           <div class="field">
             <label for="new-res-site">Site</label>
-            <input type="text" id="new-res-site" name="site" placeholder="TLC / TLS">
+            <input type="text" id="new-res-site" name="site" value="{{ resource_form_values.site if resource_form_values }}" placeholder="TLC / TLS">
             <div class="hint">Only meaningful for equipment/facility resources that live at one of the two lab sites.</div>
           </div>
           <div class="field"><button type="submit" class="btn btn-primary">Save resource</button></div>

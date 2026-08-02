@@ -111,16 +111,16 @@
   <h3>Resources</h3>
   <form method="post">
     <input type="hidden" name="action" value="create_resource">
-    <label>Code <input type="text" name="code" required></label>
-    <label>Name <input type="text" name="name" required></label>
+    <label>Code <input type="text" name="code" value="{{ resource_form_values.code if resource_form_values }}" required></label>
+    <label>Name <input type="text" name="name" value="{{ resource_form_values.name if resource_form_values }}" required></label>
     <label>Type
       <select name="resource_type" required>
-        <option value="" disabled selected>Choose a type&hellip;</option>
-        {% for t in resource_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        <option value="" disabled {{ 'selected' if not resource_form_values }}>Choose a type&hellip;</option>
+        {% for t in resource_types %}<option value="{{ t }}" {{ 'selected' if resource_form_values and resource_form_values.resource_type == t }}>{{ t }}</option>{% endfor %}
       </select>
     </label>
-    <label>Status <input type="text" name="status" placeholder="available"></label>
-    <label>Site <input type="text" name="site" placeholder="TLC / TLS"></label>
+    <label>Status <input type="text" name="status" value="{{ resource_form_values.status if resource_form_values }}" placeholder="available"></label>
+    <label>Site <input type="text" name="site" value="{{ resource_form_values.site if resource_form_values }}" placeholder="TLC / TLS"></label>
     <button type="submit">Save Resource</button>
   </form>
 

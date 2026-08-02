@@ -19,7 +19,7 @@ CAPABILITY_DUP_KEYS = ["name", "description"]
 
 RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "site"}
 RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "site"]
-RESOURCE_TYPES = ["equipment", "facility", "technician"]
+RESOURCE_TYPES = ["equipment", "facility", "technician", "procedure"]
 
 MAPPING_SORTABLE_KEYS = {"code", "resource_name", "capability_name"}
 MAPPING_DUP_KEYS = ["code", "resource_name", "capability_name"]
@@ -244,8 +244,12 @@ def _touch_template(db, template_id) -> None:
     db.execute("UPDATE activity_templates SET version = version + 1 WHERE id = ?", (template_id,))
 
 
-def _render_admin(db):
-    return render_ui("admin_manage.html", **_load_admin_context(db))
+def _render_admin(db, active_tab_override: str | None = None, **extra):
+    context = _load_admin_context(db)
+    if active_tab_override:
+        context["active_tab"] = active_tab_override
+    context.update(extra)
+    return render_ui("admin_manage.html", **context)
 
 
 @bp.route("/", methods=["GET", "POST"])
@@ -362,19 +366,35 @@ def admin_manage():
             status = request.form.get("status", "").strip() or "available"
             site = request.form.get("site", "").strip() or None
 
+            resource_form_error = None
             if not (code and name and resource_type):
-                flash("Resource code, name, and type are required.", "error")
+                resource_form_error = "Resource code, name, and type are required."
             elif resource_type not in RESOURCE_TYPES:
-                flash(f"Resource type must be one of: {', '.join(RESOURCE_TYPES)}.", "error")
+                resource_form_error = f"Resource type must be one of: {', '.join(RESOURCE_TYPES)}."
             elif db.execute("SELECT 1 FROM resources WHERE code = ?", (code,)).fetchone():
-                flash(f"Resource code {code} already exists.", "error")
-            else:
-                db.execute(
-                    "INSERT INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)",
-                    (code, name, resource_type, status, site),
+                resource_form_error = f"Resource code '{code}' is already in use. Choose a different code."
+
+            if resource_form_error:
+                # Re-render in place (rather than the shared redirect below) so the admin's
+                # typed values aren't silently lost - a duplicate code otherwise looked like
+                # "the save did nothing", since the create-resource form reset to blank with
+                # only an easy-to-miss flash message as feedback.
+                flash(resource_form_error, "error")
+                return _render_admin(
+                    db,
+                    active_tab_override="resources",
+                    resource_form_values={
+                        "code": code, "name": name, "resource_type": resource_type,
+                        "status": status, "site": site or "",
+                    },
                 )
-                db.commit()
-                flash("Resource saved.", "info")
+
+            db.execute(
+                "INSERT INTO resources (code, name, resource_type, status, site) VALUES (?, ?, ?, ?, ?)",
+                (code, name, resource_type, status, site),
+            )
+            db.commit()
+            flash("Resource saved.", "info")
 
         elif action == "update_resource":
             resource_id = request.form.get("resource_id", "").strip()
