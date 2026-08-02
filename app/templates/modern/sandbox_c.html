@@ -6,7 +6,8 @@
 <style>
   .sbx-grid { display: inline-block; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 14px; }
   .sbx-grid-row { display: flex; }
-  .sbx-grid-row.header .sbx-cell { font-weight: 700; background: var(--color-bg); cursor: default; }
+  .sbx-grid-row.header .sbx-cell { font-weight: 700; background: var(--color-bg); cursor: pointer; }
+  .sbx-grid-row.header .sbx-cell:hover { background: var(--color-primary-light); }
   .sbx-cell {
     width: 150px;
     padding: 6px 8px;
@@ -20,21 +21,32 @@
   }
   .sbx-grid-row .sbx-cell:last-child { border-right: none; }
   .sbx-cell.active { box-shadow: inset 0 0 0 2px var(--color-primary); background: var(--color-primary-light); }
-  .sbx-cell.selected:not(.active) { background: var(--color-primary-light); }
+  .sbx-cell.selected:not(.active) { background: rgba(79, 70, 229, 0.32); }
+  .sbx-row-handle, .sbx-corner {
+    width: 26px;
+    flex: none;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    cursor: pointer;
+  }
+  .sbx-row-handle:hover, .sbx-corner:hover { background: var(--color-primary-light); }
+  .sbx-row-handle.selected { background: rgba(79, 70, 229, 0.32); }
   .sbx-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
 </style>
 
 <div class="page-header">
   <div class="eyebrow">Prototype &middot; Option C</div>
   <h1>Custom keyboard-navigable grid</h1>
-  <p class="lead">Arrow keys/Tab/Enter move the active cell. Click a cell, then Shift+click (or Shift+arrow) another to select a rectangle. Paste fills exactly that shape starting at the active cell; Copy takes the current selection back out as a tab-separated block for pasting into Excel.</p>
+  <p class="lead">Arrow keys/Tab/Enter move the active cell. Click a cell, then Shift+click (or Shift+arrow) another to select a rectangle. Click a row handle (left column) or a column header to select a whole row/column; click the top-left corner to select everything. Ctrl+C/Ctrl+X/Ctrl+V and Ctrl+Z (undo) all work as expected.</p>
   <p><a href="{{ url_for('sandbox.index') }}">&larr; Back to all three options</a></p>
 </div>
 
 <div class="sbx-toolbar">
+  <button type="button" id="sbx-undo" class="btn btn-secondary btn-sm" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button type="button" id="sbx-add-row" class="btn btn-secondary btn-sm">+ Row</button>
-  <button type="button" id="sbx-del-row" class="btn btn-secondary btn-sm">🗑 Delete active row</button>
-  <button type="button" id="sbx-copy" class="btn btn-secondary btn-sm">📋 Copy selection as TSV</button>
+  <button type="button" id="sbx-del-row" class="btn btn-secondary btn-sm">🗑 Delete selected row(s)</button>
+  <button type="button" id="sbx-copy" class="btn btn-secondary btn-sm">📋 Copy selection as TSV (Ctrl+C)</button>
   <button type="button" id="sbx-export-json" class="btn btn-secondary btn-sm">⬇️ Export JSON</button>
   <label class="btn btn-secondary btn-sm" style="cursor:pointer;">📤 Import file<input type="file" id="sbx-import" accept=".csv,.json" style="display:none;"></label>
   <button type="button" id="sbx-save" class="btn btn-primary btn-sm">💾 Save all</button>
@@ -42,10 +54,12 @@
 
 <div class="sbx-grid" id="sbx-c-grid">
   <div class="sbx-grid-row header">
-    <div class="sbx-cell">Code</div><div class="sbx-cell">Name</div><div class="sbx-cell">Category</div><div class="sbx-cell">Quantity</div><div class="sbx-cell">Notes</div>
+    <div class="sbx-corner" id="sbx-corner" title="Select all"></div>
+    <div class="sbx-cell" data-col="0">Code</div><div class="sbx-cell" data-col="1">Name</div><div class="sbx-cell" data-col="2">Category</div><div class="sbx-cell" data-col="3">Quantity</div><div class="sbx-cell" data-col="4">Notes</div>
   </div>
   {% for r in rows %}
   <div class="sbx-grid-row" data-row="{{ loop.index0 }}">
+    <div class="sbx-row-handle" title="Select row"></div>
     <div class="sbx-cell" contenteditable="true" data-col="0">{{ r.code or '' }}</div>
     <div class="sbx-cell" contenteditable="true" data-col="1">{{ r.name or '' }}</div>
     <div class="sbx-cell" contenteditable="true" data-col="2">{{ r.category or '' }}</div>
@@ -66,6 +80,8 @@
 (function () {
   var FIELDS = RmsSandbox.FIELDS;
   var grid = document.getElementById("sbx-c-grid");
+  var MAX_UNDO = 50;
+  var undoStack = [];
 
   function dataRows() {
     return Array.prototype.filter.call(grid.children, function (r) { return !r.classList.contains("header"); });
@@ -73,14 +89,19 @@
   function cellAt(r, c) {
     var rows = dataRows();
     if (!rows[r]) return null;
-    return rows[r].children[c] || null;
+    return rows[r].querySelector('.sbx-cell[data-col="' + c + '"]');
+  }
+  function rowHandleAt(r) {
+    var rows = dataRows();
+    return rows[r] ? rows[r].querySelector(".sbx-row-handle") : null;
   }
 
   var active = { row: 0, col: 0 };
   var selection = null; // {r1,c1,r2,c2} or null (meaning just the active cell)
+  var selectionMode = "cell"; // "cell" | "row" | "column" | "all" - how the current selection was made
 
   function clearHighlight() {
-    grid.querySelectorAll(".sbx-cell.active,.sbx-cell.selected").forEach(function (el) {
+    grid.querySelectorAll(".sbx-cell.active,.sbx-cell.selected,.sbx-row-handle.selected").forEach(function (el) {
       el.classList.remove("active", "selected");
     });
   }
@@ -94,12 +115,20 @@
   }
 
   function render() {
+    // Keep each row's data-row attribute in sync with its actual position - rows created
+    // dynamically (add/paste/import/undo) don't otherwise carry one, unlike the
+    // server-rendered rows the page starts with.
+    dataRows().forEach(function (row, i) { row.setAttribute("data-row", i); });
     clearHighlight();
     var b = bounds();
     for (var r = b.r1; r <= b.r2; r++) {
       for (var c = b.c1; c <= b.c2; c++) {
         var cell = cellAt(r, c);
         if (cell) cell.classList.add("selected");
+      }
+      if (selectionMode === "row" || selectionMode === "all") {
+        var handle = rowHandleAt(r);
+        if (handle) handle.classList.add("selected");
       }
     }
     var activeCell = cellAt(active.row, active.col);
@@ -117,6 +146,7 @@
 
   function setActive(r, c, extend) {
     var rows = dataRows();
+    if (!rows.length) return;
     r = Math.max(0, Math.min(r, rows.length - 1));
     c = Math.max(0, Math.min(c, FIELDS.length - 1));
     if (extend) {
@@ -125,20 +155,182 @@
     } else {
       selection = null;
     }
+    selectionMode = "cell";
     active = { row: r, col: c };
     render();
   }
 
-  grid.addEventListener("click", function (e) {
+  function selectRow(r, extend) {
+    var rows = dataRows();
+    if (!rows.length) return;
+    r = Math.max(0, Math.min(r, rows.length - 1));
+    var anchorRow = extend && selectionMode === "row" && selection ? selection.r1 : r;
+    selection = { r1: anchorRow, c1: 0, r2: r, c2: FIELDS.length - 1 };
+    selectionMode = "row";
+    active = { row: r, col: 0 };
+    render();
+  }
+
+  function selectColumn(c, extend) {
+    var rows = dataRows();
+    if (!rows.length) return;
+    var anchorCol = extend && selectionMode === "column" && selection ? selection.c1 : c;
+    selection = { r1: 0, c1: anchorCol, r2: rows.length - 1, c2: c };
+    selectionMode = "column";
+    active = { row: 0, col: c };
+    render();
+  }
+
+  function selectAll() {
+    var rows = dataRows();
+    if (!rows.length) return;
+    selection = { r1: 0, c1: 0, r2: rows.length - 1, c2: FIELDS.length - 1 };
+    selectionMode = "all";
+    active = { row: 0, col: 0 };
+    render();
+  }
+
+  // --- Undo ---
+  function snapshotJson() { return JSON.stringify(gridToObjects()); }
+  function pushUndo() {
+    undoStack.push(snapshotJson());
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+  }
+  function restoreJson(json) {
+    var objs = JSON.parse(json);
+    dataRows().forEach(function (r) { r.remove(); });
+    objs.forEach(function (o) { grid.appendChild(makeRow(o)); });
+    selection = null;
+    selectionMode = "cell";
+    active = { row: 0, col: 0 };
+    render();
+  }
+  function undo() {
+    if (!undoStack.length) return;
+    restoreJson(undoStack.pop());
+  }
+
+  // Track direct typing into a cell as one undo step: snapshot on focus-in, and only
+  // keep that snapshot (push it) if the cell's content actually changed by focus-out.
+  var focusSnapshot = null;
+  var focusValueBefore = null;
+  grid.addEventListener("focusin", function (e) {
     var cell = e.target.closest(".sbx-cell");
-    if (!cell || cell.parentElement.classList.contains("header")) return;
-    var r = Array.prototype.indexOf.call(dataRows(), cell.parentElement);
-    var c = Number(cell.getAttribute("data-col"));
-    setActive(r, c, e.shiftKey);
+    if (!cell || cell.closest(".header")) return;
+    focusSnapshot = snapshotJson();
+    focusValueBefore = cell.textContent;
+  });
+  grid.addEventListener("focusout", function (e) {
+    var cell = e.target.closest(".sbx-cell");
+    if (!cell || cell.closest(".header")) return;
+    if (focusSnapshot !== null && cell.textContent !== focusValueBefore) {
+      undoStack.push(focusSnapshot);
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+    }
+    focusSnapshot = null;
   });
 
+  // --- Click handling: cells, row handles, column headers, corner ---
+  grid.addEventListener("click", function (e) {
+    if (e.target.closest("#sbx-corner")) {
+      selectAll();
+      return;
+    }
+    var handle = e.target.closest(".sbx-row-handle");
+    if (handle) {
+      var r = Array.prototype.indexOf.call(dataRows(), handle.parentElement);
+      selectRow(r, e.shiftKey);
+      return;
+    }
+    var headerCell = e.target.closest(".header .sbx-cell");
+    if (headerCell) {
+      selectColumn(Number(headerCell.getAttribute("data-col")), e.shiftKey);
+      return;
+    }
+    var cell = e.target.closest(".sbx-cell");
+    if (!cell || cell.closest(".header")) return;
+    var row = Array.prototype.indexOf.call(dataRows(), cell.parentElement);
+    var col = Number(cell.getAttribute("data-col"));
+    setActive(row, col, e.shiftKey);
+  });
+
+  function copySelection() {
+    var b = bounds();
+    var lines = [];
+    for (var r = b.r1; r <= b.r2; r++) {
+      var line = [];
+      for (var c = b.c1; c <= b.c2; c++) {
+        var cell = cellAt(r, c);
+        line.push(cell ? cell.textContent.trim() : "");
+      }
+      lines.push(line.join("\t"));
+    }
+    RmsSandbox.copyText(lines.join("\n"));
+  }
+
+  function clearSelectionContents() {
+    var b = bounds();
+    pushUndo();
+    for (var r = b.r1; r <= b.r2; r++) {
+      for (var c = b.c1; c <= b.c2; c++) {
+        var cell = cellAt(r, c);
+        if (cell) cell.textContent = "";
+      }
+    }
+  }
+
+  function deleteSelectedRows() {
+    var b = bounds();
+    pushUndo();
+    var rows = dataRows();
+    for (var r = b.r2; r >= b.r1; r--) {
+      if (rows[r]) rows[r].remove();
+    }
+    selection = null;
+    selectionMode = "cell";
+    active = { row: Math.max(0, Math.min(b.r1, dataRows().length - 1)), col: 0 };
+    render();
+  }
+
   grid.addEventListener("keydown", function (e) {
+    var ctrl = e.ctrlKey || e.metaKey;
     var key = e.key;
+
+    if (ctrl && key.toLowerCase() === "z") {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (ctrl && key.toLowerCase() === "c") {
+      e.preventDefault();
+      copySelection();
+      return;
+    }
+    if (ctrl && key.toLowerCase() === "x") {
+      e.preventDefault();
+      copySelection();
+      if (selectionMode === "row") {
+        deleteSelectedRows();
+      } else {
+        clearSelectionContents();
+        render();
+      }
+      return;
+    }
+    if ((key === "Delete" || key === "Backspace") && selection) {
+      // Only intercept Delete/Backspace when there's a real selection beyond the lone
+      // active cell - a single cell with no selection keeps normal text-editing
+      // Backspace/Delete behavior.
+      e.preventDefault();
+      if (selectionMode === "row") {
+        deleteSelectedRows();
+      } else {
+        clearSelectionContents();
+        render();
+      }
+      return;
+    }
+
     var moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     if (moves[key]) {
       e.preventDefault();
@@ -157,6 +349,7 @@
     var text = (e.clipboardData || window.clipboardData).getData("text");
     var pasted = RmsSandbox.parseDelimited(text);
     if (!pasted.length) return;
+    pushUndo();
     var startRow = active.row, startCol = active.col;
     pasted.forEach(function (rowValues, rOffset) {
       var r = startRow + rOffset;
@@ -169,28 +362,22 @@
       });
     });
     selection = { r1: startRow, c1: startCol, r2: startRow + pasted.length - 1, c2: startCol + (pasted[0].length - 1) };
+    selectionMode = "cell";
     active = { row: selection.r1, col: selection.c1 };
     render();
   });
 
-  document.getElementById("sbx-copy").addEventListener("click", function () {
-    var b = bounds();
-    var lines = [];
-    for (var r = b.r1; r <= b.r2; r++) {
-      var line = [];
-      for (var c = b.c1; c <= b.c2; c++) {
-        var cell = cellAt(r, c);
-        line.push(cell ? cell.textContent.trim() : "");
-      }
-      lines.push(line.join("\t"));
-    }
-    RmsSandbox.copyText(lines.join("\n"));
-  });
+  document.getElementById("sbx-copy").addEventListener("click", copySelection);
+  document.getElementById("sbx-undo").addEventListener("click", undo);
 
   function makeRow(values) {
     values = values || {};
     var row = document.createElement("div");
     row.className = "sbx-grid-row";
+    var handle = document.createElement("div");
+    handle.className = "sbx-row-handle";
+    handle.title = "Select row";
+    row.appendChild(handle);
     FIELDS.forEach(function (f, i) {
       var cell = document.createElement("div");
       cell.className = "sbx-cell";
@@ -203,21 +390,22 @@
   }
 
   document.getElementById("sbx-add-row").addEventListener("click", function () {
+    pushUndo();
     grid.appendChild(makeRow({}));
   });
 
   document.getElementById("sbx-del-row").addEventListener("click", function () {
-    var rows = dataRows();
-    if (rows[active.row]) rows[active.row].remove();
-    selection = null;
-    active = { row: Math.min(active.row, dataRows().length - 1), col: active.col };
-    render();
+    if (!dataRows().length) return;
+    deleteSelectedRows();
   });
 
   function gridToObjects() {
     return dataRows().map(function (row) {
       var obj = {};
-      FIELDS.forEach(function (f, i) { obj[f] = row.children[i].textContent.trim(); });
+      FIELDS.forEach(function (f, i) {
+        var cell = row.querySelector('.sbx-cell[data-col="' + i + '"]');
+        obj[f] = cell ? cell.textContent.trim() : "";
+      });
       return obj;
     });
   }
@@ -245,6 +433,7 @@
         window.alert("Could not read that file: " + err.message);
         return;
       }
+      pushUndo();
       objs.forEach(function (o) { grid.appendChild(makeRow(o)); });
     };
     reader.readAsText(file);
