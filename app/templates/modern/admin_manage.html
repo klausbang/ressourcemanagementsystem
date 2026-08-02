@@ -29,8 +29,34 @@
   #tab-proposals:checked ~ .tab-list label[for="tab-proposals"],
   #tab-customers:checked ~ .tab-list label[for="tab-customers"] {
     color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    border-bottom-color: var(--color-surface);
   }
+
+  /* Fixed, compact, classic-tab-styled header - keeps all 9 tabs on one line and
+     pins them just below the page's own fixed top nav bar while scrolling. */
+  .tabs .tab-list {
+    position: sticky;
+    top: var(--topbar-height);
+    z-index: 40;
+    background: var(--color-bg);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 2px;
+    padding-top: 6px;
+  }
+  .tabs .tab-label {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    background: var(--color-surface-alt, #f1f5f9);
+    border: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    margin-bottom: 0;
+  }
+  .tabs .tab-label-count { font-size: 0.66rem; margin-top: 1px; }
 
   .template-item-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--color-border); }
   .template-item-row:last-child { border-bottom: none; }
@@ -52,7 +78,7 @@
 
 {% set new_proposals_count = proposals|selectattr('status', 'equalto', 'new')|list|length %}
 
-<details class="card" style="margin-bottom:20px;" open>
+<details class="card" style="margin-bottom:20px;">
   <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
   <img src="{{ url_for('static', filename='img/usage-role-admin.svg') }}" alt="Admin workflow: Capabilities, then Resources, then assign capabilities to resources, then exclusion groups, activity templates, users, and staff absences" style="max-width:100%; height:auto; margin-top:10px;">
   <div class="workflow-tiles">
@@ -675,6 +701,7 @@
         <div class="group-card-head">
           <div>
             <div class="group-card-title">
+              <span class="section-help" style="font-weight:700;">#{{ p['id'] }}</span>
               {% if p['proposal_type'] == 'bug' %}🐛{% else %}💡{% endif %} {{ p['title'] }}
               {% if p['_dup'] %}{{ macros.dup_flag() }}{% endif %}
             </div>
@@ -689,11 +716,24 @@
           </form>
         </div>
 
-        {% if p['description'] %}<p style="white-space:pre-wrap;">{{ p['description'] }}</p>{% endif %}
-
         <form method="post" class="form-grid">
           <input type="hidden" name="action" value="update_proposal">
           <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+          <div class="field" style="flex:1 1 100%;">
+            <label for="proposal-title-{{ p['id'] }}">Title</label>
+            <input type="text" id="proposal-title-{{ p['id'] }}" name="title" value="{{ p['title'] }}" required>
+          </div>
+          <div class="field" style="flex:1 1 100%;">
+            <label for="proposal-desc-{{ p['id'] }}">Description</label>
+            <textarea id="proposal-desc-{{ p['id'] }}" name="description" rows="3" style="width:100%;">{{ p['description'] or '' }}</textarea>
+          </div>
+          <div class="field">
+            <label for="proposal-type-{{ p['id'] }}">Type</label>
+            <select id="proposal-type-{{ p['id'] }}" name="proposal_type">
+              <option value="enhancement" {% if p['proposal_type'] == 'enhancement' %}selected{% endif %}>💡 Enhancement</option>
+              <option value="bug" {% if p['proposal_type'] == 'bug' %}selected{% endif %}>🐛 Bug</option>
+            </select>
+          </div>
           <div class="field">
             <label for="proposal-status-{{ p['id'] }}">Status</label>
             <select id="proposal-status-{{ p['id'] }}" name="status">

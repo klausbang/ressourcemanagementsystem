@@ -7,6 +7,7 @@ from .routes_planner import bp as planner_bp
 from .routes_technician import bp as technician_bp
 from .routes_reports import bp as reports_bp
 from .routes_proposals import bp as proposals_bp
+from .routes_sandbox import bp as sandbox_bp
 
 
 def create_app() -> Flask:
@@ -22,6 +23,7 @@ def create_app() -> Flask:
     app.register_blueprint(technician_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(proposals_bp)
+    app.register_blueprint(sandbox_bp)
 
     with app.app_context():
         init_db()

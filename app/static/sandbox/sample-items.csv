@@ -1,0 +1,9 @@
+code,name,category,quantity,notes
+INV-001,Digital Multimeter,equipment,4,Calibrated quarterly
+INV-002,Vibration Table,equipment,1,Needs recalibration
+INV-003,Humidity Chamber,facility,2,
+INV-004,CON Test Chamber,facility,1,Shared with CI setup
+INV-005,Spectrum Analyzer,equipment,1,Shared across sites
+INV-006,Torque Wrench Set,equipment,3,
+INV-007,ESD Test Gun,equipment,1,Handle with care
+INV-008,Anechoic Chamber,facility,1,TLS site

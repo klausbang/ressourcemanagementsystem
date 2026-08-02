@@ -1,0 +1,52 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Editable Table Prototypes{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Admin &middot; Prototype</div>
+  <h1>Editable table view prototypes</h1>
+  <p class="lead">Three different ways to make an RMS table more spreadsheet-like: paste rows in from Excel/CSV/JSON, insert them one-by-one or in a batch, and copy or export back out. All three operate on the same sample table below - nothing here touches real Users/Resources/Capabilities data. Try each, then decide (if any) which is worth building into the real Admin/Planner tables.</p>
+</div>
+
+<div class="callout">
+  <strong>Sample files for testing paste/import:</strong>
+  <a href="{{ url_for('static', filename='sandbox/sample-items.csv') }}">sample-items.csv</a> &middot;
+  <a href="{{ url_for('static', filename='sandbox/sample-items.json') }}">sample-items.json</a> &middot;
+  <a href="{{ url_for('static', filename='sandbox/sample-items.xlsx') }}">sample-items.xlsx</a>
+  &mdash; open the .xlsx in Excel/Sheets and copy a range of cells to test the Excel-paste path, or open the .csv/.json directly, or use each page's own "Import file" control.
+</div>
+
+<div class="workflow-tiles" style="margin-bottom:20px;">
+  <a href="{{ url_for('sandbox.page_a') }}" class="workflow-tile">📋 Option A &mdash; Spreadsheet grid</a>
+  <a href="{{ url_for('sandbox.page_b') }}" class="workflow-tile">📥 Option B &mdash; Form table + bulk import</a>
+  <a href="{{ url_for('sandbox.page_c') }}" class="workflow-tile">⌨️ Option C &mdash; Custom keyboard grid</a>
+</div>
+
+<div class="card">
+  <div class="card-title">Option A &mdash; Spreadsheet-like grid</div>
+  <div class="card-subtitle">Every cell is directly editable in place, like a plain spreadsheet.</div>
+  <p>Click any cell and type, or paste a block copied from Excel/Sheets/a CSV starting at any cell - it fills right and down, adding rows if the paste is bigger than the table. One "Save all" button replaces the whole sandbox table with whatever's currently in the grid. Closest to "just paste into Excel and it works", but has no undo and no explicit per-row actions.</p>
+  <a class="btn btn-primary" href="{{ url_for('sandbox.page_a') }}">Open Option A &rarr;</a>
+</div>
+
+<div class="card">
+  <div class="card-title">Option B &mdash; Traditional form table + bulk import panel</div>
+  <div class="card-subtitle">The exact editing style RMS already uses everywhere else (Users, Resources, Capabilities&hellip;), plus a bulk-import add-on.</div>
+  <p>Each row has its own Save/Delete, exactly like every other table in this app. A separate "Bulk add rows" panel accepts a paste or a file upload, shows a preview of what will be inserted, and adds them as new rows in one batch on confirmation - existing rows are never touched by an import. Closest to "the smallest change to what RMS already does".</p>
+  <a class="btn btn-primary" href="{{ url_for('sandbox.page_b') }}">Open Option B &rarr;</a>
+</div>
+
+<div class="card">
+  <div class="card-title">Option C &mdash; Custom keyboard-navigable grid</div>
+  <div class="card-subtitle">A hand-built data grid: arrow keys/Tab to move, click-and-shift-click to select a range, right where you'd expect in a real spreadsheet.</div>
+  <p>Select a rectangular range with the mouse or keyboard, paste to fill exactly that shape (not just from row 1), copy a selection back out as a tab-separated block for pasting into Excel, and use the toolbar to add/delete rows. The most "feels like a real spreadsheet" of the three, and the most custom code behind it.</p>
+  <a class="btn btn-primary" href="{{ url_for('sandbox.page_c') }}">Open Option C &rarr;</a>
+</div>
+
+<form method="post" action="{{ url_for('sandbox.action') }}" style="margin-top:20px;">
+  <input type="hidden" name="action" value="reset_sample_data">
+  <input type="hidden" name="return_to" value="a">
+  <button type="submit" class="btn btn-secondary btn-sm" data-confirm="Reset the sandbox table back to its 8 original sample rows? Anything you've added or changed will be lost.">↺ Reset sandbox to sample data</button>
+</form>
+{% endblock %}

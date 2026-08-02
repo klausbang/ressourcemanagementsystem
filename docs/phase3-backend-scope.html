@@ -45,6 +45,7 @@
         <li>reschedule_dismissals (Phase 15; one row per (dependent activity, prerequisite) pair whose reschedule suggestion was accepted or ignored, so it is not repeated)</li>
         <li>customers (Phase 17; a known-customer list a planner can pick from, or add to inline, when creating/editing a customer order) and customer_orders.customer_id (optional FK to it; customer_orders.customer_name stays as a denormalized snapshot so every existing display/report is unaffected)</li>
         <li>template_applications (Phase 18; one row per "apply template" action - which template, order, optional EUT, when, and whether any member has since been individually changed) and ordered_tests.template_application_id (optional FK linking an activity back to the batch that created it); activity_templates.version (Phase 18; an integer counter bumped on every item add/edit/delete/reorder, compared against a batch's <code>applied_template_version</code> to detect drift)</li>
+        <li>sandbox_items (Phase 22; a standalone, no-FK/no-CHECK table backing three unintegrated editable-table-view prototypes at <code>/sandbox/</code> - not a real entity, and not referenced from anywhere else in the schema)</li>
       </ul>
     </section>
 
@@ -65,6 +66,7 @@
         <li>Technician scope (<code>routes_technician.py</code>, single POST-dispatch route): dashboard of tests allocated to the technician's linked resource; create a work order per assigned test; set/change its test procedure; move it through planned/in_progress/on_hold/completed (start/resume are conflict-checked, see below); edit notes</li>
         <li>Test report scope (<code>routes_reports.py</code>): create a report from a work order (snapshots that procedure's check-items); fill in and save a draft report; submit for review; approve/reject a submitted report (any technician other than the author, or a planner); reopen a rejected report; list reports pending the current user's review and full report history</li>
         <li>Basic login/logout for role-aware actions; login switches a technician's session to the Modern UI automatically</li>
+        <li>Sandbox scope (<code>routes_sandbox.py</code>, admin-only, Modern UI only): an index page plus three prototype pages (contenteditable grid, per-row form table with bulk paste-import, custom keyboard-navigable grid), each reading/writing <code>sandbox_items</code>; shared actions (<code>replace_all</code>, <code>create_row</code>/<code>update_row</code>/<code>delete_row</code>, <code>batch_insert</code>, <code>reset_sample_data</code>) plus JSON/CSV export routes. Deliberately not wired to any real entity table - this is a try-it-and-decide area (see docs/ai-questions.html), not a delivered feature</li>
       </ul>
     </section>
 

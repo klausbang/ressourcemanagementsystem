@@ -1,0 +1,154 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Sandbox Option A{% endblock %}
+
+{% block content %}
+<style>
+  #sbx-a-table td[contenteditable] { min-width: 90px; }
+  #sbx-a-table td[contenteditable]:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: var(--color-primary-light); }
+  #sbx-a-table td.qty { text-align: right; }
+  .sbx-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Prototype &middot; Option A</div>
+  <h1>Spreadsheet-like grid</h1>
+  <p class="lead">Click any cell and type, or paste a block copied from Excel/Sheets/a CSV file - it fills starting at the cell you click, adding rows automatically if the pasted block is bigger than the table.</p>
+  <p><a href="{{ url_for('sandbox.index') }}">&larr; Back to all three options</a></p>
+</div>
+
+<div class="callout">Paste into any cell to fill from there. Nothing is saved to the server until you click "Save all rows".</div>
+
+<div class="sbx-toolbar">
+  <button type="button" id="sbx-add-row" class="btn btn-secondary btn-sm">+ Add row</button>
+  <button type="button" id="sbx-copy" class="btn btn-secondary btn-sm">📋 Copy as TSV (paste into Excel)</button>
+  <button type="button" id="sbx-export-json" class="btn btn-secondary btn-sm">⬇️ Export JSON</button>
+  <label class="btn btn-secondary btn-sm" style="cursor:pointer;">📤 Import file<input type="file" id="sbx-import" accept=".csv,.json" style="display:none;"></label>
+  <button type="button" id="sbx-save" class="btn btn-primary btn-sm">💾 Save all rows</button>
+</div>
+
+<div class="table-wrap">
+  <table class="modern-table" id="sbx-a-table">
+    <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Quantity</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td contenteditable="true" data-field="code">{{ r.code or '' }}</td>
+        <td contenteditable="true" data-field="name">{{ r.name or '' }}</td>
+        <td contenteditable="true" data-field="category">{{ r.category or '' }}</td>
+        <td contenteditable="true" data-field="quantity" class="qty">{{ r.quantity if r.quantity is not none else '' }}</td>
+        <td contenteditable="true" data-field="notes">{{ r.notes or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<form method="post" action="{{ url_for('sandbox.action') }}" id="sbx-save-form">
+  <input type="hidden" name="action" value="replace_all">
+  <input type="hidden" name="return_to" value="a">
+  <input type="hidden" name="rows_json" id="sbx-rows-json">
+</form>
+
+<script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+<script>
+(function () {
+  var FIELDS = RmsSandbox.FIELDS;
+  var table = document.getElementById("sbx-a-table");
+  var tbody = table.querySelector("tbody");
+
+  function newRow(values) {
+    values = values || {};
+    var tr = document.createElement("tr");
+    FIELDS.forEach(function (f) {
+      var td = document.createElement("td");
+      td.contentEditable = "true";
+      td.setAttribute("data-field", f);
+      if (f === "quantity") td.className = "qty";
+      td.textContent = values[f] || "";
+      tr.appendChild(td);
+    });
+    return tr;
+  }
+
+  function gridToObjects() {
+    return Array.prototype.map.call(tbody.querySelectorAll("tr"), function (tr) {
+      var obj = {};
+      Array.prototype.forEach.call(tr.querySelectorAll("td"), function (td) {
+        obj[td.getAttribute("data-field")] = td.textContent.trim();
+      });
+      return obj;
+    });
+  }
+
+  document.getElementById("sbx-add-row").addEventListener("click", function () {
+    tbody.appendChild(newRow({}));
+  });
+
+  document.getElementById("sbx-copy").addEventListener("click", function () {
+    RmsSandbox.copyText(RmsSandbox.objectsToTsv(gridToObjects()));
+  });
+
+  document.getElementById("sbx-export-json").addEventListener("click", function () {
+    RmsSandbox.downloadFile("sandbox-items.json", JSON.stringify(gridToObjects(), null, 2), "application/json");
+  });
+
+  document.getElementById("sbx-save").addEventListener("click", function () {
+    document.getElementById("sbx-rows-json").value = JSON.stringify(gridToObjects());
+    document.getElementById("sbx-save-form").submit();
+  });
+
+  document.getElementById("sbx-import").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var objs;
+      try {
+        if (file.name.toLowerCase().endsWith(".json")) {
+          objs = RmsSandbox.parseJsonRows(reader.result);
+        } else {
+          objs = RmsSandbox.rowsToObjects(RmsSandbox.parseDelimited(reader.result));
+        }
+      } catch (err) {
+        window.alert("Could not read that file: " + err.message);
+        return;
+      }
+      objs.forEach(function (o) { tbody.appendChild(newRow(o)); });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  // Fill starting at the pasted-into cell, growing rows/using existing columns as needed.
+  tbody.addEventListener("paste", function (e) {
+    var td = e.target.closest("td");
+    if (!td) return;
+    e.preventDefault();
+    var text = (e.clipboardData || window.clipboardData).getData("text");
+    var grid = RmsSandbox.parseDelimited(text);
+    if (!grid.length) return;
+
+    var startRow = td.parentElement;
+    var startColIndex = Array.prototype.indexOf.call(startRow.children, td);
+
+    grid.forEach(function (rowValues, rOffset) {
+      var targetRow = startRow;
+      for (var i = 0; i < rOffset; i++) {
+        targetRow = targetRow.nextElementSibling || (function () {
+          var r = newRow({});
+          tbody.appendChild(r);
+          return r;
+        })();
+      }
+      rowValues.forEach(function (val, cOffset) {
+        var colIndex = startColIndex + cOffset;
+        if (colIndex >= FIELDS.length) return; // paste wider than the table - ignore extra columns
+        var cell = targetRow.children[colIndex];
+        if (cell) cell.textContent = val;
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,257 @@
+{% extends 'modern/base.html' %}
+
+{% block title %}Sandbox Option C{% endblock %}
+
+{% block content %}
+<style>
+  .sbx-grid { display: inline-block; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 14px; }
+  .sbx-grid-row { display: flex; }
+  .sbx-grid-row.header .sbx-cell { font-weight: 700; background: var(--color-bg); cursor: default; }
+  .sbx-cell {
+    width: 150px;
+    padding: 6px 8px;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.85rem;
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sbx-grid-row .sbx-cell:last-child { border-right: none; }
+  .sbx-cell.active { box-shadow: inset 0 0 0 2px var(--color-primary); background: var(--color-primary-light); }
+  .sbx-cell.selected:not(.active) { background: var(--color-primary-light); }
+  .sbx-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Prototype &middot; Option C</div>
+  <h1>Custom keyboard-navigable grid</h1>
+  <p class="lead">Arrow keys/Tab/Enter move the active cell. Click a cell, then Shift+click (or Shift+arrow) another to select a rectangle. Paste fills exactly that shape starting at the active cell; Copy takes the current selection back out as a tab-separated block for pasting into Excel.</p>
+  <p><a href="{{ url_for('sandbox.index') }}">&larr; Back to all three options</a></p>
+</div>
+
+<div class="sbx-toolbar">
+  <button type="button" id="sbx-add-row" class="btn btn-secondary btn-sm">+ Row</button>
+  <button type="button" id="sbx-del-row" class="btn btn-secondary btn-sm">🗑 Delete active row</button>
+  <button type="button" id="sbx-copy" class="btn btn-secondary btn-sm">📋 Copy selection as TSV</button>
+  <button type="button" id="sbx-export-json" class="btn btn-secondary btn-sm">⬇️ Export JSON</button>
+  <label class="btn btn-secondary btn-sm" style="cursor:pointer;">📤 Import file<input type="file" id="sbx-import" accept=".csv,.json" style="display:none;"></label>
+  <button type="button" id="sbx-save" class="btn btn-primary btn-sm">💾 Save all</button>
+</div>
+
+<div class="sbx-grid" id="sbx-c-grid">
+  <div class="sbx-grid-row header">
+    <div class="sbx-cell">Code</div><div class="sbx-cell">Name</div><div class="sbx-cell">Category</div><div class="sbx-cell">Quantity</div><div class="sbx-cell">Notes</div>
+  </div>
+  {% for r in rows %}
+  <div class="sbx-grid-row" data-row="{{ loop.index0 }}">
+    <div class="sbx-cell" contenteditable="true" data-col="0">{{ r.code or '' }}</div>
+    <div class="sbx-cell" contenteditable="true" data-col="1">{{ r.name or '' }}</div>
+    <div class="sbx-cell" contenteditable="true" data-col="2">{{ r.category or '' }}</div>
+    <div class="sbx-cell" contenteditable="true" data-col="3">{{ r.quantity if r.quantity is not none else '' }}</div>
+    <div class="sbx-cell" contenteditable="true" data-col="4">{{ r.notes or '' }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('sandbox.action') }}" id="sbx-save-form">
+  <input type="hidden" name="action" value="replace_all">
+  <input type="hidden" name="return_to" value="c">
+  <input type="hidden" name="rows_json" id="sbx-rows-json">
+</form>
+
+<script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+<script>
+(function () {
+  var FIELDS = RmsSandbox.FIELDS;
+  var grid = document.getElementById("sbx-c-grid");
+
+  function dataRows() {
+    return Array.prototype.filter.call(grid.children, function (r) { return !r.classList.contains("header"); });
+  }
+  function cellAt(r, c) {
+    var rows = dataRows();
+    if (!rows[r]) return null;
+    return rows[r].children[c] || null;
+  }
+
+  var active = { row: 0, col: 0 };
+  var selection = null; // {r1,c1,r2,c2} or null (meaning just the active cell)
+
+  function clearHighlight() {
+    grid.querySelectorAll(".sbx-cell.active,.sbx-cell.selected").forEach(function (el) {
+      el.classList.remove("active", "selected");
+    });
+  }
+
+  function bounds() {
+    var sel = selection || { r1: active.row, c1: active.col, r2: active.row, c2: active.col };
+    return {
+      r1: Math.min(sel.r1, sel.r2), r2: Math.max(sel.r1, sel.r2),
+      c1: Math.min(sel.c1, sel.c2), c2: Math.max(sel.c1, sel.c2),
+    };
+  }
+
+  function render() {
+    clearHighlight();
+    var b = bounds();
+    for (var r = b.r1; r <= b.r2; r++) {
+      for (var c = b.c1; c <= b.c2; c++) {
+        var cell = cellAt(r, c);
+        if (cell) cell.classList.add("selected");
+      }
+    }
+    var activeCell = cellAt(active.row, active.col);
+    if (activeCell) {
+      activeCell.classList.add("active");
+      activeCell.focus();
+      var range = document.createRange();
+      range.selectNodeContents(activeCell);
+      range.collapse(false);
+      var sel2 = window.getSelection();
+      sel2.removeAllRanges();
+      sel2.addRange(range);
+    }
+  }
+
+  function setActive(r, c, extend) {
+    var rows = dataRows();
+    r = Math.max(0, Math.min(r, rows.length - 1));
+    c = Math.max(0, Math.min(c, FIELDS.length - 1));
+    if (extend) {
+      if (!selection) selection = { r1: active.row, c1: active.col, r2: active.row, c2: active.col };
+      selection.r2 = r; selection.c2 = c;
+    } else {
+      selection = null;
+    }
+    active = { row: r, col: c };
+    render();
+  }
+
+  grid.addEventListener("click", function (e) {
+    var cell = e.target.closest(".sbx-cell");
+    if (!cell || cell.parentElement.classList.contains("header")) return;
+    var r = Array.prototype.indexOf.call(dataRows(), cell.parentElement);
+    var c = Number(cell.getAttribute("data-col"));
+    setActive(r, c, e.shiftKey);
+  });
+
+  grid.addEventListener("keydown", function (e) {
+    var key = e.key;
+    var moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (moves[key]) {
+      e.preventDefault();
+      setActive(active.row + moves[key][0], active.col + moves[key][1], e.shiftKey);
+    } else if (key === "Tab") {
+      e.preventDefault();
+      setActive(active.row, active.col + (e.shiftKey ? -1 : 1), false);
+    } else if (key === "Enter") {
+      e.preventDefault();
+      setActive(active.row + 1, active.col, false);
+    }
+  });
+
+  grid.addEventListener("paste", function (e) {
+    e.preventDefault();
+    var text = (e.clipboardData || window.clipboardData).getData("text");
+    var pasted = RmsSandbox.parseDelimited(text);
+    if (!pasted.length) return;
+    var startRow = active.row, startCol = active.col;
+    pasted.forEach(function (rowValues, rOffset) {
+      var r = startRow + rOffset;
+      while (dataRows().length <= r) grid.appendChild(makeRow({}));
+      rowValues.forEach(function (val, cOffset) {
+        var c = startCol + cOffset;
+        if (c >= FIELDS.length) return;
+        var cell = cellAt(r, c);
+        if (cell) cell.textContent = val;
+      });
+    });
+    selection = { r1: startRow, c1: startCol, r2: startRow + pasted.length - 1, c2: startCol + (pasted[0].length - 1) };
+    active = { row: selection.r1, col: selection.c1 };
+    render();
+  });
+
+  document.getElementById("sbx-copy").addEventListener("click", function () {
+    var b = bounds();
+    var lines = [];
+    for (var r = b.r1; r <= b.r2; r++) {
+      var line = [];
+      for (var c = b.c1; c <= b.c2; c++) {
+        var cell = cellAt(r, c);
+        line.push(cell ? cell.textContent.trim() : "");
+      }
+      lines.push(line.join("\t"));
+    }
+    RmsSandbox.copyText(lines.join("\n"));
+  });
+
+  function makeRow(values) {
+    values = values || {};
+    var row = document.createElement("div");
+    row.className = "sbx-grid-row";
+    FIELDS.forEach(function (f, i) {
+      var cell = document.createElement("div");
+      cell.className = "sbx-cell";
+      cell.contentEditable = "true";
+      cell.setAttribute("data-col", i);
+      cell.textContent = values[f] || "";
+      row.appendChild(cell);
+    });
+    return row;
+  }
+
+  document.getElementById("sbx-add-row").addEventListener("click", function () {
+    grid.appendChild(makeRow({}));
+  });
+
+  document.getElementById("sbx-del-row").addEventListener("click", function () {
+    var rows = dataRows();
+    if (rows[active.row]) rows[active.row].remove();
+    selection = null;
+    active = { row: Math.min(active.row, dataRows().length - 1), col: active.col };
+    render();
+  });
+
+  function gridToObjects() {
+    return dataRows().map(function (row) {
+      var obj = {};
+      FIELDS.forEach(function (f, i) { obj[f] = row.children[i].textContent.trim(); });
+      return obj;
+    });
+  }
+
+  document.getElementById("sbx-export-json").addEventListener("click", function () {
+    RmsSandbox.downloadFile("sandbox-items.json", JSON.stringify(gridToObjects(), null, 2), "application/json");
+  });
+
+  document.getElementById("sbx-save").addEventListener("click", function () {
+    document.getElementById("sbx-rows-json").value = JSON.stringify(gridToObjects());
+    document.getElementById("sbx-save-form").submit();
+  });
+
+  document.getElementById("sbx-import").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var objs;
+      try {
+        objs = file.name.toLowerCase().endsWith(".json")
+          ? RmsSandbox.parseJsonRows(reader.result)
+          : RmsSandbox.rowsToObjects(RmsSandbox.parseDelimited(reader.result));
+      } catch (err) {
+        window.alert("Could not read that file: " + err.message);
+        return;
+      }
+      objs.forEach(function (o) { grid.appendChild(makeRow(o)); });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

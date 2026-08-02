@@ -299,6 +299,20 @@ CREATE TABLE IF NOT EXISTS report_steps (
     result TEXT CHECK(result IN ('pass', 'fail', 'n_a') OR result IS NULL),
     FOREIGN KEY (report_id) REFERENCES test_reports(id) ON DELETE CASCADE
 );
+
+-- Sandbox table for the Phase 22 editable-table-view prototypes (docs/PROJECT_PLAN.md).
+-- Deliberately separate from every real entity table: it exists only so the three
+-- prototype pages have something real to insert/paste/export against without risking
+-- actual resource/capability data, and carries no FK/CHECK constraints of its own since
+-- it's meant to be freely broken and reset while trying things out.
+CREATE TABLE IF NOT EXISTS sandbox_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT,
+    name TEXT,
+    category TEXT,
+    quantity INTEGER,
+    notes TEXT
+);
 """
 
 
@@ -564,6 +578,7 @@ def init_db() -> None:
     _migrate_ordered_tests_template_application(db)
     _migrate_template_applications_table(db)
     _migrate_activity_templates_version(db)
+    _seed_sandbox_items(db, only_if_empty=True)
     db.commit()
 
 
@@ -1451,4 +1466,35 @@ def _seed_apply_template(db: sqlite3.Connection, order_code: str, eut_name: str,
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (order["id"], eut["id"], item["activity_name"], item["required_capability_id"], step_number, application_id),
+        )
+
+
+SANDBOX_SAMPLE_ITEMS = [
+    ("INV-001", "Digital Multimeter", "equipment", 4, "Calibrated quarterly"),
+    ("INV-002", "Vibration Table", "equipment", 1, "Needs recalibration"),
+    ("INV-003", "Humidity Chamber", "facility", 2, ""),
+    ("INV-004", "CON Test Chamber", "facility", 1, "Shared with CI setup"),
+    ("INV-005", "Spectrum Analyzer", "equipment", 1, "Shared across sites"),
+    ("INV-006", "Torque Wrench Set", "equipment", 3, ""),
+    ("INV-007", "ESD Test Gun", "equipment", 1, "Handle with care"),
+    ("INV-008", "Anechoic Chamber", "facility", 1, "TLS site"),
+]
+
+
+def _seed_sandbox_items(db: sqlite3.Connection, only_if_empty: bool = False) -> None:
+    """Populate the editable-table-prototype sandbox with its sample dataset. Called with
+    only_if_empty=True on every app startup (first-run seeding only, so it never fights with
+    whatever a user is mid-trial editing); called with only_if_empty=False (wiping first) by
+    the sandbox's own "Reset sample data" action, so a trial can always be restarted cleanly."""
+    if only_if_empty:
+        count = db.execute("SELECT COUNT(*) FROM sandbox_items").fetchone()[0]
+        if count > 0:
+            return
+    else:
+        db.execute("DELETE FROM sandbox_items")
+        db.execute("DELETE FROM sqlite_sequence WHERE name = 'sandbox_items'")
+    for code, name, category, quantity, notes in SANDBOX_SAMPLE_ITEMS:
+        db.execute(
+            "INSERT INTO sandbox_items (code, name, category, quantity, notes) VALUES (?, ?, ?, ?, ?)",
+            (code, name, category, quantity, notes),
         )

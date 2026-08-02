@@ -21,6 +21,7 @@
       <nav class="main-nav" id="mainNav">
         {% if session.get('role') == 'admin' %}
         <a href="{{ url_for('admin.admin_manage') }}" class="{{ 'active' if request.endpoint == 'admin.admin_manage' }}">Admin</a>
+        <a href="{{ url_for('sandbox.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('sandbox.') }}">🧪 Table Prototypes</a>
         {% endif %}
         {% if session.get('role') == 'planner' %}
         <a href="{{ url_for('planner.planner_orders') }}" class="{{ 'active' if request.endpoint == 'planner.planner_orders' }}">Planner</a>

@@ -1,0 +1,160 @@
+{% extends 'modern/base.html' %}
+{% import 'modern/_macros.html' as macros %}
+
+{% block title %}Sandbox Option B{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Prototype &middot; Option B</div>
+  <h1>Traditional form table + bulk import</h1>
+  <p class="lead">The same per-row Save/Delete editing style RMS already uses everywhere (Users, Resources, Capabilities&hellip;), plus a bulk-import panel for adding many rows at once from a paste or a file.</p>
+  <p><a href="{{ url_for('sandbox.index') }}">&larr; Back to all three options</a></p>
+</div>
+
+<div class="card">
+  <div class="card-title">Add one row</div>
+  <form method="post" action="{{ url_for('sandbox.action') }}" class="form-grid">
+    <input type="hidden" name="action" value="create_row">
+    <input type="hidden" name="return_to" value="b">
+    <div class="field"><label>Code<input type="text" name="code"></label></div>
+    <div class="field"><label>Name<input type="text" name="name"></label></div>
+    <div class="field"><label>Category<input type="text" name="category"></label></div>
+    <div class="field"><label>Quantity<input type="number" name="quantity"></label></div>
+    <div class="field" style="flex:1 1 200px;"><label>Notes<input type="text" name="notes"></label></div>
+    <div class="field"><button type="submit" class="btn btn-primary">Add row</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">Bulk add rows</div>
+  <div class="card-subtitle">Paste a block copied from Excel/Sheets/a CSV, or choose a .csv/.json file, then Preview before inserting. Existing rows are never touched - this only adds new ones.</div>
+  <div class="field">
+    <label for="sbx-bulk-text">Paste here</label>
+    <textarea id="sbx-bulk-text" rows="5" style="width:100%;" placeholder="code&#9;name&#9;category&#9;quantity&#9;notes"></textarea>
+  </div>
+  <div class="sbx-toolbar" style="display:flex; gap:8px; align-items:center; margin:10px 0;">
+    <label class="btn btn-secondary btn-sm" style="cursor:pointer;">📤 Choose file<input type="file" id="sbx-bulk-file" accept=".csv,.json" style="display:none;"></label>
+    <button type="button" id="sbx-preview" class="btn btn-secondary btn-sm">Preview</button>
+    <span id="sbx-preview-count" class="section-help"></span>
+  </div>
+  <div id="sbx-preview-wrap" class="table-wrap" style="display:none;">
+    <table class="modern-table" id="sbx-preview-table">
+      <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Quantity</th><th>Notes</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <form method="post" action="{{ url_for('sandbox.action') }}" id="sbx-insert-form" style="margin-top:10px;">
+    <input type="hidden" name="action" value="batch_insert">
+    <input type="hidden" name="return_to" value="b">
+    <input type="hidden" name="rows_json" id="sbx-insert-json">
+    <button type="submit" class="btn btn-primary" id="sbx-insert-btn" disabled>Insert previewed rows</button>
+  </form>
+</div>
+
+<div class="section-head">
+  <h2>Existing rows</h2>
+  <div>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('sandbox.export_csv') }}">⬇️ Export CSV</a>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('sandbox.export_json') }}">⬇️ Export JSON</a>
+  </div>
+</div>
+{% if rows %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Quantity</th><th>Notes</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><input type="text" name="code" value="{{ r.code or '' }}" form="row-save-{{ r.id }}"></td>
+        <td><input type="text" name="name" value="{{ r.name or '' }}" form="row-save-{{ r.id }}"></td>
+        <td><input type="text" name="category" value="{{ r.category or '' }}" form="row-save-{{ r.id }}"></td>
+        <td><input type="number" name="quantity" value="{{ r.quantity if r.quantity is not none else '' }}" form="row-save-{{ r.id }}"></td>
+        <td><input type="text" name="notes" value="{{ r.notes or '' }}" form="row-save-{{ r.id }}"></td>
+        <td class="inline-form">
+          <button type="submit" form="row-save-{{ r.id }}" class="btn btn-secondary btn-sm">Save</button>
+          <button type="submit" form="row-delete-{{ r.id }}" class="btn btn-danger btn-sm" data-confirm="Delete this row?">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% for r in rows %}
+<form id="row-save-{{ r.id }}" method="post" action="{{ url_for('sandbox.action') }}" hidden>
+  <input type="hidden" name="action" value="update_row">
+  <input type="hidden" name="return_to" value="b">
+  <input type="hidden" name="item_id" value="{{ r.id }}">
+</form>
+<form id="row-delete-{{ r.id }}" method="post" action="{{ url_for('sandbox.action') }}" hidden>
+  <input type="hidden" name="action" value="delete_row">
+  <input type="hidden" name="return_to" value="b">
+  <input type="hidden" name="item_id" value="{{ r.id }}">
+</form>
+{% endfor %}
+{% else %}
+<div class="empty-state"><span class="icon">🗂️</span>No rows yet.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('sandbox.action') }}" style="margin-top:16px;">
+  <input type="hidden" name="action" value="reset_sample_data">
+  <input type="hidden" name="return_to" value="b">
+  <button type="submit" class="btn btn-secondary btn-sm" data-confirm="Reset the sandbox table back to its 8 original sample rows?">↺ Reset sandbox to sample data</button>
+</form>
+
+<script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+<script>
+(function () {
+  var parsedRows = [];
+
+  function renderPreview(rows) {
+    parsedRows = rows;
+    var tbody = document.querySelector("#sbx-preview-table tbody");
+    tbody.innerHTML = "";
+    rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      RmsSandbox.FIELDS.forEach(function (f) {
+        var td = document.createElement("td");
+        td.textContent = r[f] || "";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    document.getElementById("sbx-preview-wrap").style.display = rows.length ? "block" : "none";
+    document.getElementById("sbx-preview-count").textContent = rows.length
+      ? rows.length + " row(s) ready to insert"
+      : "No rows found to preview";
+    document.getElementById("sbx-insert-btn").disabled = rows.length === 0;
+  }
+
+  function previewFromText(text, isJson) {
+    try {
+      var rows = isJson ? RmsSandbox.parseJsonRows(text) : RmsSandbox.rowsToObjects(RmsSandbox.parseDelimited(text));
+      renderPreview(rows);
+    } catch (err) {
+      window.alert("Could not parse that as " + (isJson ? "JSON" : "CSV/pasted table") + ": " + err.message);
+    }
+  }
+
+  var chosenFile = null;
+  document.getElementById("sbx-bulk-file").addEventListener("change", function (e) {
+    chosenFile = e.target.files[0] || null;
+  });
+
+  document.getElementById("sbx-preview").addEventListener("click", function () {
+    if (chosenFile) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        previewFromText(reader.result, chosenFile.name.toLowerCase().endsWith(".json"));
+      };
+      reader.readAsText(chosenFile);
+    } else {
+      previewFromText(document.getElementById("sbx-bulk-text").value, false);
+    }
+  });
+
+  document.getElementById("sbx-insert-form").addEventListener("submit", function () {
+    document.getElementById("sbx-insert-json").value = JSON.stringify(parsedRows);
+  });
+})();
+</script>
+{% endblock %}

@@ -445,12 +445,19 @@
   <p><em>Enhancement ideas and bug reports submitted from the "P" link any signed-in user sees on every page, along with the exact page they were on.</em></p>
   {% for p in proposals %}
   <fieldset style="margin-bottom:14px;">
-    <legend>{{ '[Bug]' if p['proposal_type'] == 'bug' else '[Enhancement]' }} {{ p['title'] }}</legend>
+    <legend>#{{ p['id'] }} {{ '[Bug]' if p['proposal_type'] == 'bug' else '[Enhancement]' }} {{ p['title'] }}</legend>
     <p>By {{ p['submitted_by_username'] or 'unknown user' }} on {{ p['created_at'] }} &mdash; page: <code>{{ p['path'] }}</code></p>
-    {% if p['description'] %}<p>{{ p['description'] }}</p>{% endif %}
     <form method="post">
       <input type="hidden" name="action" value="update_proposal">
       <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+      <label>Title <input type="text" name="title" value="{{ p['title'] }}" required></label>
+      <label>Description <textarea name="description" rows="3">{{ p['description'] or '' }}</textarea></label>
+      <label>Type
+        <select name="proposal_type">
+          <option value="enhancement" {% if p['proposal_type'] == 'enhancement' %}selected{% endif %}>Enhancement</option>
+          <option value="bug" {% if p['proposal_type'] == 'bug' %}selected{% endif %}>Bug</option>
+        </select>
+      </label>
       <label>Status
         <select name="status">
           <option value="new" {% if p['status'] == 'new' %}selected{% endif %}>New</option>

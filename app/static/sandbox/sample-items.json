@@ -1,0 +1,58 @@
+[
+  {
+    "code": "INV-001",
+    "name": "Digital Multimeter",
+    "category": "equipment",
+    "quantity": 4,
+    "notes": "Calibrated quarterly"
+  },
+  {
+    "code": "INV-002",
+    "name": "Vibration Table",
+    "category": "equipment",
+    "quantity": 1,
+    "notes": "Needs recalibration"
+  },
+  {
+    "code": "INV-003",
+    "name": "Humidity Chamber",
+    "category": "facility",
+    "quantity": 2,
+    "notes": ""
+  },
+  {
+    "code": "INV-004",
+    "name": "CON Test Chamber",
+    "category": "facility",
+    "quantity": 1,
+    "notes": "Shared with CI setup"
+  },
+  {
+    "code": "INV-005",
+    "name": "Spectrum Analyzer",
+    "category": "equipment",
+    "quantity": 1,
+    "notes": "Shared across sites"
+  },
+  {
+    "code": "INV-006",
+    "name": "Torque Wrench Set",
+    "category": "equipment",
+    "quantity": 3,
+    "notes": ""
+  },
+  {
+    "code": "INV-007",
+    "name": "ESD Test Gun",
+    "category": "equipment",
+    "quantity": 1,
+    "notes": "Handle with care"
+  },
+  {
+    "code": "INV-008",
+    "name": "Anechoic Chamber",
+    "category": "facility",
+    "quantity": 1,
+    "notes": "TLS site"
+  }
+]

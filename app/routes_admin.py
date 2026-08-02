@@ -673,20 +673,27 @@ def admin_manage():
 
         elif action == "update_proposal":
             proposal_id = request.form.get("proposal_id", "").strip()
+            title = request.form.get("title", "").strip()
+            description = request.form.get("description", "").strip() or None
+            proposal_type = request.form.get("proposal_type", "").strip()
             status = request.form.get("status", "").strip()
             admin_comment = request.form.get("admin_comment", "").strip() or None
             valid_statuses = ("new", "accepted", "in_progress", "done", "rejected")
 
-            if not (proposal_id and status in valid_statuses):
-                flash("A valid proposal and status are required.", "error")
+            if not (proposal_id and title and proposal_type in ("enhancement", "bug") and status in valid_statuses):
+                flash("A valid proposal, title, type, and status are required.", "error")
             else:
                 db.execute(
                     """
                     UPDATE proposals
-                    SET status = ?, admin_comment = ?, admin_user_id = ?, updated_at = ?
+                    SET title = ?, description = ?, proposal_type = ?, status = ?, admin_comment = ?,
+                        admin_user_id = ?, updated_at = ?
                     WHERE id = ?
                     """,
-                    (status, admin_comment, session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id),
+                    (
+                        title, description, proposal_type, status, admin_comment,
+                        session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id,
+                    ),
                 )
                 db.commit()
                 flash("Proposal updated.", "info")
