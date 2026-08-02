@@ -113,7 +113,12 @@
     <input type="hidden" name="action" value="create_resource">
     <label>Code <input type="text" name="code" required></label>
     <label>Name <input type="text" name="name" required></label>
-    <label>Type <input type="text" name="resource_type" placeholder="equipment/facility/technician" required></label>
+    <label>Type
+      <select name="resource_type" required>
+        <option value="" disabled selected>Choose a type&hellip;</option>
+        {% for t in resource_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </label>
     <label>Status <input type="text" name="status" placeholder="available"></label>
     <label>Site <input type="text" name="site" placeholder="TLC / TLS"></label>
     <button type="submit">Save Resource</button>
@@ -135,7 +140,11 @@
       <tr class="{{ 'dup-row' if r['_dup'] }}">
         <td><input type="text" name="code" value="{{ r['code'] }}" form="resource-save-{{ r['id'] }}"></td>
         <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
-        <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
+        <td>
+          <select name="resource_type" form="resource-save-{{ r['id'] }}">
+            {% for t in resource_types %}<option value="{{ t }}" {{ 'selected' if t == r['resource_type'] }}>{{ t }}</option>{% endfor %}
+          </select>
+        </td>
         <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
         <td><input type="text" name="site" value="{{ r['site'] or '' }}" form="resource-save-{{ r['id'] }}"></td>
         <td>

@@ -421,8 +421,25 @@ table.modern-table input[type="text"], table.modern-table select {
   user-select: none;
 }
 .tab-label:hover { color: var(--color-text); }
+.tab-label-count { display: block; font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); margin-top: 2px; }
+.tab-label-count .attn { color: var(--color-danger); }
 
 .tab-panel { display: none; }
+
+/* ---------- Workflow quick-jump tiles (Admin landing page, section A) ---------- */
+
+.workflow-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.workflow-tile {
+  cursor: pointer;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  user-select: none;
+}
+.workflow-tile:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 /* generic show/hide wiring is emitted per-page via data attributes handled in templates */
 

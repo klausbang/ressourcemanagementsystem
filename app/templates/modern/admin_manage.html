@@ -1,6 +1,10 @@
 {% extends 'modern/base.html' %}
 {% import 'modern/_macros.html' as macros %}
 
+{% macro tab_count(total, attention=0) %}
+<span class="tab-label-count">{{ total }}{% if attention %} <span class="attn">({{ attention }}!)</span>{% endif %}</span>
+{% endmacro %}
+
 {% block title %}Admin{% endblock %}
 
 {% block content %}
@@ -46,44 +50,58 @@
   <p class="lead">Set up who can use the system, what capabilities exist, what resources you have, and which resources can perform which capabilities.</p>
 </div>
 
+{% set new_proposals_count = proposals|selectattr('status', 'equalto', 'new')|list|length %}
+
 <details class="card" style="margin-bottom:20px;" open>
   <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
   <img src="{{ url_for('static', filename='img/usage-role-admin.svg') }}" alt="Admin workflow: Capabilities, then Resources, then assign capabilities to resources, then exclusion groups, activity templates, users, and staff absences" style="max-width:100%; height:auto; margin-top:10px;">
+  <div class="workflow-tiles">
+    <label for="tab-capabilities" class="workflow-tile">🎓 Capabilities</label>
+    <label for="tab-resources" class="workflow-tile">🔧 Resources</label>
+    <label for="tab-mappings" class="workflow-tile">🔗 Assign capabilities</label>
+    <label for="tab-exclusion" class="workflow-tile">🚫 Exclusion groups</label>
+    <label for="tab-templates" class="workflow-tile">📋 Activity templates</label>
+    <label for="tab-users" class="workflow-tile">👤 Users</label>
+    <label for="tab-absences" class="workflow-tile">🌴 Staff absences</label>
+  </div>
 </details>
 
-<div class="stat-strip">
-  <div class="stat-tile"><div class="stat-value">{{ users|length }}</div><div class="stat-label">Users</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ capabilities|length }}</div><div class="stat-label">Capabilities</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ resources|length }}</div><div class="stat-label">Resources</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ exclusion_groups|length }}</div><div class="stat-label">Exclusion groups</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ absences|length }}</div><div class="stat-label">Staff absences</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ proposals|selectattr('status', 'equalto', 'new')|list|length }}</div><div class="stat-label">New proposals</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ incomplete_customers|length }}</div><div class="stat-label">Customers needing info</div></div>
-</div>
+<details style="margin-bottom:20px;">
+  <summary class="btn btn-secondary btn-sm" style="display:inline-block; cursor:pointer;">📊 Show counts</summary>
+  <div class="stat-strip" style="margin-top:14px;">
+    <div class="stat-tile"><div class="stat-value">{{ users|length }}</div><div class="stat-label">Users</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ capabilities|length }}</div><div class="stat-label">Capabilities</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ resources|length }}</div><div class="stat-label">Resources</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ mappings|length }}</div><div class="stat-label">Capability assignments</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ exclusion_groups|length }}</div><div class="stat-label">Exclusion groups</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ absences|length }}</div><div class="stat-label">Staff absences</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ new_proposals_count }}</div><div class="stat-label">New proposals</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ incomplete_customers|length }}</div><div class="stat-label">Customers needing info</div></div>
+  </div>
+</details>
 
 <div class="tabs">
-  <input type="radio" name="admin-tabs" id="tab-users" class="tab-input" checked>
-  <input type="radio" name="admin-tabs" id="tab-capabilities" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-resources" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-exclusion" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-templates" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-absences" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-proposals" class="tab-input">
-  <input type="radio" name="admin-tabs" id="tab-customers" class="tab-input">
+  <input type="radio" name="admin-tabs" id="tab-users" class="tab-input" {{ 'checked' if active_tab == 'users' }}>
+  <input type="radio" name="admin-tabs" id="tab-capabilities" class="tab-input" {{ 'checked' if active_tab == 'capabilities' }}>
+  <input type="radio" name="admin-tabs" id="tab-resources" class="tab-input" {{ 'checked' if active_tab == 'resources' }}>
+  <input type="radio" name="admin-tabs" id="tab-mappings" class="tab-input" {{ 'checked' if active_tab == 'mappings' }}>
+  <input type="radio" name="admin-tabs" id="tab-exclusion" class="tab-input" {{ 'checked' if active_tab == 'exclusion' }}>
+  <input type="radio" name="admin-tabs" id="tab-templates" class="tab-input" {{ 'checked' if active_tab == 'templates' }}>
+  <input type="radio" name="admin-tabs" id="tab-absences" class="tab-input" {{ 'checked' if active_tab == 'absences' }}>
+  <input type="radio" name="admin-tabs" id="tab-proposals" class="tab-input" {{ 'checked' if active_tab == 'proposals' }}>
+  <input type="radio" name="admin-tabs" id="tab-customers" class="tab-input" {{ 'checked' if active_tab == 'customers' }}>
 
   <div class="tab-list" role="tablist">
-    <label for="tab-users" class="tab-label">👤 Users</label>
-    <label for="tab-capabilities" class="tab-label">🎓 Capabilities</label>
-    <label for="tab-resources" class="tab-label">🔧 Resources</label>
-    <label for="tab-mappings" class="tab-label">🔗 Capability assignments</label>
-    <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups</label>
-    <label for="tab-absences" class="tab-label">🌴 Staff absences</label>
-    <label for="tab-templates" class="tab-label">📋 Activity templates</label>
-    <label for="tab-proposals" class="tab-label">💡 Proposals{% if proposals|selectattr('status', 'equalto', 'new')|list|length %} ({{ proposals|selectattr('status', 'equalto', 'new')|list|length }}){% endif %}</label>
-    <label for="tab-customers" class="tab-label">🏢 Customers{% if incomplete_customers %} ({{ incomplete_customers|length }}){% endif %}</label>
+    <label for="tab-users" class="tab-label">👤 Users{{ tab_count(users|length) }}</label>
+    <label for="tab-capabilities" class="tab-label">🎓 Capabilities{{ tab_count(capabilities|length) }}</label>
+    <label for="tab-resources" class="tab-label">🔧 Resources{{ tab_count(resources|length) }}</label>
+    <label for="tab-mappings" class="tab-label">🔗 Capability assignments{{ tab_count(mappings|length) }}</label>
+    <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups{{ tab_count(exclusion_groups|length) }}</label>
+    <label for="tab-absences" class="tab-label">🌴 Staff absences{{ tab_count(absences|length) }}</label>
+    <label for="tab-templates" class="tab-label">📋 Activity templates{{ tab_count(templates|length) }}</label>
+    <label for="tab-proposals" class="tab-label">💡 Proposals{{ tab_count(proposals|length, new_proposals_count) }}</label>
+    <label for="tab-customers" class="tab-label">🏢 Customers{{ tab_count(customers|length, incomplete_customers|length) }}</label>
   </div>
 
   <div class="tabs-body">
@@ -254,7 +272,10 @@
           </div>
           <div class="field">
             <label for="new-res-type">Type</label>
-            <input type="text" id="new-res-type" name="resource_type" placeholder="equipment / facility / technician" required>
+            <select id="new-res-type" name="resource_type" required>
+              <option value="" disabled selected>Choose a type&hellip;</option>
+              {% for t in resource_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
           </div>
           <div class="field">
             <label for="new-res-status">Status</label>
@@ -289,7 +310,11 @@
                 <input type="text" name="code" value="{{ r['code'] }}" form="resource-save-{{ r['id'] }}">
               </td>
               <td><input type="text" name="name" value="{{ r['name'] }}" form="resource-save-{{ r['id'] }}"></td>
-              <td><input type="text" name="resource_type" value="{{ r['resource_type'] }}" form="resource-save-{{ r['id'] }}"></td>
+              <td>
+                <select name="resource_type" form="resource-save-{{ r['id'] }}">
+                  {% for t in resource_types %}<option value="{{ t }}" {{ 'selected' if t == r['resource_type'] }}>{{ t }}</option>{% endfor %}
+                </select>
+              </td>
               <td><input type="text" name="status" value="{{ r['status'] }}" form="resource-save-{{ r['id'] }}"></td>
               <td><input type="text" name="site" value="{{ r['site'] or '' }}" form="resource-save-{{ r['id'] }}" placeholder="TLC / TLS"></td>
               <td class="inline-form">

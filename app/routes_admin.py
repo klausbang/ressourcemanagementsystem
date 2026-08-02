@@ -19,6 +19,7 @@ CAPABILITY_DUP_KEYS = ["name", "description"]
 
 RESOURCE_SORTABLE_KEYS = {"code", "name", "resource_type", "status", "site"}
 RESOURCE_DUP_KEYS = ["code", "name", "resource_type", "status", "site"]
+RESOURCE_TYPES = ["equipment", "facility", "technician"]
 
 MAPPING_SORTABLE_KEYS = {"code", "resource_name", "capability_name"}
 MAPPING_DUP_KEYS = ["code", "resource_name", "capability_name"]
@@ -37,6 +38,24 @@ ABSENCE_DUP_KEYS = ["resource_code", "start_date", "end_date"]
 
 CUSTOMER_SORTABLE_KEYS = {"name", "contact_name", "contact_email", "contact_phone"}
 CUSTOMER_DUP_KEYS = ["name"]
+
+# Which tab an action's result belongs on, so a POST redirect lands back where it was
+# submitted from instead of always resetting to the first ("Users") tab - the same fix
+# already applied to the Planner page's tabs.
+ACTION_TAB = {
+    "create_user": "users", "update_user": "users", "delete_user": "users",
+    "create_capability": "capabilities", "update_capability": "capabilities", "delete_capability": "capabilities",
+    "create_resource": "resources", "update_resource": "resources", "delete_resource": "resources",
+    "assign_capability": "mappings", "remove_capability": "mappings",
+    "create_exclusion_group": "exclusion", "update_exclusion_group": "exclusion", "delete_exclusion_group": "exclusion",
+    "assign_exclusion_resource": "exclusion", "remove_exclusion_resource": "exclusion",
+    "create_template": "templates", "update_template": "templates", "delete_template": "templates",
+    "add_template_item": "templates", "update_template_item": "templates",
+    "delete_template_item": "templates", "move_template_item": "templates",
+    "create_absence": "absences", "delete_absence": "absences",
+    "update_proposal": "proposals", "delete_proposal": "proposals",
+    "create_customer": "customers", "update_customer": "customers", "delete_customer": "customers",
+}
 
 
 def _load_admin_context(db) -> dict:
@@ -183,8 +202,15 @@ def _load_admin_context(db) -> dict:
         c["is_complete"] = bool(c["contact_name"] and c["contact_email"] and c["address"])
     incomplete_customers = [c for c in customers if not c["is_complete"]]
 
+    valid_tabs = {"users", "capabilities", "resources", "mappings", "exclusion", "templates", "absences", "proposals", "customers"}
+    active_tab = request.args.get("tab", "users")
+    if active_tab not in valid_tabs:
+        active_tab = "users"
+
     return {
+        "active_tab": active_tab,
         "users": users,
+        "resource_types": RESOURCE_TYPES,
         "resources": resources,
         "capabilities": capabilities,
         "mappings": mappings,
@@ -338,6 +364,8 @@ def admin_manage():
 
             if not (code and name and resource_type):
                 flash("Resource code, name, and type are required.", "error")
+            elif resource_type not in RESOURCE_TYPES:
+                flash(f"Resource type must be one of: {', '.join(RESOURCE_TYPES)}.", "error")
             elif db.execute("SELECT 1 FROM resources WHERE code = ?", (code,)).fetchone():
                 flash(f"Resource code {code} already exists.", "error")
             else:
@@ -358,6 +386,8 @@ def admin_manage():
 
             if not (resource_id and code and name and resource_type and status):
                 flash("Resource code, name, type, and status are required.", "error")
+            elif resource_type not in RESOURCE_TYPES:
+                flash(f"Resource type must be one of: {', '.join(RESOURCE_TYPES)}.", "error")
             elif db.execute(
                 "SELECT 1 FROM resources WHERE code = ? AND id != ?", (code, resource_id)
             ).fetchone():
@@ -711,6 +741,6 @@ def admin_manage():
                 db.commit()
                 flash("Customer deleted.", "info")
 
-        return redirect(url_for("admin.admin_manage"))
+        return redirect(url_for("admin.admin_manage", tab=ACTION_TAB.get(action, "users")))
 
     return _render_admin(db)

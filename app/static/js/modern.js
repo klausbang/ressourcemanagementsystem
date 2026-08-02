@@ -124,4 +124,51 @@
       }
     });
   })();
+
+  // Make the floating "P" proposal dialog draggable by its title bar, so it can be moved
+  // out of the way of whatever part of the page it's covering while writing a proposal
+  // about that exact area.
+  (function () {
+    var dialog = document.getElementById("proposalDialog");
+    var handle = document.getElementById("proposalDialogHandle");
+    if (!dialog || !handle) return;
+
+    var dragging = false;
+    var startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+    handle.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      var rect = dialog.getBoundingClientRect();
+      // First drag: switch from the browser's centered auto-margin layout to an
+      // explicit fixed position matching where it currently is, so it doesn't jump.
+      dialog.style.margin = "0";
+      dialog.style.position = "fixed";
+      dialog.style.left = rect.left + "px";
+      dialog.style.top = rect.top + "px";
+      startLeft = rect.left;
+      startTop = rect.top;
+      startX = e.clientX;
+      startY = e.clientY;
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      dialog.style.left = startLeft + (e.clientX - startX) + "px";
+      dialog.style.top = startTop + (e.clientY - startY) + "px";
+    });
+
+    function stopDragging() { dragging = false; }
+    handle.addEventListener("pointerup", stopDragging);
+    handle.addEventListener("pointercancel", stopDragging);
+
+    // Reset to the browser's default centered position each time the dialog reopens,
+    // so a drag on one report doesn't leave it off-screen the next time it's used.
+    dialog.addEventListener("close", function () {
+      dialog.style.position = "";
+      dialog.style.margin = "";
+      dialog.style.left = "";
+      dialog.style.top = "";
+    });
+  })();
 })();

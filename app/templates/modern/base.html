@@ -77,7 +77,7 @@
                  box-shadow:0 2px 8px rgba(0,0,0,0.25);">P</button>
 
   <dialog id="proposalDialog" style="border:none; border-radius:var(--radius-md); padding:20px; max-width:480px; width:90%;">
-    <div class="card-title">💡🐛 Suggest an enhancement or report a bug</div>
+    <div class="card-title" id="proposalDialogHandle" style="cursor:move; user-select:none;" title="Drag to move this window">↕ 💡🐛 Suggest an enhancement or report a bug</div>
     {% include 'modern/_proposal_form.html' %}
     <form method="dialog" style="margin-top:8px;"><button type="submit" class="btn btn-ghost btn-sm">Cancel</button></form>
   </dialog>
