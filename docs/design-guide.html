@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RMS UI Design Guide</title>
+  <style>
+    .swatch-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 20px; }
+    .swatch { border: 1px solid #ccc; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; min-width: 140px; }
+    .swatch .box { width: 100%; height: 28px; border-radius: 4px; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.1); }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 24px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 0.9rem; }
+    th { background: #f2f2f2; }
+    code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RMS UI Design Guide</h1>
+    <p><a href="index.html">Back to Documentation Home</a></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Purpose</h2>
+      <p>Requested directly (proposal id 27, filed generally rather than against one page): a reference for what RMS's UI looks like, how it behaves, and how its pieces fit together - functionality, behaviour, and look and feel - so a new page in any module (Admin, Planner, Technician) reads as part of the same system rather than a one-off, and so the conventions already built up over 22 phases are written down somewhere instead of only existing as precedent scattered across templates.</p>
+      <p>This is the design-system companion to <a href="doc-style-guide.html">the documentation style guide</a> (which covers how <em>docs pages</em> are written) and <a href="dual-ui.html">Dual Interface: Simple and Modern</a> (which covers why two interfaces exist and exactly which pages differ between them). This guide covers the Modern interface's actual visual language in detail, since that's where almost all of the design system lives; Simple's much smaller plain-HTML vocabulary is covered in section 10.</p>
+    </section>
+
+    <section>
+      <h2>2. Design Tokens</h2>
+      <p>Every color, radius, and shadow used in the Modern interface is a CSS custom property defined once in <code>app/static/css/modern.css</code>'s <code>:root</code> block, not a hardcoded value repeated per component. A new component should reuse one of these rather than introducing a new color.</p>
+
+      <h3>2.1 Colors</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="box" style="background:#4f46e5;"></div><code>--color-primary</code><br>#4f46e5 - primary actions, active tab, links</div>
+        <div class="swatch"><div class="box" style="background:#4338ca;"></div><code>--color-primary-dark</code><br>#4338ca - primary hover</div>
+        <div class="swatch"><div class="box" style="background:#eef2ff;"></div><code>--color-primary-light</code><br>#eef2ff - active/selected backgrounds</div>
+        <div class="swatch"><div class="box" style="background:#16a34a;"></div><code>--color-success</code> / <code>-light</code><br>#16a34a / #f0fdf4 - "available", "pass", "completed"</div>
+        <div class="swatch"><div class="box" style="background:#dc2626;"></div><code>--color-danger</code> / <code>-light</code><br>#dc2626 / #fef2f2 - errors, delete, "fail", "rejected"</div>
+        <div class="swatch"><div class="box" style="background:#d97706;"></div><code>--color-warning</code> / <code>-light</code><br>#d97706 / #fffbeb - "on hold", attention counts, dup-row flag</div>
+        <div class="swatch"><div class="box" style="background:#2563eb;"></div><code>--color-info</code> / <code>-light</code><br>#2563eb / #eff6ff - "in progress", "submitted", type badges</div>
+        <div class="swatch"><div class="box" style="background:#f6f7fb;"></div><code>--color-bg</code><br>#f6f7fb - page background</div>
+        <div class="swatch"><div class="box" style="background:#ffffff;border:1px solid #ddd;"></div><code>--color-surface</code><br>#ffffff - cards, tables, inputs</div>
+        <div class="swatch"><div class="box" style="background:#e2e8f0;"></div><code>--color-border</code><br>#e2e8f0 - all hairline borders</div>
+        <div class="swatch"><div class="box" style="background:#0f172a;"></div><code>--color-text</code><br>#0f172a - body text</div>
+        <div class="swatch"><div class="box" style="background:#64748b;"></div><code>--color-text-muted</code><br>#64748b - subtitles, meta, hints</div>
+        <div class="swatch"><div class="box" style="background:#94a3b8;"></div><code>--color-text-faint</code><br>#94a3b8 - sort icons, "planned"/neutral badges</div>
+      </div>
+      <p><strong>Rule of thumb:</strong> status/result meaning is color-coded consistently everywhere it appears - green = available/pass/completed/approved, red = danger/fail/rejected/error, amber = warning/on-hold/needs-attention, blue = informational/in-progress/type. A new status should map onto one of these four, not invent a fifth.</p>
+
+      <h3>2.2 Shape and Elevation</h3>
+      <table>
+        <tr><th>Token</th><th>Value</th><th>Used for</th></tr>
+        <tr><td><code>--radius-sm</code></td><td>6px</td><td>inputs, small buttons, badges</td></tr>
+        <tr><td><code>--radius-md</code></td><td>10px</td><td>cards, tables, the tab strip</td></tr>
+        <tr><td><code>--radius-lg</code></td><td>16px</td><td>large surfaces (rare)</td></tr>
+        <tr><td><code>--shadow-sm</code></td><td>0 1px 2px rgba(15,23,42,.06)</td><td>cards, stat tiles, the sticky top bar</td></tr>
+        <tr><td><code>--shadow-md</code> / <code>-lg</code></td><td>larger blur/spread</td><td>reserved for modal-like overlays (little used so far)</td></tr>
+        <tr><td><code>--font-sans</code></td><td>system font stack (-apple-system, Segoe UI, Roboto&hellip;)</td><td>the only font family in the app - no web fonts loaded</td></tr>
+        <tr><td><code>--topbar-height</code></td><td>60px</td><td>the fixed top nav's real height, kept as a variable (Phase 22) specifically so anything that needs to stick just below it - e.g. the Admin page's tab bar - has an exact number to offset by instead of a guessed pixel value</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Page Layout Patterns</h2>
+      <table>
+        <tr><th>Pattern</th><th>Markup</th><th>When to use it</th></tr>
+        <tr><td>Page header</td><td><code>.page-header</code> &gt; <code>.eyebrow</code> (small caps section label) + <code>&lt;h1&gt;</code> + <code>p.lead</code> (muted, max 62 characters wide)</td><td>Once, at the top of every page. The eyebrow names the module ("Admin", "Planner", "Prototype &middot; Option C"); the lead sentence says what the page is for in plain language.</td></tr>
+        <tr><td>Card</td><td><code>.card</code> &gt; <code>.card-title</code> + <code>.card-subtitle</code> + content</td><td>Any self-contained block: a create-form, an explanatory panel, one of the sandbox prototype summaries. The default building block for "a labeled group of stuff."</td></tr>
+        <tr><td>Collapsible explainer</td><td>native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code>, no JS</td><td>"How this page fits in your workflow" panels and the Admin stat strip. Collapsed by default unless there's a strong reason to force it open (Phase 22 changed the workflow explainer to collapsed-by-default after direct feedback that open-by-default pushed real content too far down).</td></tr>
+        <tr><td>Stat strip</td><td><code>.stat-strip</code> (auto-fit grid) of <code>.stat-tile</code> (<code>.stat-value</code> + <code>.stat-label</code>)</td><td>A row of "N of this, N of that" counts. Keep it behind a collapsible control if the page already has a lot above the fold (see Admin).</td></tr>
+        <tr><td>Section head</td><td><code>.section-head</code> (flex, space-between) wrapping an <code>&lt;h2&gt;</code> and optional right-aligned actions</td><td>A heading introducing a table or list further down a tab/panel, e.g. "Existing resources" with an Export link beside it.</td></tr>
+        <tr><td>Callout</td><td><code>.callout</code> (left-border accent box)</td><td>"What this is" / "Reading the chart" explanations - a short paragraph of context that isn't quite a card and isn't quite a hint.</td></tr>
+        <tr><td>Empty state</td><td><code>.empty-state</code> with a large <code>.icon</code> emoji + a sentence</td><td>Every list/table that can legitimately be empty renders one instead of a bare "no rows" or a blank table.</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. Navigation and Wayfinding</h2>
+      <ul>
+        <li><strong>Top bar</strong> (<code>.topbar</code>): sticky at the very top (<code>position: sticky; top: 0</code>), role-scoped links (only the signed-in user's own role's links render), current page highlighted via an <code>.active</code> class computed from <code>request.endpoint</code> in each template - never hardcoded per page.</li>
+        <li><strong>Tabs</strong> (<code>.tabs</code>/<code>.tab-list</code>/<code>.tab-input</code>/<code>.tab-panel</code>): a CSS-only pattern with no JavaScript at all - a hidden radio per tab plus a <code>&lt;label for=&gt;</code>, and sibling-combinator CSS (<code>#tab-x:checked ~ .tabs-body #panel-x { display: block; }</code>) showing the matching panel. Used by Admin Manage (9 tabs) and Planner Orders (5 tabs).
+          <ul>
+            <li>Which tab is active on page load is decided <em>server-side</em> (an <code>active_tab</code> context variable, from a <code>?tab=</code> query param), not just whichever radio happens to be marked <code>checked</code> in the template. Every POST action's redirect carries the right <code>tab=</code> value back, so submitting a form on the Resources tab returns you to the Resources tab, not tab #1 - a real bug fixed on the Planner page and later, separately, on the Admin page, because it was never carried over the first time.</li>
+            <li>The Admin page's tab bar is additionally <code>position: sticky; top: var(--topbar-height)</code> (Phase 22) so it stays visible while scrolling a long tab's content, restyled with a bordered "raised tab" look instead of a plain underline, and set to <code>flex-wrap: nowrap; overflow-x: auto</code> so all 9 tabs stay on one line rather than wrapping. This was deliberately scoped to Admin's own <code>&lt;style&gt;</code> block, not the shared <code>.tab-list</code> class in modern.css, since Planner's 5 tabs weren't asked for the same treatment.</li>
+          </ul>
+        </li>
+        <li><strong>Quick-jump tiles</strong> (<code>.workflow-tiles</code>/<code>.workflow-tile</code>): small pill-shaped <code>&lt;label for="tab-x"&gt;</code> elements that check a tab's radio from anywhere else on the page (a label's <code>for</code> attribute works regardless of where in the document it sits) - used in the Admin workflow explainer so its diagram steps are directly clickable, with zero JavaScript.</li>
+        <li><strong>Order-switcher / master-detail selection</strong>: query-param-driven (<code>?overview_order_id=</code>), same idea as tabs - state lives in the URL, not in client-side JS state, so a reload or a shared link reproduces the same view.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Forms and Data Entry</h2>
+      <ul>
+        <li><strong>Layout:</strong> <code>form.form-grid</code> (a wrapping flex/grid of fields) containing one <code>.field</code> per input: a <code>&lt;label&gt;</code>, the control, and an optional <code>.hint</code> line underneath in muted small text.</li>
+        <li><strong>Buttons:</strong> <code>.btn</code> is the base; add exactly one intent modifier - <code>.btn-primary</code> (the main/confirming action on a form), <code>.btn-secondary</code> (everything else - Save on an existing row, Cancel, navigation), <code>.btn-danger</code> (Delete), <code>.btn-ghost</code> (low-emphasis, e.g. Log out) - plus <code>.btn-sm</code> for compact contexts like a table row's action cell.</li>
+        <li><strong>Restricted-choice fields:</strong> when a text field's real values are a small fixed set (resource type: equipment/facility/technician/procedure; proposal status; user role), use a <code>&lt;select&gt;</code>, not free text, and validate the same set server-side too (Phase 20's resource-type fix specifically closed a gap where the UI implied a fixed set but the backend still accepted anything).</li>
+        <li><strong>Per-row inline edit</strong> (the single most-repeated pattern in this app - Users, Capabilities, Resources, Ordered Tests, Customers, Sandbox Option B&hellip;): each existing row's cells are real <code>&lt;input&gt;</code>/<code>&lt;select&gt;</code> elements, but they submit via a <code>form="row-save-{id}"</code> attribute pointing at a separate, <code>hidden</code> <code>&lt;form&gt;</code> placed <em>after the closing <code>&lt;/table&gt;</code></em> (never inside <code>&lt;tbody&gt;</code> - a <code>&lt;form&gt;</code> isn't valid there) - one such hidden form per row for Save, another for Delete. This lets every row have its own independent Save/Delete without nesting a <code>&lt;form&gt;</code> inside a <code>&lt;tr&gt;</code>.</li>
+        <li><strong>Preserve typed input on a rejected save:</strong> when a create-form's validation fails (e.g. a duplicate code), re-render the page in place with the submitted values echoed back into the form, instead of falling through to a generic redirect that resets it to blank - a validation error should never look indistinguishable from "nothing happened" (Phase 21's resource-form fix, following the same precedent <code>create_order</code>/<code>create_eut</code> had already set).</li>
+        <li><strong>Dirty-form tracking</strong> (Modern only, <code>modern.js</code>): a form's own Save button starts disabled and only enables once something in that form actually changes from its loaded state; leaving the page with any form still dirty triggers the browser's native "leave without saving?" prompt.</li>
+        <li><strong>Scroll and tab position across a save</strong>: a plain POST-redirect-GET would otherwise always land back at the top of the page. <code>modern.js</code> restores the scroll position (keyed by path, ignoring query string) after every such round trip, and the active tab is restored server-side as described in section 4 - together these mean clicking Save on, say, the 40th row of a long table leaves you looking at that same row afterward, not scrolled to the top of tab one.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Tables</h2>
+      <ul>
+        <li><code>table.modern-table</code> wrapped in a <code>.table-wrap</code> div (adds a border, rounded corners, and horizontal scroll so a wide table never breaks the page layout).</li>
+        <li><strong>Sortable headers</strong>: every listing table uses the <code>macros.sort_th(label, key, table_id, endpoint)</code> macro - a plain link (no JS) that flips <code>&lt;table_id&gt;_sort</code>/<code>&lt;table_id&gt;_dir</code> query params, server-sorted via <code>app/table_utils.py:rows_with_meta</code>, so several independent tables on one page (e.g. Admin's tabs) each sort independently and existing filters/tab state survive a re-sort.</li>
+        <li><strong>Duplicate-row highlighting</strong>: any row whose full set of <em>displayed</em> columns exactly matches another row gets class <code>.dup-row</code> (amber background + a left accent bar) and <code>macros.dup_flag()</code> (a ⚠️ with an explanatory tooltip) next to its first cell - even though the underlying rows are genuinely distinct records. Also computed by <code>rows_with_meta</code>, keyed per-table by an explicit <code>dup_keys</code> list.</li>
+        <li><strong>Actions column</strong>: the last column, holding that row's Save/Delete buttons (see section 5's inline-edit pattern) plus any row-specific extras (a History link, a template-group Sync button, etc.).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Feedback and Confirmation</h2>
+      <ul>
+        <li><strong>Flash messages</strong> (<code>.flash</code>/<code>.flash-info</code>/<code>.flash-error</code>): rendered once, unconditionally, near the top of every page regardless of which tab is active, so an error from an action on tab 3 is never invisible because tab 1 is showing. Auto-dismiss after 6 seconds, with a manual close button too.</li>
+        <li><strong>Scoped inline confirmations</strong>: for feedback that belongs visually next to the thing it's about (e.g. "Applied template 'X' (17 activities added)" shown inside the Apply-Template card itself, not just in the general flash area), use <code>get_flashed_messages(category_filter=[...])</code> with a dedicated category - this can be called alongside the page's own unfiltered flash loop without consuming or duplicating the message.</li>
+        <li><strong>Destructive-action confirmation</strong>: add <code>data-confirm="Delete resource 'X'?"</code> to the button; <code>modern.js</code> intercepts the click with a native <code>window.confirm()</code> and cancels the submit if the user declines. Every Delete button in the app uses this - never a silent, un-confirmed delete.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>8. Icons (Emoji) Reference</h2>
+      <p>RMS uses emoji as its entire icon set - no icon font or SVG sprite. Keep new icons consistent with the meanings already established:</p>
+      <table>
+        <tr><th>Icon</th><th>Meaning</th><th>Icon</th><th>Meaning</th></tr>
+        <tr><td>💾</td><td>Save</td><td>➕ / + Row</td><td>Add / create</td></tr>
+        <tr><td>🗑</td><td>Delete</td><td>✏️</td><td>Edit</td></tr>
+        <tr><td>🔍</td><td>Search / filter</td><td>↶</td><td>Undo</td></tr>
+        <tr><td>⬇️</td><td>Export / download</td><td>📤</td><td>Import / upload</td></tr>
+        <tr><td>📋</td><td>Copy</td><td>🕘</td><td>History</td></tr>
+        <tr><td>💡</td><td>Enhancement proposal</td><td>🐛</td><td>Bug report</td></tr>
+        <tr><td>👤</td><td>Users</td><td>🎓</td><td>Capabilities</td></tr>
+        <tr><td>🔧</td><td>Resources</td><td>🔗</td><td>Capability assignments</td></tr>
+        <tr><td>🚫</td><td>Exclusion group / hard conflict</td><td>🔀</td><td>Cross-site warning</td></tr>
+        <tr><td>📋 (templates)</td><td>Activity templates</td><td>🌴</td><td>Staff absences</td></tr>
+        <tr><td>🏢</td><td>Customers</td><td>📅</td><td>Schedule / dates / milestones</td></tr>
+        <tr><td>📊</td><td>Dashboard / counts</td><td>🗂️</td><td>Order workspace / orders</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>9. Behavioural Conventions ("state that survives a round trip")</h2>
+      <p>A recurring theme across many phases: an action shouldn't disorient the user by moving them somewhere they weren't. Specifically, after any Save/Add/Delete/Apply:</p>
+      <ol>
+        <li>The scroll position stays the same (section 5).</li>
+        <li>The active tab stays the same (section 4).</li>
+        <li>A single-order workspace action returns to that same order's workspace, not the tabbed page or Dashboard, when it was submitted from there (a hidden <code>return_to</code>/<code>return_order_id</code> pair on the form, resolved by <code>_redirect_after()</code>).</li>
+        <li>A proposal submitted from a specific page/tab (the floating "P" dialog) returns to that exact URL - including its query string - afterward, not just the bare page path.</li>
+      </ol>
+      <p>When building a new action, check whether it needs the same treatment before assuming a plain redirect to the page's default view is good enough.</p>
+    </section>
+
+    <section>
+      <h2>10. Simple UI's Plainer Vocabulary</h2>
+      <p>Simple mode deliberately has almost none of the above - it renders the exact same routes and data through separate templates under <code>templates/simple/</code>, with no CSS framework and no JavaScript at all (see <a href="dual-ui.html">Dual Interface</a> for the full rationale). What it does keep:</p>
+      <ul>
+        <li>Plain <code>&lt;h2&gt;</code>/<code>&lt;h3&gt;</code> headings and <code>&lt;section&gt;</code> blocks instead of the page-header/card system.</li>
+        <li>A bare <code>&lt;table border="1" cellpadding="6"&gt;</code> instead of <code>.modern-table</code> - but the <em>same</em> <code>macros.sort_th</code> macro and the same <code>.dup-row</code>/dup-flag convention, since both are pure server-side/CSS and don't need JS.</li>
+        <li>The same per-row hidden-form Save/Delete pattern (section 5) - it's markup-only, so it works identically with no JS.</li>
+        <li>Native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code> for the workflow explainer, same as Modern.</li>
+        <li>No tabs (all sections stacked on one scrollable page), no flash auto-dismiss (messages just render and stay until the next page load), no dirty-form tracking or scroll/tab restoration, no drag/keyboard-grid/spreadsheet-style features - anything requiring JS simply doesn't exist in Simple, rather than existing in a degraded form.</li>
+      </ul>
+      <p>A handful of pages exist only in Modern at all (no Simple equivalent) because the workflow itself is JS-native or print-oriented: the Technician dashboard and Test Reports (work-order lifecycle buttons, a printable report), the Planner Schedule tab and its Day/Week/Month/All Gantt chart, and the admin-only editable-table-view sandbox. See dual-ui.html section 7 for the full list and reasoning.</p>
+    </section>
+
+    <section>
+      <h2>11. Accessibility Basics Already in Place</h2>
+      <ul>
+        <li>A skip-link (<code>.skip-link</code>) as the very first focusable element, jumping to <code>#main-content</code>.</li>
+        <li>The tab list carries <code>role="tablist"</code>; each sortable column header carries <code>aria-sort</code>.</li>
+        <li>Icon-only buttons (the nav toggle, flash close button) carry <code>aria-label</code>; the nav toggle also reflects <code>aria-expanded</code>.</li>
+        <li>Every form field has a real <code>&lt;label for=&gt;</code>, not just a placeholder.</li>
+      </ul>
+      <p>Not yet systematically covered: keyboard-only operation of the sandbox's custom grid (Option C) beyond its own arrow-key/Tab model, and color-contrast auditing of the badge palette. Worth a pass if this design system is extended much further.</p>
+    </section>
+
+    <section>
+      <h2>12. Checklist for a New Page or Feature</h2>
+      <ol>
+        <li>Does it belong in both UI modes, or is there a concrete reason (JS-native interaction, printability) it's Modern-only? Say so explicitly in the page and in dual-ui.html if so.</li>
+        <li>Page header: eyebrow + h1 + one-sentence lead. Cards for self-contained blocks. Section-head for anything introducing a table.</li>
+        <li>Any table: wrap in <code>.table-wrap</code>, use <code>.modern-table</code>, wire up <code>sort_th</code> and dup-row detection via <code>rows_with_meta</code>, give it an empty state.</li>
+        <li>Any editable row: the external-hidden-form pattern (section 5), never a <code>&lt;form&gt;</code> inside <code>&lt;tbody&gt;</code>.</li>
+        <li>Any new status/type: does it map onto the existing four badge colors (section 2.1) rather than inventing a new one? Is a free-text field that really has a small fixed set restricted to a <code>&lt;select&gt;</code>, validated server-side too?</li>
+        <li>Any destructive action: <code>data-confirm</code>.</li>
+        <li>Any multi-tab or multi-view page: does its own POST actions' redirects carry back whatever query param decides "which view/tab" (section 4/9), so a save doesn't bounce the user back to view #1?</li>
+        <li>New icon: check section 8 before picking an emoji nothing else uses for the same concept.</li>
+        <li>Update this guide, dual-ui.html, and/or phase3-backend-scope.html if the new page introduces a genuinely new pattern, not just an instance of an existing one.</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
