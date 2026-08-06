@@ -9,16 +9,43 @@
   #tab-tests:checked ~ .tabs-body #panel-tests,
   #tab-assign:checked ~ .tabs-body #panel-assign,
   #tab-schedule:checked ~ .tabs-body #panel-schedule,
+  #tab-visual:checked ~ .tabs-body #panel-visual,
   #tab-overview:checked ~ .tabs-body #panel-overview { display: block; }
 
   #tab-orders:checked ~ .tab-list label[for="tab-orders"],
   #tab-tests:checked ~ .tab-list label[for="tab-tests"],
   #tab-assign:checked ~ .tab-list label[for="tab-assign"],
   #tab-schedule:checked ~ .tab-list label[for="tab-schedule"],
+  #tab-visual:checked ~ .tab-list label[for="tab-visual"],
   #tab-overview:checked ~ .tab-list label[for="tab-overview"] {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
+
+  .vis-layout { display: flex; gap: 18px; align-items: flex-start; }
+  .vis-queue { flex: 0 0 300px; max-height: 720px; overflow-y: auto; }
+  .vis-grid-wrap { flex: 1; min-width: 0; overflow-x: auto; }
+  .vis-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 10px; background: var(--color-surface); cursor: grab; }
+  .vis-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-subtle, #e2ecff); }
+  .vis-card.dragging { opacity: 0.4; }
+  .vis-card-title { font-weight: 700; }
+  .vis-card-meta { color: var(--color-text-muted); font-size: 0.82rem; margin: 2px 0 8px; }
+  .vis-card-suggestion { font-size: 0.82rem; margin-bottom: 6px; }
+  .vis-card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  table.vis-grid { border-collapse: collapse; width: 100%; }
+  table.vis-grid th, table.vis-grid td { border: 1px solid var(--color-border); padding: 4px; vertical-align: top; }
+  table.vis-grid th { background: var(--color-bg-subtle, #f7f7f9); position: sticky; top: 0; font-size: 0.8rem; }
+  table.vis-grid td.vis-tech-cell { width: 150px; font-size: 0.85rem; font-weight: 700; background: var(--color-bg-subtle, #f7f7f9); }
+  table.vis-grid td.vis-day-cell { width: 92px; min-width: 92px; height: 56px; }
+  table.vis-grid td.vis-day-cell.weekend { background: var(--color-bg-subtle, #f7f7f9); }
+  table.vis-grid td.vis-day-cell.suggested { background: #fff6d8; outline: 2px solid #e0b400; outline-offset: -2px; }
+  table.vis-grid td.vis-day-cell.dragover { background: var(--color-primary-subtle, #e2ecff); }
+  table.vis-grid th.vis-not-capable, table.vis-grid td.vis-tech-cell.vis-not-capable { opacity: 0.55; }
+  .vis-chip { display: block; font-size: 0.72rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 3px; padding: 1px 4px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vis-cell-form { margin: 0; }
+  .vis-cell-btn { width: 100%; min-height: 20px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); border-radius: 3px; cursor: pointer; font-size: 0.75rem; }
+  .vis-cell-btn:disabled { cursor: default; border-style: dotted; opacity: 0.5; }
+  .vis-cell-btn:not(:disabled):hover { border-color: var(--color-primary); color: var(--color-primary); }
 
   .test-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; background: var(--color-surface); }
   .test-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -88,6 +115,7 @@
   <input type="radio" name="planner-tabs" id="tab-tests" class="tab-input" {{ 'checked' if active_tab == 'tests' }}>
   <input type="radio" name="planner-tabs" id="tab-assign" class="tab-input" {{ 'checked' if active_tab == 'assign' }}>
   <input type="radio" name="planner-tabs" id="tab-schedule" class="tab-input" {{ 'checked' if active_tab == 'schedule' }}>
+  <input type="radio" name="planner-tabs" id="tab-visual" class="tab-input" {{ 'checked' if active_tab == 'visual' }}>
   <input type="radio" name="planner-tabs" id="tab-overview" class="tab-input" {{ 'checked' if active_tab == 'overview' }}>
 
   <div class="tab-list" role="tablist">
@@ -95,6 +123,7 @@
     <label for="tab-tests" class="tab-label">🧪 Ordered tests</label>
     <label for="tab-assign" class="tab-label">🔧 Resource assignment</label>
     <label for="tab-schedule" class="tab-label">📅 Schedule</label>
+    <label for="tab-visual" class="tab-label">🧲 Visual Schedule</label>
     <label for="tab-overview" class="tab-label">📊 Orders overview</label>
   </div>
 
@@ -715,6 +744,89 @@
       {% else %}
       <div class="empty-state"><span class="icon">✅</span>Every ordered test either has a scheduled work order or is shown on the chart above.</div>
       {% endif %}
+    </section>
+
+    <section class="tab-panel" id="panel-visual">
+      <div class="callout">
+        <strong>How this works:</strong> pick a test from the queue on the left (click "Select"), then place it on the grid — click a cell's <em>Place here</em> button (works with keyboard: Tab then Enter/Space), or drag the queue card straight onto a cell. A suggested slot (earliest technician with the matching capability, free that day, and not on leave) is highlighted once a test is selected — use "Accept suggested slot" to place it there in one step, or pick any other cell to override manually. Technician rows dimmed in the grid don't have the selected test's required capability; you can still place there if that's intentional.
+      </div>
+
+      <div class="vis-nav" style="display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_prev, vis_selected=vis_selected_id) }}">&larr; Previous {{ vis_days|length }} days</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_today, vis_selected=vis_selected_id) }}">Today</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_next, vis_selected=vis_selected_id) }}">Next {{ vis_days|length }} days &rarr;</a>
+      </div>
+
+      <div class="vis-layout">
+        <div class="vis-queue" id="visQueue">
+          {% if vis_queue %}
+          {% for q in vis_queue %}
+          <div class="vis-card {{ 'selected' if vis_selected_id == q['ordered_test_id'] }}" draggable="true" data-ordered-test-id="{{ q['ordered_test_id'] }}">
+            <div class="vis-card-title">{{ q['test_name'] }}</div>
+            <div class="vis-card-meta">{{ q['order_code'] }} &middot; {{ q['customer_name'] }} &middot; requires {{ q['capability_name'] or 'no specific capability' }}{% if q['planned_start_date'] %} &middot; planned from {{ q['planned_start_date'] }}{% endif %}</div>
+            {% if q['suggestion'] %}
+            <div class="vis-card-suggestion">💡 Suggested: <strong>{{ q['suggestion']['technician_username'] }}</strong>, {{ q['suggestion']['scheduled_date'] }}</div>
+            {% else %}
+            <div class="vis-card-suggestion section-help" style="margin:0 0 6px;">No available slot found in the next 21 days — place manually.</div>
+            {% endif %}
+            <div class="vis-card-actions">
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=q['ordered_test_id']) }}">{{ '✓ Selected' if vis_selected_id == q['ordered_test_id'] else 'Select' }}</a>
+              {% if q['suggestion'] %}
+              <form method="post">
+                <input type="hidden" name="action" value="schedule_test">
+                <input type="hidden" name="ordered_test_id" value="{{ q['ordered_test_id'] }}">
+                <input type="hidden" name="technician_user_id" value="{{ q['suggestion']['technician_user_id'] }}">
+                <input type="hidden" name="scheduled_date" value="{{ q['suggestion']['scheduled_date'] }}">
+                <button type="submit" class="btn btn-primary btn-sm">Accept suggested slot</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="empty-state"><span class="icon">✅</span>Nothing waiting to be scheduled.</div>
+          {% endif %}
+        </div>
+
+        <div class="vis-grid-wrap">
+          <table class="vis-grid">
+            <thead>
+              <tr>
+                <th>Technician</th>
+                {% for d in vis_days %}
+                <th>{{ d['label'] }}{% if d['is_today'] %}<br>(today){% endif %}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% if vis_technicians %}
+              {% for tech in vis_technicians %}
+              <tr>
+                <td class="vis-tech-cell {{ '' if tech['matches_selected_capability'] else 'vis-not-capable' }}">{{ tech['username'] }}{% if tech['resource_code'] %} <span class="section-help">({{ tech['resource_code'] }})</span>{% endif %}</td>
+                {% for d in vis_days %}
+                {% set is_suggested = vis_selected_suggestion and vis_selected_suggestion['technician_user_id'] == tech['user_id'] and vis_selected_suggestion['scheduled_date'] == d['date_iso'] %}
+                <td class="vis-day-cell {{ 'weekend' if d['is_weekend'] }} {{ 'suggested' if is_suggested }}" data-technician-id="{{ tech['user_id'] }}" data-date="{{ d['date_iso'] }}">
+                  {% for chip in tech['cells'][d['date_iso']] %}
+                  <span class="vis-chip" title="{{ chip['order_code'] }} - {{ chip['test_name'] }} ({{ chip['wo_status'] }})">{{ chip['order_code'] }}: {{ chip['test_name'] }}</span>
+                  {% endfor %}
+                  <form method="post" class="vis-cell-form">
+                    <input type="hidden" name="action" value="schedule_test">
+                    <input type="hidden" name="technician_user_id" value="{{ tech['user_id'] }}">
+                    <input type="hidden" name="scheduled_date" value="{{ d['date_iso'] }}">
+                    <input type="hidden" name="ordered_test_id" value="{{ vis_selected_id or '' }}" class="vis-cell-target-input">
+                    <button type="submit" class="vis-cell-btn" {{ 'disabled' if not vis_selected_id }} title="{{ 'Place selected test here' if vis_selected_id else 'Select a test from the queue first' }}">{{ '📥 Place here' if vis_selected_id else '·' }}</button>
+                  </form>
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+              {% else %}
+              <tr><td colspan="{{ vis_days|length + 1 }}" class="empty-state">No technician users found.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <section class="tab-panel" id="panel-overview">

@@ -9,6 +9,7 @@ from .scheduling import (
     conflict_message,
     find_running_conflict,
     find_unmet_dependency,
+    next_work_order_code,
     unmet_dependency_message,
 )
 from .table_utils import rows_with_meta
@@ -29,21 +30,6 @@ def _linked_resource_id(db) -> int | None:
         return None
     row = db.execute("SELECT linked_resource_id FROM users WHERE id = ?", (user_id,)).fetchone()
     return row["linked_resource_id"] if row else None
-
-
-def _next_work_order_code(db) -> str:
-    # Based on the numeric suffix of existing codes, not MAX(id): seed data's work order
-    # codes don't necessarily follow the id sequence, so an id-based next code can collide
-    # with an existing one that was assigned out of sequence.
-    max_num = 0
-    for row in db.execute("SELECT work_order_code FROM work_orders").fetchall():
-        code = row["work_order_code"] or ""
-        if code.startswith("WO-"):
-            try:
-                max_num = max(max_num, int(code[3:]))
-            except ValueError:
-                pass
-    return f"WO-{max_num + 1:04d}"
 
 
 def _load_technician_context(db) -> dict:
@@ -191,7 +177,7 @@ def technician_dashboard():
             ).fetchone():
                 flash("A work order already exists for this test.", "error")
             else:
-                code = _next_work_order_code(db)
+                code = next_work_order_code(db)
                 db.execute(
                     """
                     INSERT INTO work_orders

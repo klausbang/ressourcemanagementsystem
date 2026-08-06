@@ -10,6 +10,8 @@ from .scheduling import (
     find_all_running_conflicts,
     find_planned_facility_overlaps,
     find_reschedule_suggestions,
+    next_work_order_code,
+    suggest_placement,
     would_create_dependency_cycle,
 )
 from .table_utils import rows_with_meta
@@ -32,6 +34,8 @@ SCHEDULE_WINDOW_HOURS = 24
 SCHEDULE_DEFAULT_HOUR = 8  # assumed start-of-shift time when only a scheduled_date (no time) is known
 SCHEDULE_MAX_WEEKS = 8
 SCHEDULE_MAX_MONTHS = 6
+
+VISUAL_SCHEDULE_DAYS = 14  # Phase 28: width of the visual-scheduling grid, in days
 
 
 def _parse_date_only(value: str | None) -> date | None:
@@ -376,6 +380,123 @@ def _load_schedule_context(db) -> dict:
     }
 
 
+def _load_visual_schedule_context(db) -> dict:
+    """Phase 28 (FR-PLN-6): planner-facing interactive scheduling grid - place unscheduled
+    ordered tests (the "queue") onto a technician x day grid by click, drag, or keyboard,
+    with a computed suggested slot per queued test (see suggest_placement in
+    app/scheduling.py). Day-level only, like the rest of the schema. Modern-only UI (see
+    docs/dual-ui.html section 8): Simple gets the same underlying schedule_test action
+    through a plain per-row form instead of this grid."""
+
+    vis_start_param = request.args.get("vis_start", "").strip()
+    try:
+        vis_view_day = date.fromisoformat(vis_start_param) if vis_start_param else date.today()
+    except ValueError:
+        vis_view_day = date.today()
+
+    days = []
+    for i in range(VISUAL_SCHEDULE_DAYS):
+        d = vis_view_day + timedelta(days=i)
+        days.append(
+            {
+                "date_iso": d.isoformat(),
+                "label": d.strftime("%a %m/%d"),
+                "is_today": d == date.today(),
+                "is_weekend": d.weekday() >= 5,
+            }
+        )
+    window_start_iso = days[0]["date_iso"]
+    window_end_iso = days[-1]["date_iso"]
+
+    technicians = [
+        dict(row)
+        for row in db.execute(
+            """
+            SELECT u.id AS user_id, u.username, r.code AS resource_code
+            FROM users u
+            LEFT JOIN resources r ON r.id = u.linked_resource_id
+            WHERE u.role = 'technician'
+            ORDER BY u.username
+            """
+        ).fetchall()
+    ]
+
+    placed_rows = db.execute(
+        """
+        SELECT
+            wo.technician_user_id, wo.scheduled_date, wo.status AS wo_status,
+            wo.work_order_code, o.order_code, ot.test_name
+        FROM work_orders wo
+        JOIN ordered_tests ot ON ot.id = wo.ordered_test_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        WHERE wo.scheduled_date BETWEEN ? AND ?
+        """,
+        (window_start_iso, window_end_iso),
+    ).fetchall()
+    placed_by_cell: dict[tuple[int, str], list] = {}
+    for row in placed_rows:
+        key = (row["technician_user_id"], row["scheduled_date"])
+        placed_by_cell.setdefault(key, []).append(dict(row))
+    for tech in technicians:
+        tech["cells"] = {d["date_iso"]: placed_by_cell.get((tech["user_id"], d["date_iso"]), []) for d in days}
+
+    queue_rows = db.execute(
+        """
+        SELECT
+            ot.id AS ordered_test_id, o.order_code, o.customer_name, ot.test_name,
+            ot.planned_start_date, c.id AS capability_id, c.name AS capability_name
+        FROM ordered_tests ot
+        JOIN customer_orders o ON o.id = ot.order_id
+        LEFT JOIN capabilities c ON c.id = ot.required_capability_id
+        LEFT JOIN work_orders wo ON wo.ordered_test_id = ot.id
+        WHERE wo.id IS NULL
+        ORDER BY (ot.planned_start_date IS NULL), ot.planned_start_date, o.order_code, ot.sequence, ot.id
+        """
+    ).fetchall()
+
+    queue = []
+    for row in queue_rows:
+        item = dict(row)
+        item["suggestion"] = suggest_placement(db, item["ordered_test_id"])
+        queue.append(item)
+
+    selected_id_raw = request.args.get("vis_selected", "").strip()
+    selected_id = int(selected_id_raw) if selected_id_raw.isdigit() else None
+    selected_item = next((q for q in queue if q["ordered_test_id"] == selected_id), None) if selected_id else None
+
+    capable_technician_ids: set[int] = set()
+    if selected_item and selected_item["capability_id"]:
+        capable_technician_ids = {
+            row["user_id"]
+            for row in db.execute(
+                """
+                SELECT DISTINCT u.id AS user_id
+                FROM users u
+                JOIN resource_capabilities rc ON rc.resource_id = u.linked_resource_id
+                WHERE u.role = 'technician' AND rc.capability_id = ?
+                """,
+                (selected_item["capability_id"],),
+            ).fetchall()
+        }
+    for tech in technicians:
+        tech["matches_selected_capability"] = (
+            not selected_item or not selected_item["capability_id"] or tech["user_id"] in capable_technician_ids
+        )
+
+    return {
+        "vis_view_day": vis_view_day,
+        "vis_days": days,
+        "vis_technicians": technicians,
+        "vis_queue": queue,
+        "vis_selected_id": selected_id,
+        "vis_selected_suggestion": selected_item["suggestion"] if selected_item else None,
+        "vis_prev": (vis_view_day - timedelta(days=VISUAL_SCHEDULE_DAYS)).isoformat(),
+        "vis_next": (vis_view_day + timedelta(days=VISUAL_SCHEDULE_DAYS)).isoformat(),
+        "vis_today": date.today().isoformat(),
+        "is_visual_tab": bool(vis_start_param) or bool(selected_id_raw),
+    }
+
+
 def _redirect_after(fallback_endpoint: str, **fallback_kwargs):
     """Where a POST action sends the browser afterward. Every action-handling form on the
     single-order workspace page (Phase 16) carries a hidden return_to=order/return_order_id
@@ -638,11 +759,14 @@ def _load_planner_context(db) -> dict:
     }
     context.update(_load_schedule_context(db))
     context.update(_load_orders_overview_context(db, orders, tests_for_alloc, euts_rows))
+    context.update(_load_visual_schedule_context(db))
 
     if context["is_schedule_tab"]:
         active_tab = "schedule"
     elif context["is_overview_tab"]:
         active_tab = "overview"
+    elif context["is_visual_tab"] or request.args.get("tab") == "visual":
+        active_tab = "visual"
     elif request.args.get("tab") in ("orders", "tests", "assign"):
         active_tab = request.args.get("tab")
     else:
@@ -1276,6 +1400,91 @@ def planner_orders():
                 flash("Resource assigned to test.", "info")
 
             return _redirect_after("planner.planner_orders", tab="assign")
+
+        if action == "schedule_test":
+            ordered_test_id = request.form.get("ordered_test_id", "").strip()
+            technician_user_id = request.form.get("technician_user_id", "").strip()
+            scheduled_date = request.form.get("scheduled_date", "").strip()
+
+            if not (ordered_test_id and technician_user_id and scheduled_date):
+                flash("Test, technician, and date are all required to schedule.", "error")
+                return _redirect_after("planner.planner_orders", tab="visual")
+
+            test = db.execute(
+                "SELECT test_name, required_capability_id FROM ordered_tests WHERE id = ?",
+                (ordered_test_id,),
+            ).fetchone()
+            technician = db.execute(
+                "SELECT username, linked_resource_id FROM users WHERE id = ? AND role = 'technician'",
+                (technician_user_id,),
+            ).fetchone()
+
+            if test is None or technician is None:
+                flash("Ordered test or technician not found.", "error")
+                return _redirect_after("planner.planner_orders", tab="visual")
+
+            # Soft warning only, not a hard block: unlike assign_resource (a real resource
+            # record with an enforced capability match), a technician's linked_resource_id
+            # can be stale/unset in practice (see docs/ai-questions.html), and technicians
+            # already self-assign work orders with no capability check at all (see
+            # action == "create_work_order" in routes_technician.py) - so the planner is
+            # trusted to override here too, same as that existing path.
+            if test["required_capability_id"]:
+                has_capability = db.execute(
+                    "SELECT 1 FROM resource_capabilities WHERE resource_id = ? AND capability_id = ?",
+                    (technician["linked_resource_id"], test["required_capability_id"]),
+                ).fetchone()
+                if not has_capability:
+                    flash(
+                        f"Warning: {technician['username']} does not have the required capability "
+                        f"for '{test['test_name']}' - scheduled anyway (manual override).",
+                        "info",
+                    )
+
+            existing = db.execute(
+                "SELECT id, status FROM work_orders WHERE ordered_test_id = ?", (ordered_test_id,)
+            ).fetchone()
+
+            if existing and existing["status"] != "planned":
+                flash(
+                    f"'{test['test_name']}' already has a work order that is {existing['status']} "
+                    "- it can no longer be rescheduled from here.",
+                    "error",
+                )
+                return _redirect_after("planner.planner_orders", tab="visual")
+
+            if existing:
+                db.execute(
+                    "UPDATE work_orders SET technician_user_id = ?, scheduled_date = ? WHERE id = ?",
+                    (technician_user_id, scheduled_date, existing["id"]),
+                )
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "work_order_rescheduled",
+                    f"Rescheduled to {scheduled_date}, technician {technician['username']}.",
+                )
+                db.commit()
+                flash(f"'{test['test_name']}' rescheduled to {scheduled_date}.", "info")
+            else:
+                code = next_work_order_code(db)
+                db.execute(
+                    """
+                    INSERT INTO work_orders
+                        (work_order_code, ordered_test_id, technician_user_id, status, scheduled_date)
+                    VALUES (?, ?, ?, 'planned', ?)
+                    """,
+                    (code, ordered_test_id, technician_user_id, scheduled_date),
+                )
+                history.record(
+                    db, ordered_test_id, session.get("user_id"), session.get("username"),
+                    "work_order_created",
+                    f"Work order {code} created and scheduled for {scheduled_date} "
+                    f"({technician['username']}) via visual scheduling.",
+                )
+                db.commit()
+                flash(f"'{test['test_name']}' scheduled for {scheduled_date} with {technician['username']}.", "info")
+
+            return _redirect_after("planner.planner_orders", tab="visual")
 
     return _render_planner_orders(db)
 

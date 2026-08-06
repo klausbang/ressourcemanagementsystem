@@ -171,4 +171,50 @@
       dialog.style.top = "";
     });
   })();
+
+  // Phase 28: Visual Schedule tab - drag a queue card onto a grid cell as a mouse shortcut
+  // for the same schedule_test placement each cell's plain form already performs (click and
+  // keyboard use that form directly via its "Place here" button; this just fills the form's
+  // hidden ordered_test_id in from the dragged card and submits it on drop).
+  (function () {
+    var queue = document.getElementById("visQueue");
+    if (!queue) return;
+
+    var draggedId = null;
+
+    queue.querySelectorAll(".vis-card[draggable=true]").forEach(function (card) {
+      card.addEventListener("dragstart", function (e) {
+        draggedId = card.getAttribute("data-ordered-test-id");
+        card.classList.add("dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.setData("text/plain", draggedId || "");
+          e.dataTransfer.effectAllowed = "move";
+        }
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("dragging");
+      });
+    });
+
+    document.querySelectorAll(".vis-day-cell").forEach(function (cell) {
+      cell.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        cell.classList.add("dragover");
+      });
+      cell.addEventListener("dragleave", function () {
+        cell.classList.remove("dragover");
+      });
+      cell.addEventListener("drop", function (e) {
+        e.preventDefault();
+        cell.classList.remove("dragover");
+        var id = draggedId || (e.dataTransfer && e.dataTransfer.getData("text/plain"));
+        if (!id) return;
+        var form = cell.querySelector(".vis-cell-form");
+        var input = form && form.querySelector(".vis-cell-target-input");
+        if (!form || !input) return;
+        input.value = id;
+        form.submit();
+      });
+    });
+  })();
 })();

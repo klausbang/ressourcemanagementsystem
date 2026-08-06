@@ -231,6 +231,137 @@ def find_planned_facility_overlaps(db: sqlite3.Connection) -> list[tuple[dict, d
     return overlaps
 
 
+def next_work_order_code(db: sqlite3.Connection) -> str:
+    # Based on the numeric suffix of existing codes, not MAX(id): seed data's work order
+    # codes don't necessarily follow the id sequence, so an id-based next code can collide
+    # with an existing one that was assigned out of sequence. Shared by the technician
+    # self-service work order creation and the planner-side visual scheduling (Phase 28).
+    max_num = 0
+    for row in db.execute("SELECT work_order_code FROM work_orders").fetchall():
+        code = row["work_order_code"] or ""
+        if code.startswith("WO-"):
+            try:
+                max_num = max(max_num, int(code[3:]))
+            except ValueError:
+                pass
+    return f"WO-{max_num + 1:04d}"
+
+
+def suggest_placement(db: sqlite3.Connection, ordered_test_id: int, lookahead_days: int = 21) -> dict | None:
+    """Phase 28 (visual scheduling, FR-PLN-6): propose the earliest (technician, date) pair
+    an unscheduled ordered test could be placed on, so the planner has a one-click default
+    instead of guessing. Day-level only (no time-of-day column exists yet - see
+    docs/ai-questions.html). A candidate day is skipped if:
+      - the technician already has a non-completed work order scheduled that day, or
+      - the technician has a staff_absence covering that day, or
+      - any equipment/facility resource already allocated to this ordered test (Phase 5/9)
+        already has another work order scheduled that day (a day-granularity cousin of the
+        facility/equipment overlap concern in find_planned_facility_overlaps above).
+    Candidate technicians are every technician-role user whose linked resource has the
+    ordered test's required capability, in username order; if the test has no
+    required_capability_id, every technician-role user is a candidate. Returns None if no
+    slot is found within lookahead_days - the planner then places manually. This is a
+    suggestion only: nothing is written to the database here."""
+
+    test = db.execute(
+        "SELECT required_capability_id, planned_start_date FROM ordered_tests WHERE id = ?",
+        (ordered_test_id,),
+    ).fetchone()
+    if test is None:
+        return None
+
+    if test["required_capability_id"]:
+        technicians = db.execute(
+            """
+            SELECT DISTINCT u.id AS user_id, u.username
+            FROM users u
+            JOIN resources r ON r.id = u.linked_resource_id
+            JOIN resource_capabilities rc ON rc.resource_id = r.id
+            WHERE u.role = 'technician' AND rc.capability_id = ?
+            ORDER BY u.username
+            """,
+            (test["required_capability_id"],),
+        ).fetchall()
+    else:
+        technicians = db.execute(
+            "SELECT id AS user_id, username FROM users WHERE role = 'technician' ORDER BY username"
+        ).fetchall()
+    if not technicians:
+        return None
+
+    other_resource_ids = {
+        row["resource_id"]
+        for row in db.execute(
+            """
+            SELECT a.resource_id FROM allocations a
+            JOIN resources r ON r.id = a.resource_id
+            WHERE a.ordered_test_id = ? AND r.resource_type IN ('equipment', 'facility')
+            """,
+            (ordered_test_id,),
+        ).fetchall()
+    }
+
+    start_day = date.today()
+    if test["planned_start_date"]:
+        planned = date.fromisoformat(test["planned_start_date"])
+        if planned > start_day:
+            start_day = planned
+
+    for offset in range(lookahead_days):
+        day = start_day + timedelta(days=offset)
+        day_iso = day.isoformat()
+
+        if other_resource_ids:
+            placeholders = ",".join("?" for _ in other_resource_ids)
+            busy_resource = db.execute(
+                f"""
+                SELECT 1
+                FROM allocations a
+                JOIN work_orders wo ON wo.ordered_test_id = a.ordered_test_id
+                WHERE a.resource_id IN ({placeholders})
+                  AND a.ordered_test_id != ?
+                  AND wo.status != 'completed'
+                  AND wo.scheduled_date = ?
+                LIMIT 1
+                """,
+                list(other_resource_ids) + [ordered_test_id, day_iso],
+            ).fetchone()
+            if busy_resource:
+                continue
+
+        for tech in technicians:
+            busy = db.execute(
+                """
+                SELECT 1 FROM work_orders
+                WHERE technician_user_id = ? AND status != 'completed' AND scheduled_date = ?
+                LIMIT 1
+                """,
+                (tech["user_id"], day_iso),
+            ).fetchone()
+            if busy:
+                continue
+
+            absent = db.execute(
+                """
+                SELECT 1 FROM staff_absences a
+                JOIN users u ON u.linked_resource_id = a.resource_id
+                WHERE u.id = ? AND a.start_date <= ? AND a.end_date >= ?
+                LIMIT 1
+                """,
+                (tech["user_id"], day_iso, day_iso),
+            ).fetchone()
+            if absent:
+                continue
+
+            return {
+                "technician_user_id": tech["user_id"],
+                "technician_username": tech["username"],
+                "scheduled_date": day_iso,
+            }
+
+    return None
+
+
 def find_reschedule_suggestions(db: sqlite3.Connection) -> list[dict]:
     """Phase 15, FR-RSC-2: when a prerequisite finished late (or is already overdue and
     still not complete), suggest shifting its direct dependent's planned window by the

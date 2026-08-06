@@ -100,12 +100,12 @@
             <td>Planner Orders</td>
             <td><code>/planner/</code></td>
             <td>Planner</td>
-            <td>Tabbed CRUD workspace (5 tabs)</td>
-            <td>Create/manage customer orders, EUTs, test activities, and resource assignments; visualize the production schedule; browse all orders three ways. See section 3 for a per-tab breakdown.</td>
+            <td>Tabbed CRUD workspace (6 tabs)</td>
+            <td>Create/manage customer orders, EUTs, test activities, and resource assignments; visualize the production schedule; place unscheduled tests onto a technician x day grid; browse all orders three ways. See section 3 for a per-tab breakdown.</td>
             <td>Editable (Schedule and Orders overview tabs are view-only)</td>
             <td>Varies by tab - see section 3</td>
             <td>Yes (Customer orders / Ordered tests / Resource assignment tabs)</td>
-            <td>Both (Schedule tab is Modern-only)</td>
+            <td>Both (Schedule tab is Modern-only; Visual Schedule's grid/drag/keyboard interaction is Modern-only, Simple gets the same placement action via a plain per-row form)</td>
           </tr>
           <tr>
             <td>Order Workspace (new)</td>
@@ -242,6 +242,7 @@
           <tr><td>Ordered tests</td><td>Add/edit/delete/reorder test activities per order/EUT; apply an activity template (creating a syncable group); manage dependencies and planned dates.</td><td>Editable</td><td>Save / Delete / Apply template / Move / Add or remove dependency / Sync or delete template group</td><td>Yes</td></tr>
           <tr><td>Resource assignment</td><td>Assign or remove resources (equipment, facility, procedure, technician) on a test activity.</td><td>Editable</td><td>Assign / Remove</td><td>Yes</td></tr>
           <tr><td>Schedule</td><td>A production-schedule Gantt chart with Day (hourly), Week, Month, and combined "All" scales, flagging resource conflicts and cross-site equipment use.</td><td>View-only (visualization)</td><td>Previous/Next/Today navigation, weeks/months-shown selector, scale switcher</td><td>No</td></tr>
+          <tr><td>Visual Schedule</td><td>Place unscheduled tests (a queue, earliest-needed first) onto a technician x day grid by click, keyboard, or drag-and-drop; shows a suggested slot (capability/availability/absence aware) per queued test. Modern-only interaction; Simple UI offers the same underlying action as a plain per-row technician-select + date-input form instead.</td><td>Editable</td><td>Select / Accept suggested slot / Place here (per cell) / Previous-Next-Today window navigation</td><td>No</td></tr>
           <tr><td>Orders overview</td><td>The same order data presented three ways - List (expandable), Kanban (by status), Master-detail - for a portfolio-level read.</td><td>View-only</td><td>View switcher only</td><td>No</td></tr>
         </tbody>
       </table>

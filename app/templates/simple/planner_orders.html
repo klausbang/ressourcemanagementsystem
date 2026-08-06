@@ -434,4 +434,55 @@
   </tbody>
 </table>
 <p><em>A test can have several resources assigned at once (e.g. equipment, facility, procedure, and technician), as long as each candidate resource has the test's required capability.</em></p>
+
+<h2>Planner: Schedule Ordered Tests</h2>
+<p><em>Tests below don't have a work order yet. Pick a technician and a date to schedule one; a suggested slot (earliest technician with the matching capability who is free that day and not on leave) is shown where available, but you can choose any technician and any date instead. This is the plain-form equivalent of the Modern UI's drag-and-drop Visual Schedule tab - same underlying action, no dragging required.</em></p>
+
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      <th>Order</th>
+      <th>Customer</th>
+      <th>Test</th>
+      <th>Required Capability</th>
+      <th>Suggested Slot</th>
+      <th>Schedule</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for q in vis_queue %}
+    <tr>
+      <td>{{ q['order_code'] }}</td>
+      <td>{{ q['customer_name'] }}</td>
+      <td>{{ q['test_name'] }}</td>
+      <td>{{ q['capability_name'] or '-' }}</td>
+      <td>
+        {% if q['suggestion'] %}
+        {{ q['suggestion']['technician_username'] }}, {{ q['suggestion']['scheduled_date'] }}
+        {% else %}
+        - (none found in next 21 days)
+        {% endif %}
+      </td>
+      <td>
+        <form method="post">
+          <input type="hidden" name="action" value="schedule_test">
+          <input type="hidden" name="ordered_test_id" value="{{ q['ordered_test_id'] }}">
+          <select name="technician_user_id" required>
+            <option value="">Select</option>
+            {% for tech in vis_technicians %}
+            <option value="{{ tech['user_id'] }}" {{ 'selected' if q['suggestion'] and q['suggestion']['technician_user_id'] == tech['user_id'] }}>
+              {{ tech['username'] }}{% if tech['resource_code'] %} ({{ tech['resource_code'] }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <input type="date" name="scheduled_date" value="{{ q['suggestion']['scheduled_date'] if q['suggestion'] else '' }}" required>
+          <button type="submit">Schedule</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">Nothing waiting to be scheduled.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}
