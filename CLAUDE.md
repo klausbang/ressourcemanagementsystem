@@ -18,7 +18,7 @@ probably already been decided, tried, or explicitly deferred.
 
 ## The recurring "check proposals" workflow
 
-The user periodically says something like **"Check proposals in the database
+The user periodically says something like **"Check approved proposals in the database
 and implement them"** or **"Check approved proposals and implement them"**.
 This is an established, standing instruction with a specific meaning:
 
