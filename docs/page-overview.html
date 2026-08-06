@@ -20,7 +20,7 @@
   <main>
     <section>
       <h2>1. Purpose</h2>
-      <p>A single reference table listing every distinct page in RMS and what it does, for anyone getting oriented in the system without reading the SRS or the code. Requested directly by a proposal filed from the Admin page (id 19). Two pages - Admin Manage and Planner Orders - are internally tabbed, so section 3 breaks each of those pages' tabs out individually, since that's where the real functional differences live.</p>
+      <p>A single reference table listing every distinct page in RMS and what it does, for anyone getting oriented in the system without reading the SRS or the code. Requested directly by a proposal filed from the Admin page (id 19), and kept current since - most recently for the Phase 27 Proposals Table view. Two pages - Admin Manage and Planner Orders - are internally tabbed, so section 3 breaks each of those pages' tabs out individually, since that's where the real functional differences live.</p>
       <p>Column definitions used throughout: <strong>View-only or editable</strong> means whether the page has any form that writes data (a filter form doesn't count). <strong>Function buttons</strong> lists the distinct actions available, not every button instance. <strong>Sortable</strong> means the page's table(s) have clickable, server-side sortable column headers (<code>app/table_utils.py:rows_with_meta</code>). <strong>UI mode</strong> notes where a page differs from the norm - most pages exist in both Simple (plain HTML, no JS) and Modern (styled, JS-enabled) interfaces over identical routes and data (see <a href="dual-ui.html">Dual Interface: Simple and Modern</a>); a few (Technician Dashboard, Test Reports) exist only in Modern.</p>
     </section>
 
@@ -90,11 +90,11 @@
             <td><code>/admin/</code></td>
             <td>Admin</td>
             <td>Tabbed CRUD workspace (9 tabs)</td>
-            <td>Manage users, capabilities, resources, capability assignments, exclusion groups, activity templates, staff absences, customers, and review submitted proposals. See section 3 for a per-tab breakdown.</td>
+            <td>Manage users, capabilities, resources, capability assignments, exclusion groups, activity templates, staff absences, customers, and review submitted proposals (Form view, or Modern's editable-grid Table view). See section 3 for a per-tab breakdown.</td>
             <td>Editable</td>
             <td>Varies by tab - see section 3</td>
             <td>Yes (every tab)</td>
-            <td>Both (Modern adds a collapsible stat strip, clickable workflow tiles, and per-tab attention counts; Simple shows all 9 sections stacked, no tabs)</td>
+            <td>Both (Modern adds a collapsible stat strip and workflow explainer - both collapsed by default, clickable workflow tiles, a sticky compact tab bar, per-tab attention counts, and the Proposals tab's Table view; Simple shows all 9 sections stacked, no tabs, Form view only)</td>
           </tr>
           <tr>
             <td>Planner Orders</td>
@@ -195,6 +195,17 @@
             <td>No</td>
             <td>Both (Modern: dialog; Simple: dedicated page/nav link)</td>
           </tr>
+          <tr>
+            <td>Editable-Grid Prototypes (dev tool)</td>
+            <td><code>/sandbox/</code>, <code>/sandbox/a</code>, <code>/sandbox/b</code>, <code>/sandbox/c</code></td>
+            <td>Admin (internal use)</td>
+            <td>Prototyping sandbox</td>
+            <td>Not a product feature - an internal, admin-only area (Phase 22) for trialling editable spreadsheet-style table UIs against one throwaway table, unlinked from any real navigation. Three competing options were built (A: contenteditable grid with fill-from-cursor paste; B: RMS's per-row form-table convention plus a bulk paste/import panel; C: a hand-built keyboard-navigable grid); Option C was chosen and refined (Phases 23-24), then its engine was extracted and reused for real by the Admin Proposals tab's Table view (Phase 27) - see that row in section 3.1 below for the real, customer-facing result. See docs/srs.html's open questions (section 13) on whether this route should now be retired.</td>
+            <td>Editable</td>
+            <td>Varies by option - insert/paste/import row(s), copy, undo, filter, multi-row edit, export, save/reset</td>
+            <td>No</td>
+            <td>Modern only</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -216,7 +227,7 @@
           <tr><td>Exclusion groups</td><td>Define mutual-exclusion facility groups (e.g. a shared test chamber only one setup can use at a time) and their membership.</td><td>Editable</td><td>Save / Delete / Assign / Remove</td><td>Yes</td></tr>
           <tr><td>Activity templates</td><td>Maintain reusable, ordered standard activity templates and their items.</td><td>Editable</td><td>Save / Delete / Add item / Move item up-down</td><td>Yes</td></tr>
           <tr><td>Staff absences</td><td>Record a technician's absence/vacation periods.</td><td>Editable</td><td>Add / Delete</td><td>Yes</td></tr>
-          <tr><td>Proposals</td><td>Review and triage enhancement/bug proposals submitted by any signed-in role from anywhere in the app.</td><td>Editable (status and comment)</td><td>Update status / Delete</td><td>Yes</td></tr>
+          <tr><td>Proposals</td><td>Review and triage Enhancement/Bug/New feature proposals submitted by any signed-in role from anywhere in the app: title, description, type, General flag, status (New/Accepted/In progress/Backlog/Done/Failed testing/Rejected), admin comment, test status (Waiting/Passed/Failed/Passed with comments), and tester comment. Modern UI offers a Form view (one card per proposal, as described here) and a Table view (an editable grid with the same fields except id/description/reported-against page/submitter/timestamp, which stay Form-view only) - see docs/design-guide.html section 6 and docs/srs.html FR-FBK-6. Type/Status/Test status save immediately in Modern's Form view; Table view saves everything shown, by id, on its own Save button; Simple UI has Form view only, saved via the page's ordinary Save button.</td><td>Editable</td><td>Save / Delete (Form view); Save, no add/delete (Table view)</td><td>Yes (Form view's table; Table view is its own keyboard/mouse-driven grid, not a sortable-header table)</td></tr>
           <tr><td>Customers</td><td>Full CRUD on the customer list; flags any profile missing required contact info for follow-up.</td><td>Editable</td><td>Save / Delete</td><td>Yes</td></tr>
         </tbody>
       </table>
