@@ -42,10 +42,16 @@
   table.vis-grid td.vis-day-cell.dragover { background: var(--color-primary-subtle, #e2ecff); }
   table.vis-grid th.vis-not-capable, table.vis-grid td.vis-tech-cell.vis-not-capable { opacity: 0.55; }
   .vis-chip { display: block; font-size: 0.72rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 3px; padding: 1px 4px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  a.vis-chip.vis-chip-movable { color: inherit; text-decoration: none; cursor: grab; border-style: dashed; }
-  a.vis-chip.vis-chip-movable:hover { border-color: var(--color-primary); color: var(--color-primary); }
-  a.vis-chip.vis-chip-movable.selected { border-color: var(--color-primary); border-style: solid; box-shadow: 0 0 0 1px var(--color-primary); }
-  a.vis-chip.vis-chip-movable.dragging { opacity: 0.4; }
+  details.vis-chip.vis-chip-movable { display: block; border: none; background: transparent; padding: 0; margin-bottom: 2px; overflow: visible; text-overflow: clip; white-space: normal; }
+  details.vis-chip.vis-chip-movable summary { cursor: grab; list-style: none; border: 1px dashed var(--color-border); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+  details.vis-chip.vis-chip-movable summary::-webkit-details-marker { display: none; }
+  details.vis-chip.vis-chip-movable summary::before { content: "▸ "; opacity: 0.6; }
+  details.vis-chip.vis-chip-movable[open] summary::before { content: "▾ "; }
+  details.vis-chip.vis-chip-movable summary:hover, details.vis-chip.vis-chip-movable summary:focus { border-color: var(--color-primary); color: var(--color-primary); }
+  details.vis-chip.vis-chip-movable.selected summary { border-color: var(--color-primary); border-style: solid; box-shadow: 0 0 0 1px var(--color-primary); }
+  details.vis-chip.vis-chip-movable.dragging summary { opacity: 0.4; }
+  .vis-chip-detail { font-size: 0.78rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; padding: 6px 8px; margin: 3px 0 4px; }
+  .vis-chip-detail > div { margin-bottom: 4px; }
   .vis-selected-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .vis-cell-form { margin: 0; }
   .vis-cell-btn { width: 100%; min-height: 20px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); border-radius: 3px; cursor: pointer; font-size: 0.75rem; }
@@ -751,9 +757,9 @@
       {% endif %}
     </section>
 
-    <section class="tab-panel" id="panel-visual">
+    <section class="tab-panel" id="panel-visual" tabindex="-1">
       <div class="callout">
-        <strong>How this works:</strong> pick a test from the queue on the left (click "Select"), then place it on the grid — click a cell's <em>Place here</em> button (works with keyboard: Tab then Enter/Space), or drag the queue card straight onto a cell. A suggested slot (earliest technician with the matching capability, free that day, and not on leave) is highlighted once a test is selected — use "Accept suggested slot" to place it there in one step, or pick any other cell to override manually. Technician rows dimmed in the grid don't have the selected test's required capability; you can still place there if that's intentional.
+        <strong>How this works:</strong> click a queue card's "Select" button (or, on a grid chip, open it and click "Move this test") to arm a test for placement — or double-click the card/chip as a mouse shortcut for the same thing. A single click on a grid chip just shows its details without arming it. Once armed, place it on the grid — click a cell's <em>Place here</em> button (works with keyboard: Tab then Enter/Space), or drag the queue card or chip straight onto a cell. A suggested slot (earliest technician with the matching capability, free that day, and not on leave) is highlighted once a test is armed — use "Accept suggested slot" to place it there in one step, or pick any other cell to override manually. Technician rows dimmed in the grid don't have the selected test's required capability; you can still place there if that's intentional.
       </div>
 
       <div class="vis-nav" style="display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
@@ -776,7 +782,8 @@
         <div class="vis-queue" id="visQueue">
           {% if vis_queue %}
           {% for q in vis_queue %}
-          <div class="vis-card {{ 'selected' if vis_selected_id == q['ordered_test_id'] }}" draggable="true" data-ordered-test-id="{{ q['ordered_test_id'] }}">
+          {% set select_href = url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=q['ordered_test_id']) %}
+          <div class="vis-card {{ 'selected' if vis_selected_id == q['ordered_test_id'] }}" draggable="true" data-ordered-test-id="{{ q['ordered_test_id'] }}" data-select-href="{{ select_href }}" title="Double-click, or the Select button, to arm this test for placement">
             <div class="vis-card-title">{{ q['test_name'] }}</div>
             <div class="vis-card-meta">{{ q['order_code'] }} &middot; {{ q['customer_name'] }} &middot; requires {{ q['capability_name'] or 'no specific capability' }}{% if q['planned_start_date'] %} &middot; planned from {{ q['planned_start_date'] }}{% endif %}</div>
             {% if q['suggestion'] %}
@@ -785,7 +792,7 @@
             <div class="vis-card-suggestion section-help" style="margin:0 0 6px;">No available slot found in the next 21 days — place manually.</div>
             {% endif %}
             <div class="vis-card-actions">
-              <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=q['ordered_test_id']) }}">{{ '✓ Selected' if vis_selected_id == q['ordered_test_id'] else 'Select' }}</a>
+              <a class="btn btn-secondary btn-sm" data-vis-nav href="{{ select_href }}">{{ '✓ Selected' if vis_selected_id == q['ordered_test_id'] else 'Select' }}</a>
               {% if q['suggestion'] %}
               <form method="post">
                 <input type="hidden" name="action" value="schedule_test">
@@ -823,10 +830,15 @@
                 <td class="vis-day-cell {{ 'weekend' if d['is_weekend'] }} {{ 'suggested' if is_suggested }}" data-technician-id="{{ tech['user_id'] }}" data-date="{{ d['date_iso'] }}">
                   {% for chip in tech['cells'][d['date_iso']] %}
                   {% if chip['wo_status'] == 'planned' %}
-                  <a class="vis-chip vis-chip-movable {{ 'selected' if vis_selected_id == chip['ordered_test_id'] }}"
-                     draggable="true" data-ordered-test-id="{{ chip['ordered_test_id'] }}"
-                     href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=chip['ordered_test_id']) }}"
-                     title="{{ chip['order_code'] }} - {{ chip['test_name'] }} (planned - click, keyboard-select, or drag to move)">{{ chip['order_code'] }}: {{ chip['test_name'] }}</a>
+                  {% set move_href = url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=chip['ordered_test_id']) %}
+                  <details class="vis-chip vis-chip-movable {{ 'selected' if vis_selected_id == chip['ordered_test_id'] }}" data-ordered-test-id="{{ chip['ordered_test_id'] }}" data-select-href="{{ move_href }}">
+                    <summary draggable="true" data-ordered-test-id="{{ chip['ordered_test_id'] }}" title="{{ chip['order_code'] }} - {{ chip['test_name'] }} (click for details; drag or double-click to move)">{{ chip['order_code'] }}: {{ chip['test_name'] }}</summary>
+                    <div class="vis-chip-detail">
+                      <div>{{ chip['order_code'] }} &middot; {{ chip['test_name'] }}</div>
+                      <div class="section-help">Work order {{ chip['work_order_code'] }} &middot; status: {{ chip['wo_status'] }}</div>
+                      <a class="btn btn-secondary btn-sm" data-vis-nav href="{{ move_href }}">{{ '✓ Selected' if vis_selected_id == chip['ordered_test_id'] else '↔ Move this test' }}</a>
+                    </div>
+                  </details>
                   {% else %}
                   <span class="vis-chip" title="{{ chip['order_code'] }} - {{ chip['test_name'] }} ({{ chip['wo_status'] }})">{{ chip['order_code'] }}: {{ chip['test_name'] }}</span>
                   {% endif %}

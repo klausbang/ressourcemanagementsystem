@@ -172,20 +172,31 @@
     });
   })();
 
-  // Phase 28 (+ follow-up id 38): Visual Schedule tab - drag a queue card, or an already
-  // -placed grid chip, onto a grid cell as a mouse shortcut for the same schedule_test
-  // placement each cell's plain form already performs (click and keyboard use that form
-  // directly via its "Place here" button; this just fills the form's hidden
-  // ordered_test_id in from whatever was dragged and submits it on drop). Queue cards
-  // create a work order; dragging an existing "planned" chip instead reschedules it - both
-  // go through the identical form/action, the only difference is which id gets dragged in.
+  // Phase 28-30 (+ follow-up ids 38-40): Visual Schedule tab interactions. A queue card,
+  // or an already-placed "planned" chip, can be armed for placement three ways: its own
+  // visible link (queue's "Select", or a chip's "Move this test" inside its <details> -
+  // both keyboard/no-JS reachable), a double-click on the card/chip as a mouse shortcut
+  // to the same link's URL, or a drag straight onto a grid cell (which fills in and
+  // submits that cell's own plain placement form - click and keyboard use that same form
+  // directly via its "Place here" button). A plain single click on a chip only opens its
+  // <details> to show what it is, without arming anything - proposal id 40, so a stray
+  // click no longer silently arms a reschedule. Proposal id 39: after any of these round
+  // trips, restore keyboard focus to the same ordered test's element (wherever it now
+  // renders), instead of the browser resetting focus to the top of the page.
   (function () {
-    var grid = document.querySelector(".vis-grid");
-    if (!grid) return;
+    var panel = document.getElementById("panel-visual");
+    if (!panel) return;
+
+    var FOCUS_KEY = "rms-vis-focus:" + location.pathname;
+
+    function stashFocus(id) {
+      if (!id) return;
+      try { sessionStorage.setItem(FOCUS_KEY, id); } catch (err) { /* sessionStorage unavailable */ }
+    }
 
     var draggedId = null;
 
-    document.querySelectorAll("[draggable=true][data-ordered-test-id]").forEach(function (el) {
+    panel.querySelectorAll("[draggable=true][data-ordered-test-id]").forEach(function (el) {
       el.addEventListener("dragstart", function (e) {
         draggedId = el.getAttribute("data-ordered-test-id");
         el.classList.add("dragging");
@@ -199,7 +210,7 @@
       });
     });
 
-    document.querySelectorAll(".vis-day-cell").forEach(function (cell) {
+    panel.querySelectorAll(".vis-day-cell").forEach(function (cell) {
       cell.addEventListener("dragover", function (e) {
         e.preventDefault();
         cell.classList.add("dragover");
@@ -216,8 +227,42 @@
         var input = form && form.querySelector(".vis-cell-target-input");
         if (!form || !input) return;
         input.value = id;
+        stashFocus(id);
         form.submit();
       });
     });
+
+    panel.querySelectorAll("[data-select-href]").forEach(function (el) {
+      el.addEventListener("dblclick", function (e) {
+        e.preventDefault();
+        stashFocus(el.getAttribute("data-ordered-test-id"));
+        location.href = el.getAttribute("data-select-href");
+      });
+    });
+
+    panel.querySelectorAll("[data-vis-nav]").forEach(function (a) {
+      a.addEventListener("click", function () {
+        var owner = a.closest("[data-ordered-test-id]");
+        stashFocus(owner && owner.getAttribute("data-ordered-test-id"));
+      });
+    });
+
+    panel.querySelectorAll(".vis-cell-form").forEach(function (form) {
+      form.addEventListener("submit", function () {
+        var input = form.querySelector(".vis-cell-target-input");
+        stashFocus(input && input.value);
+      });
+    });
+
+    var pendingId = null;
+    try {
+      pendingId = sessionStorage.getItem(FOCUS_KEY);
+      if (pendingId !== null) sessionStorage.removeItem(FOCUS_KEY);
+    } catch (err) { /* ignore */ }
+    if (pendingId) {
+      var target = panel.querySelector('[data-ordered-test-id="' + pendingId + '"]');
+      var focusable = target && (target.matches("summary, a, button") ? target : target.querySelector("summary, a, button"));
+      (focusable || panel).focus();
+    }
   })();
 })();
