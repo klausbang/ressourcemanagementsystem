@@ -68,6 +68,19 @@
   .group-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .group-card-title { font-weight: 700; }
   .group-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
+
+  /* Proposals Form view / Table view switch - same CSS-only radio+label pattern as
+     the Planner Orders Overview's List/Kanban/Master-detail switch. */
+  .pv-view-switch { display: flex; gap: 6px; margin-bottom: 16px; }
+  .pv-view-switch input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .pv-view-switch label { padding: 6px 14px; border: 1px solid var(--color-border); border-radius: 999px; cursor: pointer; font-size: 0.88rem; }
+  #pv-view-form:checked ~ .pv-view-switch label[for="pv-view-form"],
+  #pv-view-table:checked ~ .pv-view-switch label[for="pv-view-table"] {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  }
+  #pv-panel-form, #pv-panel-table { display: none; }
+  #pv-view-form:checked ~ .pv-body #pv-panel-form,
+  #pv-view-table:checked ~ .pv-body #pv-panel-table { display: block; }
 </style>
 
 <div class="page-header">
@@ -697,6 +710,15 @@
         <strong>What this is:</strong> enhancement ideas, new-feature requests, and bug reports submitted from the "P" button any signed-in user sees on every page, along with the exact page/tab they were on when they submitted it (or marked "General" if it wasn't about that specific view). Changes to Type and Status save immediately; Title/Description/Comment need the Save button.
       </div>
 
+      <input type="radio" name="pv-view" id="pv-view-form" checked>
+      <input type="radio" name="pv-view" id="pv-view-table">
+      <div class="pv-view-switch">
+        <label for="pv-view-form">📝 Form view</label>
+        <label for="pv-view-table">▦ Table view</label>
+      </div>
+
+      <div class="pv-body">
+      <div id="pv-panel-form">
       {% if proposals %}
       {% for p in proposals %}
       <div class="group-card {{ 'dup-row' if p['_dup'] }}">
@@ -787,6 +809,28 @@
       {% else %}
       <div class="empty-state"><span class="icon">💡</span>No proposals submitted yet.</div>
       {% endif %}
+      </div>
+
+      <div id="pv-panel-table">
+      {% if proposals %}
+      <p class="section-help">Same data as Form view, as a keyboard-navigable grid: arrow keys/Tab/Enter to move, Shift+click/Shift+arrow or a row handle/column header to select a range, Ctrl+C/Ctrl+X/Ctrl+V and Ctrl+Z (undo). Select 2+ rows and click ✏️ to edit-and-repeat with Ctrl+R. ID is read-only; Type/Status/Test status must be typed exactly as in the Form view's dropdowns (invalid values are ignored on save). Adding or deleting proposals isn't available here - use the "P" button or the Form view's Delete button.</p>
+      <div class="sbx-toolbar">
+        <button type="button" id="pv-undo" class="btn btn-secondary btn-sm" title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button type="button" id="pv-copy" class="btn btn-secondary btn-sm">📋 Copy selection as TSV (Ctrl+C)</button>
+        <button type="button" id="pv-search-toggle" class="btn btn-secondary btn-sm" title="Search / filter">🔍 Filter</button>
+        <button type="button" id="pv-edit-multi" class="btn btn-secondary btn-sm" title="Select 2+ rows first">✏️ Edit multiple</button>
+        <button type="button" id="pv-export-json" class="btn btn-secondary btn-sm">⬇️ Export JSON</button>
+        <button type="button" id="pv-save" class="btn btn-primary btn-sm">💾 Save all</button>
+        <span class="sbx-multiedit-status" id="pv-multiedit-status"></span>
+      </div>
+      <div class="sbx-status-bar" id="pv-status-bar"></div>
+      <div class="sbx-grid" id="pv-grid"></div>
+      <div class="sbx-grid-row sbx-filter-row" id="pv-filter-row"></div>
+      {% else %}
+      <div class="empty-state"><span class="icon">💡</span>No proposals submitted yet.</div>
+      {% endif %}
+      </div>
+      </div>
     </section>
 
     <section class="tab-panel" id="panel-customers">
@@ -851,6 +895,61 @@
     </section>
   </div>
 </div>
+
+<form method="post" id="pv-save-form" hidden>
+  <input type="hidden" name="action" value="bulk_update_proposals">
+  <input type="hidden" name="rows_json" id="pv-rows-json">
+</form>
+
+<script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+<script>
+  // Admin Proposals "Table view" (proposal id 36) - the same Option C editable-grid
+  // engine the sandbox prototype uses, pointed at real proposal rows. ID is read-only
+  // (forced by idField) and there's no add/delete-row support (allowAddRow/allowDeleteRow
+  // false) since proposals carry real audit data (id, created_at, submitted_by_username)
+  // that a delete-all-and-reinsert save would destroy - the backend save is UPDATE-only,
+  // matched by id.
+  (function () {
+    var pvGrid = document.getElementById("pv-grid");
+    if (!pvGrid) return; // no proposals - table view has nothing to build
+
+    var rows = {{ proposals | tojson }};
+    rows.forEach(function (r) { r.is_general = r.is_general ? "Yes" : ""; });
+
+    RmsSandbox.createEditableGrid({
+      grid: pvGrid,
+      idField: "id",
+      fields: [
+        { key: "title", label: "Title" },
+        { key: "proposal_type", label: "Type" },
+        { key: "status", label: "Status" },
+        { key: "admin_comment", label: "Admin comment" },
+        { key: "test_status", label: "Test status" },
+        { key: "tester_comment", label: "Tester comment" },
+        { key: "is_general", label: "General" },
+      ],
+      rows: rows,
+      allowAddRow: false,
+      allowDeleteRow: false,
+      filterRow: document.getElementById("pv-filter-row"),
+      statusBar: document.getElementById("pv-status-bar"),
+      multiEditStatus: document.getElementById("pv-multiedit-status"),
+      exportFilename: "proposals.json",
+      toolbar: {
+        undo: document.getElementById("pv-undo"),
+        copy: document.getElementById("pv-copy"),
+        searchToggle: document.getElementById("pv-search-toggle"),
+        editMulti: document.getElementById("pv-edit-multi"),
+        exportJson: document.getElementById("pv-export-json"),
+        save: document.getElementById("pv-save"),
+      },
+      onSave: function (data) {
+        document.getElementById("pv-rows-json").value = JSON.stringify(data);
+        document.getElementById("pv-save-form").submit();
+      },
+    });
+  })();
+</script>
 
 <script>
   // Switching tabs is a pure CSS radio/label toggle - no navigation, so the address bar

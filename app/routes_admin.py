@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime
 
@@ -53,7 +54,7 @@ ACTION_TAB = {
     "add_template_item": "templates", "update_template_item": "templates",
     "delete_template_item": "templates", "move_template_item": "templates",
     "create_absence": "absences", "delete_absence": "absences",
-    "update_proposal": "proposals", "delete_proposal": "proposals",
+    "update_proposal": "proposals", "delete_proposal": "proposals", "bulk_update_proposals": "proposals",
     "create_customer": "customers", "update_customer": "customers", "delete_customer": "customers",
 }
 
@@ -707,6 +708,64 @@ def admin_manage():
                 )
                 db.commit()
                 flash("Proposal updated.", "info")
+
+        elif action == "bulk_update_proposals":
+            # Proposals Table view (proposal id 36) - an UPDATE-only save from the
+            # editable grid, one row per id. Unlike the sandbox grid's replace_all
+            # (delete-all-and-reinsert), this must never delete or insert rows: proposals
+            # carry real audit data (id, created_at, submitted_by_username, path,
+            # description) that the grid doesn't expose and must be left untouched.
+            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected", "backlog", "failed_testing")
+            valid_types = ("enhancement", "bug", "new_feature")
+            valid_test_statuses = ("waiting", "passed", "failed", "passed_with_comments")
+            try:
+                rows = json.loads(request.form.get("rows_json", "[]"))
+            except (ValueError, TypeError):
+                rows = []
+
+            updated = 0
+            skipped = 0
+            for row in rows:
+                if not isinstance(row, dict):
+                    skipped += 1
+                    continue
+                proposal_id = str(row.get("id", "")).strip()
+                title = str(row.get("title", "")).strip()
+                proposal_type = str(row.get("proposal_type", "")).strip()
+                status = str(row.get("status", "")).strip()
+                test_status = str(row.get("test_status", "")).strip() or "waiting"
+                admin_comment = str(row.get("admin_comment", "")).strip() or None
+                tester_comment = str(row.get("tester_comment", "")).strip() or None
+                is_general_text = str(row.get("is_general", "")).strip().lower()
+                is_general = 1 if is_general_text and is_general_text not in ("no", "0", "false", "n") else 0
+
+                if not (
+                    proposal_id.isdigit() and title and proposal_type in valid_types
+                    and status in valid_statuses and test_status in valid_test_statuses
+                ):
+                    skipped += 1
+                    continue
+
+                db.execute(
+                    """
+                    UPDATE proposals
+                    SET title = ?, proposal_type = ?, status = ?, admin_comment = ?,
+                        is_general = ?, tester_comment = ?, test_status = ?, admin_user_id = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        title, proposal_type, status, admin_comment, is_general,
+                        tester_comment, test_status,
+                        session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id,
+                    ),
+                )
+                updated += 1
+
+            db.commit()
+            if skipped:
+                flash(f"Updated {updated} proposal(s) from the table view; skipped {skipped} row(s) with missing or invalid values.", "error")
+            else:
+                flash(f"Updated {updated} proposal(s) from the table view.", "info")
 
         elif action == "delete_proposal":
             proposal_id = request.form.get("proposal_id", "").strip()
