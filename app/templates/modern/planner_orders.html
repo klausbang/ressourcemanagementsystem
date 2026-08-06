@@ -42,6 +42,11 @@
   table.vis-grid td.vis-day-cell.dragover { background: var(--color-primary-subtle, #e2ecff); }
   table.vis-grid th.vis-not-capable, table.vis-grid td.vis-tech-cell.vis-not-capable { opacity: 0.55; }
   .vis-chip { display: block; font-size: 0.72rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 3px; padding: 1px 4px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  a.vis-chip.vis-chip-movable { color: inherit; text-decoration: none; cursor: grab; border-style: dashed; }
+  a.vis-chip.vis-chip-movable:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  a.vis-chip.vis-chip-movable.selected { border-color: var(--color-primary); border-style: solid; box-shadow: 0 0 0 1px var(--color-primary); }
+  a.vis-chip.vis-chip-movable.dragging { opacity: 0.4; }
+  .vis-selected-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .vis-cell-form { margin: 0; }
   .vis-cell-btn { width: 100%; min-height: 20px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); border-radius: 3px; cursor: pointer; font-size: 0.75rem; }
   .vis-cell-btn:disabled { cursor: default; border-style: dotted; opacity: 0.5; }
@@ -757,6 +762,16 @@
         <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_next, vis_selected=vis_selected_id) }}">Next {{ vis_days|length }} days &rarr;</a>
       </div>
 
+      {% if vis_selected_info %}
+      <div class="callout vis-selected-banner">
+        <span>🎯 Selected: <strong>{{ vis_selected_info['test_name'] }}</strong> ({{ vis_selected_info['order_code'] }}) &mdash;
+          {% if vis_selected_is_queued %}not yet scheduled; click, drag, or use keyboard on a grid cell to place it.
+          {% else %}already placed (dashed chip on the grid); click, drag, or use keyboard on a different cell to move it.{% endif %}
+        </span>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat()) }}">Cancel selection</a>
+      </div>
+      {% endif %}
+
       <div class="vis-layout">
         <div class="vis-queue" id="visQueue">
           {% if vis_queue %}
@@ -807,7 +822,14 @@
                 {% set is_suggested = vis_selected_suggestion and vis_selected_suggestion['technician_user_id'] == tech['user_id'] and vis_selected_suggestion['scheduled_date'] == d['date_iso'] %}
                 <td class="vis-day-cell {{ 'weekend' if d['is_weekend'] }} {{ 'suggested' if is_suggested }}" data-technician-id="{{ tech['user_id'] }}" data-date="{{ d['date_iso'] }}">
                   {% for chip in tech['cells'][d['date_iso']] %}
+                  {% if chip['wo_status'] == 'planned' %}
+                  <a class="vis-chip vis-chip-movable {{ 'selected' if vis_selected_id == chip['ordered_test_id'] }}"
+                     draggable="true" data-ordered-test-id="{{ chip['ordered_test_id'] }}"
+                     href="{{ url_for('planner.planner_orders', tab='visual', vis_start=vis_view_day.isoformat(), vis_selected=chip['ordered_test_id']) }}"
+                     title="{{ chip['order_code'] }} - {{ chip['test_name'] }} (planned - click, keyboard-select, or drag to move)">{{ chip['order_code'] }}: {{ chip['test_name'] }}</a>
+                  {% else %}
                   <span class="vis-chip" title="{{ chip['order_code'] }} - {{ chip['test_name'] }} ({{ chip['wo_status'] }})">{{ chip['order_code'] }}: {{ chip['test_name'] }}</span>
+                  {% endif %}
                   {% endfor %}
                   <form method="post" class="vis-cell-form">
                     <input type="hidden" name="action" value="schedule_test">

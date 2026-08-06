@@ -425,7 +425,7 @@ def _load_visual_schedule_context(db) -> dict:
         """
         SELECT
             wo.technician_user_id, wo.scheduled_date, wo.status AS wo_status,
-            wo.work_order_code, o.order_code, ot.test_name
+            wo.work_order_code, o.order_code, ot.test_name, ot.id AS ordered_test_id
         FROM work_orders wo
         JOIN ordered_tests ot ON ot.id = wo.ordered_test_id
         JOIN customer_orders o ON o.id = ot.order_id
@@ -462,10 +462,29 @@ def _load_visual_schedule_context(db) -> dict:
 
     selected_id_raw = request.args.get("vis_selected", "").strip()
     selected_id = int(selected_id_raw) if selected_id_raw.isdigit() else None
+
+    # The selected test may be an unscheduled queue item (first placement) or an already
+    # -placed, still-planned test (Phase 28 follow-up, id 38: reschedule by re-selecting its
+    # grid chip) - look it up directly rather than only searching the queue, so both cases
+    # get the same capability highlighting and a "currently selected" banner in the template.
     selected_item = next((q for q in queue if q["ordered_test_id"] == selected_id), None) if selected_id else None
+    selected_info = dict(selected_item) if selected_item else None
+    if selected_id and selected_info is None:
+        row = db.execute(
+            """
+            SELECT ot.id AS ordered_test_id, o.order_code, o.customer_name, ot.test_name,
+                   c.id AS capability_id, c.name AS capability_name
+            FROM ordered_tests ot
+            JOIN customer_orders o ON o.id = ot.order_id
+            LEFT JOIN capabilities c ON c.id = ot.required_capability_id
+            WHERE ot.id = ?
+            """,
+            (selected_id,),
+        ).fetchone()
+        selected_info = dict(row) if row else None
 
     capable_technician_ids: set[int] = set()
-    if selected_item and selected_item["capability_id"]:
+    if selected_info and selected_info["capability_id"]:
         capable_technician_ids = {
             row["user_id"]
             for row in db.execute(
@@ -475,12 +494,12 @@ def _load_visual_schedule_context(db) -> dict:
                 JOIN resource_capabilities rc ON rc.resource_id = u.linked_resource_id
                 WHERE u.role = 'technician' AND rc.capability_id = ?
                 """,
-                (selected_item["capability_id"],),
+                (selected_info["capability_id"],),
             ).fetchall()
         }
     for tech in technicians:
         tech["matches_selected_capability"] = (
-            not selected_item or not selected_item["capability_id"] or tech["user_id"] in capable_technician_ids
+            not selected_info or not selected_info["capability_id"] or tech["user_id"] in capable_technician_ids
         )
 
     return {
@@ -489,6 +508,8 @@ def _load_visual_schedule_context(db) -> dict:
         "vis_technicians": technicians,
         "vis_queue": queue,
         "vis_selected_id": selected_id,
+        "vis_selected_info": selected_info,
+        "vis_selected_is_queued": selected_item is not None,
         "vis_selected_suggestion": selected_item["suggestion"] if selected_item else None,
         "vis_prev": (vis_view_day - timedelta(days=VISUAL_SCHEDULE_DAYS)).isoformat(),
         "vis_next": (vis_view_day + timedelta(days=VISUAL_SCHEDULE_DAYS)).isoformat(),

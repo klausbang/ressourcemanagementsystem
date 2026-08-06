@@ -172,27 +172,30 @@
     });
   })();
 
-  // Phase 28: Visual Schedule tab - drag a queue card onto a grid cell as a mouse shortcut
-  // for the same schedule_test placement each cell's plain form already performs (click and
-  // keyboard use that form directly via its "Place here" button; this just fills the form's
-  // hidden ordered_test_id in from the dragged card and submits it on drop).
+  // Phase 28 (+ follow-up id 38): Visual Schedule tab - drag a queue card, or an already
+  // -placed grid chip, onto a grid cell as a mouse shortcut for the same schedule_test
+  // placement each cell's plain form already performs (click and keyboard use that form
+  // directly via its "Place here" button; this just fills the form's hidden
+  // ordered_test_id in from whatever was dragged and submits it on drop). Queue cards
+  // create a work order; dragging an existing "planned" chip instead reschedules it - both
+  // go through the identical form/action, the only difference is which id gets dragged in.
   (function () {
-    var queue = document.getElementById("visQueue");
-    if (!queue) return;
+    var grid = document.querySelector(".vis-grid");
+    if (!grid) return;
 
     var draggedId = null;
 
-    queue.querySelectorAll(".vis-card[draggable=true]").forEach(function (card) {
-      card.addEventListener("dragstart", function (e) {
-        draggedId = card.getAttribute("data-ordered-test-id");
-        card.classList.add("dragging");
+    document.querySelectorAll("[draggable=true][data-ordered-test-id]").forEach(function (el) {
+      el.addEventListener("dragstart", function (e) {
+        draggedId = el.getAttribute("data-ordered-test-id");
+        el.classList.add("dragging");
         if (e.dataTransfer) {
           e.dataTransfer.setData("text/plain", draggedId || "");
           e.dataTransfer.effectAllowed = "move";
         }
       });
-      card.addEventListener("dragend", function () {
-        card.classList.remove("dragging");
+      el.addEventListener("dragend", function () {
+        el.classList.remove("dragging");
       });
     });
 
