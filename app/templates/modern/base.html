@@ -88,7 +88,18 @@
       var btn = document.getElementById('proposalOpenBtn');
       var dlg = document.getElementById('proposalDialog');
       if (btn && dlg && typeof dlg.showModal === 'function') {
-        btn.addEventListener('click', function () { dlg.showModal(); });
+        btn.addEventListener('click', function () {
+          // Re-read the current URL at the moment "P" is clicked, rather than trusting
+          // only the value Jinja rendered at page load - a CSS-only tab switch (see the
+          // Admin page's tab bar) never triggers a real navigation, so the server-rendered
+          // value would otherwise still say whichever tab was active on the last page load.
+          var pathInput = document.getElementById('proposal-path-dialog');
+          var pathLabel = document.getElementById('proposal-path-label-dialog');
+          var current = window.location.pathname + window.location.search;
+          if (pathInput) pathInput.value = current;
+          if (pathLabel) pathLabel.textContent = current;
+          dlg.showModal();
+        });
       }
     })();
   </script>

@@ -442,19 +442,21 @@
 
 <section>
   <h3>Proposals</h3>
-  <p><em>Enhancement ideas and bug reports submitted from the "P" link any signed-in user sees on every page, along with the exact page they were on.</em></p>
+  <p><em>Enhancement ideas, new-feature requests, and bug reports submitted from the "P" link any signed-in user sees on every page, along with the exact page they were on (or marked General if it wasn't about that specific view).</em></p>
   {% for p in proposals %}
   <fieldset style="margin-bottom:14px;">
-    <legend>#{{ p['id'] }} {{ '[Bug]' if p['proposal_type'] == 'bug' else '[Enhancement]' }} {{ p['title'] }}</legend>
+    <legend>#{{ p['id'] }} {{ '[Bug]' if p['proposal_type'] == 'bug' else ('[New feature]' if p['proposal_type'] == 'new_feature' else '[Enhancement]') }} {{ p['title'] }}{% if p['is_general'] %} [General]{% endif %}</legend>
     <p>By {{ p['submitted_by_username'] or 'unknown user' }} on {{ p['created_at'] }} &mdash; page: <code>{{ p['path'] }}</code></p>
     <form method="post">
       <input type="hidden" name="action" value="update_proposal">
       <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
       <label>Title <input type="text" name="title" value="{{ p['title'] }}" required></label>
       <label>Description <textarea name="description" rows="3">{{ p['description'] or '' }}</textarea></label>
+      <label><input type="checkbox" name="is_general" value="1" {% if p['is_general'] %}checked{% endif %}> General</label>
       <label>Type
         <select name="proposal_type">
           <option value="enhancement" {% if p['proposal_type'] == 'enhancement' %}selected{% endif %}>Enhancement</option>
+          <option value="new_feature" {% if p['proposal_type'] == 'new_feature' %}selected{% endif %}>New feature</option>
           <option value="bug" {% if p['proposal_type'] == 'bug' %}selected{% endif %}>Bug</option>
         </select>
       </label>
@@ -463,6 +465,7 @@
           <option value="new" {% if p['status'] == 'new' %}selected{% endif %}>New</option>
           <option value="accepted" {% if p['status'] == 'accepted' %}selected{% endif %}>Accepted</option>
           <option value="in_progress" {% if p['status'] == 'in_progress' %}selected{% endif %}>In progress</option>
+          <option value="backlog" {% if p['status'] == 'backlog' %}selected{% endif %}>Backlog</option>
           <option value="done" {% if p['status'] == 'done' %}selected{% endif %}>Done</option>
           <option value="rejected" {% if p['status'] == 'rejected' %}selected{% endif %}>Rejected</option>
         </select>

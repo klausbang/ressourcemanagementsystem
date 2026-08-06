@@ -1,13 +1,17 @@
 {% import 'modern/_macros.html' as macros %}
 <form method="post" action="{{ url_for('proposals.new_proposal') }}" class="form-grid">
-  <input type="hidden" name="path" value="{{ path }}">
+  <input type="hidden" name="path" id="proposal-path-{{ form_id }}" value="{{ path }}">
   <div class="field" style="flex:1 1 100%;">
-    <label>Reporting against: <code>{{ path }}</code></label>
+    <label>Reporting against: <code id="proposal-path-label-{{ form_id }}">{{ path }}</code></label>
+  </div>
+  <div class="field" style="flex:1 1 100%;">
+    <label><input type="checkbox" name="is_general" value="1" {% if form_values.get('is_general') %}checked{% endif %}> General - not related to this view only</label>
   </div>
   <div class="field" style="flex:1 1 100%;">
     <label for="proposal-type-{{ form_id }}">Type</label>
     <select id="proposal-type-{{ form_id }}" name="proposal_type" required>
       <option value="enhancement" {% if form_values.get('proposal_type') == 'enhancement' %}selected{% endif %}>💡 Enhancement idea</option>
+      <option value="new_feature" {% if form_values.get('proposal_type') == 'new_feature' %}selected{% endif %}>✨ New feature</option>
       <option value="bug" {% if form_values.get('proposal_type') == 'bug' %}selected{% endif %}>🐛 Bug report</option>
     </select>
   </div>

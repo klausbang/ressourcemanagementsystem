@@ -32,9 +32,10 @@ def new_proposal():
         proposal_type = request.form.get("proposal_type", "").strip()
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
+        is_general = 1 if request.form.get("is_general") else 0
 
-        if proposal_type not in ("enhancement", "bug"):
-            flash("Please choose whether this is an enhancement or a bug report.", "error")
+        if proposal_type not in ("enhancement", "bug", "new_feature"):
+            flash("Please choose a valid proposal type.", "error")
             return render_ui("proposal_new.html", path=path, form_values=request.form)
         if not title:
             flash("A short title is required.", "error")
@@ -43,8 +44,9 @@ def new_proposal():
         db.execute(
             """
             INSERT INTO proposals
-                (path, proposal_type, title, description, submitted_by_user_id, submitted_by_username, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (path, proposal_type, title, description, submitted_by_user_id,
+                 submitted_by_username, created_at, is_general)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 path or "/",
@@ -54,6 +56,7 @@ def new_proposal():
                 session.get("user_id"),
                 session.get("username"),
                 datetime.now().strftime("%Y-%m-%d %H:%M"),
+                is_general,
             ),
         )
         db.commit()

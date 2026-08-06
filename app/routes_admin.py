@@ -172,7 +172,7 @@ def _load_admin_context(db) -> dict:
         db.execute(
             """
             SELECT id, path, proposal_type, title, description, submitted_by_username,
-                   created_at, status, admin_comment, updated_at
+                   created_at, status, admin_comment, updated_at, is_general
             FROM proposals
             ORDER BY created_at DESC
             """
@@ -678,20 +678,22 @@ def admin_manage():
             proposal_type = request.form.get("proposal_type", "").strip()
             status = request.form.get("status", "").strip()
             admin_comment = request.form.get("admin_comment", "").strip() or None
-            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected")
+            is_general = 1 if request.form.get("is_general") else 0
+            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected", "backlog")
+            valid_types = ("enhancement", "bug", "new_feature")
 
-            if not (proposal_id and title and proposal_type in ("enhancement", "bug") and status in valid_statuses):
+            if not (proposal_id and title and proposal_type in valid_types and status in valid_statuses):
                 flash("A valid proposal, title, type, and status are required.", "error")
             else:
                 db.execute(
                     """
                     UPDATE proposals
                     SET title = ?, description = ?, proposal_type = ?, status = ?, admin_comment = ?,
-                        admin_user_id = ?, updated_at = ?
+                        is_general = ?, admin_user_id = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
-                        title, description, proposal_type, status, admin_comment,
+                        title, description, proposal_type, status, admin_comment, is_general,
                         session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id,
                     ),
                 )

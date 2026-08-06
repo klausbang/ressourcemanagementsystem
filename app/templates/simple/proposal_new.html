@@ -9,9 +9,12 @@
 <form method="post" action="{{ url_for('proposals.new_proposal') }}">
   <input type="hidden" name="path" value="{{ path }}">
   <p>Reporting against: <code>{{ path }}</code></p>
+  <label><input type="checkbox" name="is_general" value="1" {% if form_values.get('is_general') %}checked{% endif %}> General - not related to this view only</label>
+  <br>
   <label>Type
     <select name="proposal_type" required>
       <option value="enhancement" {% if form_values.get('proposal_type') == 'enhancement' %}selected{% endif %}>Enhancement idea</option>
+      <option value="new_feature" {% if form_values.get('proposal_type') == 'new_feature' %}selected{% endif %}>New feature</option>
       <option value="bug" {% if form_values.get('proposal_type') == 'bug' %}selected{% endif %}>Bug report</option>
     </select>
   </label>

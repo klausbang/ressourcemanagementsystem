@@ -168,16 +168,17 @@ CREATE TABLE IF NOT EXISTS activity_history (
 CREATE TABLE IF NOT EXISTS proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL,
-    proposal_type TEXT NOT NULL CHECK(proposal_type IN ('enhancement', 'bug')),
+    proposal_type TEXT NOT NULL CHECK(proposal_type IN ('enhancement', 'bug', 'new_feature')),
     title TEXT NOT NULL,
     description TEXT,
     submitted_by_user_id INTEGER,
     submitted_by_username TEXT,
     created_at TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog')),
     admin_comment TEXT,
     admin_user_id INTEGER,
     updated_at TEXT,
+    is_general INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (submitted_by_user_id) REFERENCES users(id),
     FOREIGN KEY (admin_user_id) REFERENCES users(id)
 );
@@ -565,6 +566,68 @@ def _migrate_activity_templates_version(db: sqlite3.Connection) -> None:
         db.commit()
 
 
+def _migrate_proposals_table(db: sqlite3.Connection) -> None:
+    """Upgrade a proposals table created before 'new_feature' (type) / 'backlog' (status)
+    were valid values, and before the optional is_general flag existed. Needs a full
+    rebuild (not a plain ADD COLUMN) because proposal_type/status carry CHECK constraints,
+    and SQLite cannot widen a CHECK already attached to a column - same rebuild-and-rename
+    approach as _migrate_users_table. Detected by reading the table's own CHECK clause
+    text from sqlite_master, since PRAGMA table_info doesn't expose CHECK constraints."""
+    if not _table_exists(db, "proposals"):
+        return
+    row = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'proposals'"
+    ).fetchone()
+    columns = {r["name"] for r in db.execute("PRAGMA table_info(proposals)").fetchall()}
+    already_current = (
+        row is not None and "new_feature" in row["sql"] and "backlog" in row["sql"] and "is_general" in columns
+    )
+    if already_current:
+        return
+
+    db.execute("PRAGMA foreign_keys = OFF")
+    try:
+        db.execute(
+            """
+            CREATE TABLE proposals_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL,
+                proposal_type TEXT NOT NULL CHECK(proposal_type IN ('enhancement', 'bug', 'new_feature')),
+                title TEXT NOT NULL,
+                description TEXT,
+                submitted_by_user_id INTEGER,
+                submitted_by_username TEXT,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog')),
+                admin_comment TEXT,
+                admin_user_id INTEGER,
+                updated_at TEXT,
+                is_general INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (submitted_by_user_id) REFERENCES users(id),
+                FOREIGN KEY (admin_user_id) REFERENCES users(id)
+            )
+            """
+        )
+        select_is_general = "is_general" if "is_general" in columns else "0"
+        db.execute(
+            f"""
+            INSERT INTO proposals_new
+                (id, path, proposal_type, title, description, submitted_by_user_id,
+                 submitted_by_username, created_at, status, admin_comment, admin_user_id,
+                 updated_at, is_general)
+            SELECT id, path, proposal_type, title, description, submitted_by_user_id,
+                   submitted_by_username, created_at, status, admin_comment, admin_user_id,
+                   updated_at, {select_is_general}
+            FROM proposals
+            """
+        )
+        db.execute("DROP TABLE proposals")
+        db.execute("ALTER TABLE proposals_new RENAME TO proposals")
+        db.commit()
+    finally:
+        db.execute("PRAGMA foreign_keys = ON")
+
+
 def init_db() -> None:
     db = get_db()
     _migrate_users_table(db)
@@ -578,6 +641,7 @@ def init_db() -> None:
     _migrate_ordered_tests_template_application(db)
     _migrate_template_applications_table(db)
     _migrate_activity_templates_version(db)
+    _migrate_proposals_table(db)
     _seed_sandbox_items(db, only_if_empty=True)
     db.commit()
 
