@@ -172,7 +172,8 @@ def _load_admin_context(db) -> dict:
         db.execute(
             """
             SELECT id, path, proposal_type, title, description, submitted_by_username,
-                   created_at, status, admin_comment, updated_at, is_general
+                   created_at, status, admin_comment, updated_at, is_general,
+                   tester_comment, test_status
             FROM proposals
             ORDER BY created_at DESC
             """
@@ -679,21 +680,28 @@ def admin_manage():
             status = request.form.get("status", "").strip()
             admin_comment = request.form.get("admin_comment", "").strip() or None
             is_general = 1 if request.form.get("is_general") else 0
-            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected", "backlog")
+            tester_comment = request.form.get("tester_comment", "").strip() or None
+            test_status = request.form.get("test_status", "").strip() or "waiting"
+            valid_statuses = ("new", "accepted", "in_progress", "done", "rejected", "backlog", "failed_testing")
             valid_types = ("enhancement", "bug", "new_feature")
+            valid_test_statuses = ("waiting", "passed", "failed", "passed_with_comments")
 
-            if not (proposal_id and title and proposal_type in valid_types and status in valid_statuses):
+            if not (
+                proposal_id and title and proposal_type in valid_types
+                and status in valid_statuses and test_status in valid_test_statuses
+            ):
                 flash("A valid proposal, title, type, and status are required.", "error")
             else:
                 db.execute(
                     """
                     UPDATE proposals
                     SET title = ?, description = ?, proposal_type = ?, status = ?, admin_comment = ?,
-                        is_general = ?, admin_user_id = ?, updated_at = ?
+                        is_general = ?, tester_comment = ?, test_status = ?, admin_user_id = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
                         title, description, proposal_type, status, admin_comment, is_general,
+                        tester_comment, test_status,
                         session.get("user_id"), datetime.now().strftime("%Y-%m-%d %H:%M"), proposal_id,
                     ),
                 )

@@ -467,10 +467,20 @@
           <option value="in_progress" {% if p['status'] == 'in_progress' %}selected{% endif %}>In progress</option>
           <option value="backlog" {% if p['status'] == 'backlog' %}selected{% endif %}>Backlog</option>
           <option value="done" {% if p['status'] == 'done' %}selected{% endif %}>Done</option>
+          <option value="failed_testing" {% if p['status'] == 'failed_testing' %}selected{% endif %}>Failed testing</option>
           <option value="rejected" {% if p['status'] == 'rejected' %}selected{% endif %}>Rejected</option>
         </select>
       </label>
       <label>Admin comment <input type="text" name="admin_comment" value="{{ p['admin_comment'] or '' }}"></label>
+      <label>Test status
+        <select name="test_status">
+          <option value="waiting" {% if p['test_status'] == 'waiting' %}selected{% endif %}>Waiting</option>
+          <option value="passed" {% if p['test_status'] == 'passed' %}selected{% endif %}>Passed</option>
+          <option value="failed" {% if p['test_status'] == 'failed' %}selected{% endif %}>Failed</option>
+          <option value="passed_with_comments" {% if p['test_status'] == 'passed_with_comments' %}selected{% endif %}>Passed with comments</option>
+        </select>
+      </label>
+      <label>Tester comment <input type="text" name="tester_comment" value="{{ p['tester_comment'] or '' }}"></label>
       <button type="submit">Save</button>
       <button type="submit" form="proposal-delete-{{ p['id'] }}">Delete</button>
     </form>

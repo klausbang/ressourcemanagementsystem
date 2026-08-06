@@ -174,11 +174,13 @@ CREATE TABLE IF NOT EXISTS proposals (
     submitted_by_user_id INTEGER,
     submitted_by_username TEXT,
     created_at TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog', 'failed_testing')),
     admin_comment TEXT,
     admin_user_id INTEGER,
     updated_at TEXT,
     is_general INTEGER NOT NULL DEFAULT 0,
+    tester_comment TEXT,
+    test_status TEXT NOT NULL DEFAULT 'waiting' CHECK(test_status IN ('waiting', 'passed', 'failed', 'passed_with_comments')),
     FOREIGN KEY (submitted_by_user_id) REFERENCES users(id),
     FOREIGN KEY (admin_user_id) REFERENCES users(id)
 );
@@ -567,12 +569,13 @@ def _migrate_activity_templates_version(db: sqlite3.Connection) -> None:
 
 
 def _migrate_proposals_table(db: sqlite3.Connection) -> None:
-    """Upgrade a proposals table created before 'new_feature' (type) / 'backlog' (status)
-    were valid values, and before the optional is_general flag existed. Needs a full
-    rebuild (not a plain ADD COLUMN) because proposal_type/status carry CHECK constraints,
-    and SQLite cannot widen a CHECK already attached to a column - same rebuild-and-rename
-    approach as _migrate_users_table. Detected by reading the table's own CHECK clause
-    text from sqlite_master, since PRAGMA table_info doesn't expose CHECK constraints."""
+    """Upgrade a proposals table to the current schema: 'new_feature' (type) / 'backlog'
+    and 'failed_testing' (status) as valid values, plus the optional is_general flag and
+    the tester_comment/test_status columns. Needs a full rebuild (not a plain ADD COLUMN)
+    because proposal_type/status carry CHECK constraints, and SQLite cannot widen a CHECK
+    already attached to a column - same rebuild-and-rename approach as _migrate_users_table.
+    Detected by reading the table's own CHECK clause text from sqlite_master, since
+    PRAGMA table_info doesn't expose CHECK constraints."""
     if not _table_exists(db, "proposals"):
         return
     row = db.execute(
@@ -580,7 +583,13 @@ def _migrate_proposals_table(db: sqlite3.Connection) -> None:
     ).fetchone()
     columns = {r["name"] for r in db.execute("PRAGMA table_info(proposals)").fetchall()}
     already_current = (
-        row is not None and "new_feature" in row["sql"] and "backlog" in row["sql"] and "is_general" in columns
+        row is not None
+        and "new_feature" in row["sql"]
+        and "backlog" in row["sql"]
+        and "failed_testing" in row["sql"]
+        and "is_general" in columns
+        and "tester_comment" in columns
+        and "test_status" in columns
     )
     if already_current:
         return
@@ -598,26 +607,30 @@ def _migrate_proposals_table(db: sqlite3.Connection) -> None:
                 submitted_by_user_id INTEGER,
                 submitted_by_username TEXT,
                 created_at TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog')),
+                status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'accepted', 'in_progress', 'done', 'rejected', 'backlog', 'failed_testing')),
                 admin_comment TEXT,
                 admin_user_id INTEGER,
                 updated_at TEXT,
                 is_general INTEGER NOT NULL DEFAULT 0,
+                tester_comment TEXT,
+                test_status TEXT NOT NULL DEFAULT 'waiting' CHECK(test_status IN ('waiting', 'passed', 'failed', 'passed_with_comments')),
                 FOREIGN KEY (submitted_by_user_id) REFERENCES users(id),
                 FOREIGN KEY (admin_user_id) REFERENCES users(id)
             )
             """
         )
         select_is_general = "is_general" if "is_general" in columns else "0"
+        select_tester_comment = "tester_comment" if "tester_comment" in columns else "NULL"
+        select_test_status = "test_status" if "test_status" in columns else "'waiting'"
         db.execute(
             f"""
             INSERT INTO proposals_new
                 (id, path, proposal_type, title, description, submitted_by_user_id,
                  submitted_by_username, created_at, status, admin_comment, admin_user_id,
-                 updated_at, is_general)
+                 updated_at, is_general, tester_comment, test_status)
             SELECT id, path, proposal_type, title, description, submitted_by_user_id,
                    submitted_by_username, created_at, status, admin_comment, admin_user_id,
-                   updated_at, {select_is_general}
+                   updated_at, {select_is_general}, {select_tester_comment}, {select_test_status}
             FROM proposals
             """
         )

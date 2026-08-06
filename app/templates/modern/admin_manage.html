@@ -1,8 +1,8 @@
 {% extends 'modern/base.html' %}
 {% import 'modern/_macros.html' as macros %}
 
-{% macro tab_count(total, attention=0) %}
-<span class="tab-label-count">{{ total }}{% if attention %} <span class="attn">({{ attention }}!)</span>{% endif %}</span>
+{% macro tab_count(total, attention=0, ok=0) %}
+<span class="tab-label-count">{{ total }}{% if ok %} <span class="ok">({{ ok }})</span>{% endif %}{% if attention %} <span class="attn">({{ attention }}!)</span>{% endif %}</span>
 {% endmacro %}
 
 {% block title %}Admin{% endblock %}
@@ -77,6 +77,7 @@
 </div>
 
 {% set new_proposals_count = proposals|selectattr('status', 'equalto', 'new')|list|length %}
+{% set accepted_proposals_count = proposals|selectattr('status', 'equalto', 'accepted')|list|length %}
 
 <details class="card" style="margin-bottom:20px;">
   <summary style="cursor:pointer; font-weight:700;">🗺️ How this page fits in your workflow</summary>
@@ -103,6 +104,7 @@
     <div class="stat-tile"><div class="stat-value">{{ templates|length }}</div><div class="stat-label">Activity templates</div></div>
     <div class="stat-tile"><div class="stat-value">{{ absences|length }}</div><div class="stat-label">Staff absences</div></div>
     <div class="stat-tile"><div class="stat-value">{{ new_proposals_count }}</div><div class="stat-label">New proposals</div></div>
+    <div class="stat-tile"><div class="stat-value">{{ accepted_proposals_count }}</div><div class="stat-label">Accepted, waiting for implementation</div></div>
     <div class="stat-tile"><div class="stat-value">{{ incomplete_customers|length }}</div><div class="stat-label">Customers needing info</div></div>
   </div>
 </details>
@@ -126,7 +128,7 @@
     <label for="tab-exclusion" class="tab-label">🚫 Exclusion groups{{ tab_count(exclusion_groups|length) }}</label>
     <label for="tab-absences" class="tab-label">🌴 Staff absences{{ tab_count(absences|length) }}</label>
     <label for="tab-templates" class="tab-label">📋 Activity templates{{ tab_count(templates|length) }}</label>
-    <label for="tab-proposals" class="tab-label">💡 Proposals{{ tab_count(proposals|length, new_proposals_count) }}</label>
+    <label for="tab-proposals" class="tab-label">💡 Proposals{{ tab_count(proposals|length, new_proposals_count, accepted_proposals_count) }}</label>
     <label for="tab-customers" class="tab-label">🏢 Customers{{ tab_count(customers|length, incomplete_customers|length) }}</label>
   </div>
 
@@ -717,6 +719,15 @@
           </form>
         </div>
 
+        <!-- Type/Status/Test-status below auto-submit via a deferred requestSubmit(), not a
+             plain onchange="this.form.submit()": calling requestSubmit() synchronously from
+             inside the "change" handler fires the form's "submit" event (clearing dirty-form
+             tracking) *before* the "change" event finishes bubbling up to modern.js's own
+             form-level "change" listener - which then immediately marks the form dirty again,
+             right before the navigation beforeunload check runs, producing a spurious "leave
+             site?" prompt on every auto-save. Deferring requestSubmit() by one tick lets that
+             bubble-phase listener finish first, so the submit-triggered clear is the last
+             word. -->
         <form method="post" class="form-grid">
           <input type="hidden" name="action" value="update_proposal">
           <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
@@ -733,7 +744,7 @@
           </div>
           <div class="field">
             <label for="proposal-type-{{ p['id'] }}">Type</label>
-            <select id="proposal-type-{{ p['id'] }}" name="proposal_type" onchange="this.form.submit()">
+            <select id="proposal-type-{{ p['id'] }}" name="proposal_type" onchange="var f=this.form; setTimeout(function () { f.requestSubmit(); }, 0);">
               <option value="enhancement" {% if p['proposal_type'] == 'enhancement' %}selected{% endif %}>💡 Enhancement</option>
               <option value="new_feature" {% if p['proposal_type'] == 'new_feature' %}selected{% endif %}>✨ New feature</option>
               <option value="bug" {% if p['proposal_type'] == 'bug' %}selected{% endif %}>🐛 Bug</option>
@@ -741,18 +752,32 @@
           </div>
           <div class="field">
             <label for="proposal-status-{{ p['id'] }}">Status</label>
-            <select id="proposal-status-{{ p['id'] }}" name="status" onchange="this.form.submit()">
+            <select id="proposal-status-{{ p['id'] }}" name="status" onchange="var f=this.form; setTimeout(function () { f.requestSubmit(); }, 0);">
               <option value="new" {% if p['status'] == 'new' %}selected{% endif %}>New</option>
               <option value="accepted" {% if p['status'] == 'accepted' %}selected{% endif %}>Accepted</option>
               <option value="in_progress" {% if p['status'] == 'in_progress' %}selected{% endif %}>In progress</option>
               <option value="backlog" {% if p['status'] == 'backlog' %}selected{% endif %}>Backlog</option>
               <option value="done" {% if p['status'] == 'done' %}selected{% endif %}>Done</option>
+              <option value="failed_testing" {% if p['status'] == 'failed_testing' %}selected{% endif %}>Failed testing</option>
               <option value="rejected" {% if p['status'] == 'rejected' %}selected{% endif %}>Rejected</option>
             </select>
           </div>
           <div class="field" style="flex:1 1 260px;">
             <label for="proposal-comment-{{ p['id'] }}">Admin comment</label>
             <input type="text" id="proposal-comment-{{ p['id'] }}" name="admin_comment" value="{{ p['admin_comment'] or '' }}">
+          </div>
+          <div class="field">
+            <label for="proposal-test-status-{{ p['id'] }}">Test status</label>
+            <select id="proposal-test-status-{{ p['id'] }}" name="test_status" onchange="var f=this.form; setTimeout(function () { f.requestSubmit(); }, 0);">
+              <option value="waiting" {% if p['test_status'] == 'waiting' %}selected{% endif %}>Waiting</option>
+              <option value="passed" {% if p['test_status'] == 'passed' %}selected{% endif %}>Passed</option>
+              <option value="failed" {% if p['test_status'] == 'failed' %}selected{% endif %}>Failed</option>
+              <option value="passed_with_comments" {% if p['test_status'] == 'passed_with_comments' %}selected{% endif %}>Passed with comments</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1 1 260px;">
+            <label for="proposal-tester-comment-{{ p['id'] }}">Tester comment</label>
+            <input type="text" id="proposal-tester-comment-{{ p['id'] }}" name="tester_comment" value="{{ p['tester_comment'] or '' }}">
           </div>
           <div class="field"><button type="submit" class="btn btn-secondary btn-sm">Save</button></div>
         </form>

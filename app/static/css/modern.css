@@ -426,6 +426,7 @@ table.modern-table input[type="text"], table.modern-table select {
 .tab-label:hover { color: var(--color-text); }
 .tab-label-count { display: block; font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); margin-top: 2px; }
 .tab-label-count .attn { color: var(--color-danger); }
+.tab-label-count .ok { color: var(--color-success); }
 
 .tab-panel { display: none; }
 

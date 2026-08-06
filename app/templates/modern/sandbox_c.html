@@ -50,6 +50,7 @@
   .sbx-grid-row.sbx-multiedit-anchor { outline: 2px solid var(--color-warning); outline-offset: -2px; }
   .sbx-grid-row.sbx-multiedit-target { outline: 2px dashed var(--color-warning); outline-offset: -2px; }
   .sbx-multiedit-status { font-size: 0.82rem; color: var(--color-text-muted); }
+  .sbx-status-bar { font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 10px; }
 </style>
 
 <div class="page-header">
@@ -71,6 +72,8 @@
   <button type="button" id="sbx-save" class="btn btn-primary btn-sm">💾 Save all</button>
   <span class="sbx-multiedit-status" id="sbx-multiedit-status"></span>
 </div>
+
+<div class="sbx-status-bar" id="sbx-status-bar"></div>
 
 <div class="sbx-grid" id="sbx-c-grid">
   <div class="sbx-grid-row header">
@@ -170,6 +173,21 @@
       sel2.removeAllRanges();
       sel2.addRange(range);
     }
+    updateStatusBar();
+  }
+
+  // Total rows, rows currently visible (i.e. not hidden by the filter row), and how many
+  // rows the current selection spans - a lone active cell with no range counts as 1.
+  function updateStatusBar() {
+    var rows = dataRows();
+    var total = rows.length;
+    var visible = rows.filter(function (r) { return r.style.display !== "none"; }).length;
+    var b = bounds();
+    var selectedRows = b.r2 - b.r1 + 1;
+    var parts = [total + " row" + (total === 1 ? "" : "s") + " total"];
+    if (visible !== total) parts.push(visible + " shown (filtered)");
+    parts.push(selectedRows + " row" + (selectedRows === 1 ? "" : "s") + " selected");
+    document.getElementById("sbx-status-bar").textContent = parts.join(" · ");
   }
 
   // --- Search / filter ---
@@ -203,6 +221,7 @@
       });
       row.style.display = visible ? "" : "none";
     });
+    updateStatusBar();
   }
 
   document.getElementById("sbx-search-toggle").addEventListener("click", function () {
