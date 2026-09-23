@@ -69,6 +69,15 @@ def _schedule_view_mode() -> str:
     return mode if mode in ("day", "week", "month", "all") else "day"
 
 
+def _schedule_group_mode() -> str:
+    """Phase 31 (proposal id 42): row grouping for the Schedule/Gantt charts, from
+    ?sched_group=. "test" (default) is the original one-row-per-ordered-test layout;
+    "project" collapses each project (customer order) to a single row-group via rowspan,
+    so a project appears once no matter how many of its tests are scheduled."""
+    mode = request.args.get("sched_group", "test")
+    return mode if mode in ("test", "project") else "test"
+
+
 def _schedule_span_count(param_name: str, default: int, maximum: int) -> int:
     """A selectable-count query param (?sched_weeks=/?sched_months=), clamped to [1, maximum]."""
     try:
@@ -88,11 +97,17 @@ def _add_months(d: date, months: int) -> date:
     return date(year, month, 1)
 
 
-def _place_bars(items: list, window_start: datetime, window_end: datetime, slot_hours: float) -> tuple[list, int]:
+def _place_bars(
+    items: list, window_start: datetime, window_end: datetime, slot_hours: float, group_by_project: bool = False
+) -> tuple[list, int]:
     """Position a list of items (each already carrying _bar_start/_bar_end) into slot-column
     offsets within [window_start, window_end), clipping bars that spill outside it. Shared by
     the day view (1-hour slots) and the week/month views (24-hour slots) so all three scales
-    place and clip bars with exactly the same rules."""
+    place and clip bars with exactly the same rules.
+
+    group_by_project (Phase 31) sorts rows by order_code first (start time as the tiebreaker)
+    instead of the default start-time-first ordering, so every row belonging to the same
+    project ends up contiguous - a precondition for _annotate_project_rowspans below."""
     slot_seconds = slot_hours * 3600
     slot_count = max(1, round((window_end - window_start).total_seconds() / slot_seconds))
     placed = []
@@ -117,13 +132,34 @@ def _place_bars(items: list, window_start: datetime, window_end: datetime, slot_
         entry["clipped_after"] = clipped_end < bar_end
         placed.append(entry)
 
-    placed.sort(key=lambda r: (r["col_offset"], r["order_code"]))
+    sort_key = (lambda r: (r["order_code"], r["col_offset"])) if group_by_project else (lambda r: (r["col_offset"], r["order_code"]))
+    placed.sort(key=sort_key)
     return placed, slot_count
+
+
+def _annotate_project_rowspans(rows: list) -> None:
+    """Phase 31 (proposal id 42): mark, in place, which row begins each project's group and
+    how many rows that group spans. Requires rows already sorted so same-order_code rows are
+    contiguous (see group_by_project on _place_bars) - the "By Project" schedule template
+    renders a project's identifying cell only on its first row, with that rowspan, so each
+    project appears exactly once in the view instead of once per scheduled test."""
+    i = 0
+    while i < len(rows):
+        j = i
+        while j < len(rows) and rows[j]["order_code"] == rows[i]["order_code"]:
+            j += 1
+        rows[i]["project_first"] = True
+        rows[i]["project_rowspan"] = j - i
+        for k in range(i + 1, j):
+            rows[k]["project_first"] = False
+        i = j
 
 
 def _load_schedule_context(db) -> dict:
     view_day = _schedule_view_day()
     sched_view = _schedule_view_mode()
+    sched_group = _schedule_group_mode()
+    group_by_project = sched_group == "project"
     weeks_count = _schedule_span_count("sched_weeks", 1, SCHEDULE_MAX_WEEKS)
     months_count = _schedule_span_count("sched_months", 1, SCHEDULE_MAX_MONTHS)
     now = datetime.now()
@@ -224,7 +260,9 @@ def _load_schedule_context(db) -> dict:
                 "is_current": view_day == now.date() and slot_start.hour == now.hour,
             }
         )
-    visible_rows, _ = _place_bars(all_items, day_window_start, day_window_end, slot_hours=1)
+    visible_rows, _ = _place_bars(all_items, day_window_start, day_window_end, slot_hours=1, group_by_project=group_by_project)
+    if group_by_project:
+        _annotate_project_rowspans(visible_rows)
 
     # Flag lab/equipment mutual-exclusion conflicts (Phase 9): two different ordered
     # tests, both visible today, whose resources collide (same resource, or two
@@ -286,7 +324,11 @@ def _load_schedule_context(db) -> dict:
         {"label": f"Week of {(week_start + timedelta(days=7 * w)).strftime('%b %d')}", "span": 7}
         for w in range(weeks_count)
     ]
-    week_rows, week_slot_count = _place_bars(all_items, week_window_start, week_window_end, slot_hours=24)
+    week_rows, week_slot_count = _place_bars(
+        all_items, week_window_start, week_window_end, slot_hours=24, group_by_project=group_by_project
+    )
+    if group_by_project:
+        _annotate_project_rowspans(week_rows)
     week_range_label = (
         f"{week_start.strftime('%b %d, %Y')} – "
         f"{(week_window_end.date() - timedelta(days=1)).strftime('%b %d, %Y')}"
@@ -311,7 +353,11 @@ def _load_schedule_context(db) -> dict:
         nxt = _add_months(cursor, 1)
         month_group_labels.append({"label": cursor.strftime("%B %Y"), "span": (nxt - cursor).days})
         cursor = nxt
-    month_rows, month_slot_count = _place_bars(all_items, month_window_start, month_window_end, slot_hours=24)
+    month_rows, month_slot_count = _place_bars(
+        all_items, month_window_start, month_window_end, slot_hours=24, group_by_project=group_by_project
+    )
+    if group_by_project:
+        _annotate_project_rowspans(month_rows)
     month_range_label = (
         month_start.strftime("%b %Y")
         if months_count == 1
@@ -359,6 +405,7 @@ def _load_schedule_context(db) -> dict:
         "absences_today": absences_today,
         "visits_today": visits_today,
         "sched_view": sched_view,
+        "sched_group": sched_group,
         "sched_weeks": weeks_count,
         "sched_months": months_count,
         "sched_weeks_options": list(range(1, SCHEDULE_MAX_WEEKS + 1)),

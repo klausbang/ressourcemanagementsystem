@@ -546,18 +546,26 @@
 
     <section class="tab-panel" id="panel-schedule">
       <div class="callout">
-        <strong>Reading the charts:</strong> a bar spans a work order's actual start (or scheduled date, defaulted to 08:00 if no time is recorded yet) through its completion time. In-progress and on-hold work orders without a completion time are drawn running up to now. Tests with no work order yet can't be placed on any chart — they're listed below instead. Switch between Day (1-hour columns), Week and Month (1-day columns), or All to see all three stacked together.
+        <strong>Reading the charts:</strong> a bar spans a work order's actual start (or scheduled date, defaulted to 08:00 if no time is recorded yet) through its completion time. In-progress and on-hold work orders without a completion time are drawn running up to now. Tests with no work order yet can't be placed on any chart — they're listed below instead. Switch between Day (1-hour columns), Week and Month (1-day columns), or All to see all three stacked together. Use "By Test" (one row per scheduled test) or "By Project" (one row-group per project, so a project with several tests appears once) to change how rows are grouped.
       </div>
 
       {% macro sched_view_link(mode, label) %}
       <a class="btn btn-sm {{ 'btn-primary' if sched_view == mode else 'btn-secondary' }}"
-         href="{{ url_for('planner.planner_orders', sched_start=view_day.isoformat(), sched_view=mode, sched_weeks=sched_weeks, sched_months=sched_months) }}">{{ label }}</a>
+         href="{{ url_for('planner.planner_orders', sched_start=view_day.isoformat(), sched_view=mode, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">{{ label }}</a>
+      {% endmacro %}
+      {% macro sched_group_link(mode, label) %}
+      <a class="btn btn-sm {{ 'btn-primary' if sched_group == mode else 'btn-secondary' }}"
+         href="{{ url_for('planner.planner_orders', sched_start=view_day.isoformat(), sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=mode) }}">{{ label }}</a>
       {% endmacro %}
       <div class="sched-view-switch">
         {{ sched_view_link('day', '📅 Day') }}
         {{ sched_view_link('week', '🗓️ Week') }}
         {{ sched_view_link('month', '🗓️ Month') }}
         {{ sched_view_link('all', '📚 All') }}
+      </div>
+      <div class="sched-view-switch">
+        {{ sched_group_link('test', '🧪 By Test') }}
+        {{ sched_group_link('project', '📁 By Project') }}
       </div>
 
       {% if absences_today or visits_today %}
@@ -584,10 +592,10 @@
       <div class="sched-scale-block">
         <div class="sched-scale-title">📅 Day</div>
         <div class="gantt-toolbar">
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">&larr; Previous day</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">&larr; Previous day</a>
           <span class="gantt-range">{{ view_day.strftime('%A, %b %d, %Y') }}</span>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">Today</a>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">Next day &rarr;</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">Today</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">Next day &rarr;</a>
         </div>
 
         {% if schedule_rows %}
@@ -595,6 +603,7 @@
           <table class="modern-table gantt-table">
             <thead>
               <tr>
+                {% if sched_group == 'project' %}<th class="gantt-label-col">Project</th>{% endif %}
                 <th class="gantt-label-col">Test</th>
                 {% for h in schedule_hours %}
                 <th class="gantt-hour-col {{ 'current' if h.is_current }}" title="{{ h.label }}:00">
@@ -606,9 +615,17 @@
             <tbody>
               {% for item in schedule_rows %}
               <tr>
+                {% if sched_group == 'project' %}
+                {% if item.project_first %}
+                <td class="gantt-label-col" rowspan="{{ item.project_rowspan }}">
+                  <div class="test-card-title" style="font-size:0.85rem;">{{ item.order_code }}</div>
+                  <div class="test-card-meta">{{ item.customer_name }}</div>
+                </td>
+                {% endif %}
+                {% endif %}
                 <td class="gantt-label-col">
                   <div class="test-card-title" style="font-size:0.85rem;">
-                    {{ item.order_code }} &middot; {{ item.test_name }}
+                    {% if sched_group == 'project' %}{{ item.test_name }}{% else %}{{ item.order_code }} &middot; {{ item.test_name }}{% endif %}
                     {% if item.conflicts_with %}
                     <span title="Conflicts with: {% for c in item.conflicts_with %}{{ c.work_order_code }} ({{ c.order_code }} / {{ c.test_name }}){% if not loop.last %}, {% endif %}{% endfor %}">🚫</span>
                     {% endif %}
@@ -616,7 +633,7 @@
                     <span title="Shares equipment with an activity at a different site: {% for c in item.cross_site_with %}{{ c.work_order_code }} ({{ c.order_code }} / {{ c.test_name }}, {{ c.activity_site }}){% if not loop.last %}, {% endif %}{% endfor %}">🔀</span>
                     {% endif %}
                   </div>
-                  <div class="test-card-meta">{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}</div>
+                  <div class="test-card-meta">{% if sched_group == 'project' %}{{ item.technician_username or '' }}{% else %}{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}{% endif %}</div>
                 </td>
                 {% for i in range(item.col_offset) %}<td></td>{% endfor %}
                 <td colspan="{{ item.col_span }}" class="gantt-bar status-{{ item.wo_status }} {{ 'gantt-conflict' if item.conflicts_with }} {{ 'gantt-cross-site' if item.cross_site_with and not item.conflicts_with }}"
@@ -641,10 +658,11 @@
         <table class="modern-table gantt-table {{ 'gantt-table-compact' if narrow }}">
           <thead>
             <tr>
-              <th class="gantt-label-col"></th>
+              <th class="gantt-label-col" colspan="{{ 2 if sched_group == 'project' else 1 }}"></th>
               {% for g in group_labels %}<th colspan="{{ g.span }}">{{ g.label }}</th>{% endfor %}
             </tr>
             <tr>
+              {% if sched_group == 'project' %}<th class="gantt-label-col">Project</th>{% endif %}
               <th class="gantt-label-col">Test</th>
               {% for d in day_headers %}
               <th class="gantt-day-col {{ 'gantt-day-col-narrow' if narrow }} {{ 'current' if d.is_today }} {{ 'gantt-weekend' if d.is_weekend }}">{{ d.label }}</th>
@@ -654,9 +672,17 @@
           <tbody>
             {% for item in rows %}
             <tr>
+              {% if sched_group == 'project' %}
+              {% if item.project_first %}
+              <td class="gantt-label-col" rowspan="{{ item.project_rowspan }}">
+                <div class="test-card-title" style="font-size:0.85rem;">{{ item.order_code }}</div>
+                <div class="test-card-meta">{{ item.customer_name }}</div>
+              </td>
+              {% endif %}
+              {% endif %}
               <td class="gantt-label-col">
-                <div class="test-card-title" style="font-size:0.85rem;">{{ item.order_code }} &middot; {{ item.test_name }}</div>
-                <div class="test-card-meta">{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}</div>
+                <div class="test-card-title" style="font-size:0.85rem;">{% if sched_group == 'project' %}{{ item.test_name }}{% else %}{{ item.order_code }} &middot; {{ item.test_name }}{% endif %}</div>
+                <div class="test-card-meta">{% if sched_group == 'project' %}{{ item.technician_username or '' }}{% else %}{{ item.customer_name }}{% if item.technician_username %} &middot; {{ item.technician_username }}{% endif %}{% endif %}</div>
               </td>
               {% for i in range(item.col_offset) %}<td></td>{% endfor %}
               <td colspan="{{ item.col_span }}" class="gantt-bar status-{{ item.wo_status }}"
@@ -678,14 +704,15 @@
       <div class="sched-scale-block">
         <div class="sched-scale-title">🗓️ Week</div>
         <div class="gantt-toolbar">
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=week_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">&larr; Previous {{ sched_weeks }} week{{ 's' if sched_weeks != 1 }}</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=week_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">&larr; Previous {{ sched_weeks }} week{{ 's' if sched_weeks != 1 }}</a>
           <span class="gantt-range">{{ week_range_label }}</span>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">This week</a>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=week_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">Next {{ sched_weeks }} week{{ 's' if sched_weeks != 1 }} &rarr;</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">This week</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=week_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">Next {{ sched_weeks }} week{{ 's' if sched_weeks != 1 }} &rarr;</a>
           <form method="get" class="sched-count-form">
             <input type="hidden" name="sched_start" value="{{ view_day.isoformat() }}">
             <input type="hidden" name="sched_view" value="{{ sched_view }}">
             <input type="hidden" name="sched_months" value="{{ sched_months }}">
+            <input type="hidden" name="sched_group" value="{{ sched_group }}">
             <label>Weeks shown:
               <select name="sched_weeks" onchange="this.form.submit()">
                 {% for n in sched_weeks_options %}<option value="{{ n }}" {{ 'selected' if n == sched_weeks }}>{{ n }}</option>{% endfor %}
@@ -702,14 +729,15 @@
       <div class="sched-scale-block">
         <div class="sched-scale-title">🗓️ Month</div>
         <div class="gantt-toolbar">
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=month_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">&larr; Previous {{ sched_months }} month{{ 's' if sched_months != 1 }}</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=month_prev, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">&larr; Previous {{ sched_months }} month{{ 's' if sched_months != 1 }}</a>
           <span class="gantt-range">{{ month_range_label }}</span>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">This month</a>
-          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=month_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months) }}">Next {{ sched_months }} month{{ 's' if sched_months != 1 }} &rarr;</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=sched_today, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">This month</a>
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('planner.planner_orders', sched_start=month_next, sched_view=sched_view, sched_weeks=sched_weeks, sched_months=sched_months, sched_group=sched_group) }}">Next {{ sched_months }} month{{ 's' if sched_months != 1 }} &rarr;</a>
           <form method="get" class="sched-count-form">
             <input type="hidden" name="sched_start" value="{{ view_day.isoformat() }}">
             <input type="hidden" name="sched_view" value="{{ sched_view }}">
             <input type="hidden" name="sched_weeks" value="{{ sched_weeks }}">
+            <input type="hidden" name="sched_group" value="{{ sched_group }}">
             <label>Months shown:
               <select name="sched_months" onchange="this.form.submit()">
                 {% for n in sched_months_options %}<option value="{{ n }}" {{ 'selected' if n == sched_months }}>{{ n }}</option>{% endfor %}

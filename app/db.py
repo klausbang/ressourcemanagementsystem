@@ -1287,6 +1287,86 @@ def init_demo_seed() -> None:
           AND NOT EXISTS (SELECT 1 FROM report_steps rs WHERE rs.report_id = tr.id)
     """)
 
+    # Phase 31 demo (proposal id 42, "New visual planner"): a small project with two EMC
+    # tests already run back-to-back on the Monday of the current week, so the Schedule
+    # tab's new "By Project" grouping (app/routes_planner.py:_annotate_project_rowspans)
+    # has something concrete to show out of the box - one project row-group with two test
+    # sub-rows, each an hour-precise bar on the Day chart for that Monday. Modeled as
+    # already-completed work orders (not "planned") because scheduled_date/work_orders
+    # carry no time-of-day for a merely-planned test (see the FR-PLN-6 design note and the
+    # matching open question in docs/srs.html section 13) - started_at/completed_at are the
+    # only columns that can honestly carry a specific hour range like the proposal's
+    # example ("Monday 9-12" / "Monday 13-17").
+    monday_this_week = -today.weekday()  # 0 if today is itself Monday, else negative back to it
+
+    db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('soren.demo', 'technician')")
+    db.execute("INSERT OR IGNORE INTO users (username, role) VALUES ('tue.demo', 'technician')")
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-104", "Søren Madsen", "technician", "available"))
+    db.execute("INSERT OR IGNORE INTO resources (code, name, resource_type, status) VALUES (?, ?, ?, ?)", ("TECH-105", "Tue Lund", "technician", "available"))
+    db.execute("""
+        UPDATE users SET linked_resource_id = (SELECT id FROM resources WHERE code = 'TECH-104')
+        WHERE username = 'soren.demo' AND linked_resource_id IS NULL
+    """)
+    db.execute("""
+        UPDATE users SET linked_resource_id = (SELECT id FROM resources WHERE code = 'TECH-105')
+        WHERE username = 'tue.demo' AND linked_resource_id IS NULL
+    """)
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id FROM resources r JOIN capabilities c ON c.name = 'RE' WHERE r.code = 'TECH-104'
+    """)
+    db.execute("""
+        INSERT OR IGNORE INTO resource_capabilities (resource_id, capability_id)
+        SELECT r.id, c.id FROM resources r JOIN capabilities c ON c.name = 'RI' WHERE r.code = 'TECH-105'
+    """)
+
+    _seed_order(db, "ORD-2026-101", "WSA", "Mobile Handset")
+    _seed_eut(db, "ORD-2026-101", "Mobil1", "SN-WSA-101-001")
+
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id)
+        SELECT o.id, e.id, ?, c.id
+        FROM customer_orders o
+        JOIN euts e ON e.order_id = o.id AND e.name = 'Mobil1'
+        JOIN capabilities c ON c.name = ?
+        WHERE o.order_code = 'ORD-2026-101'
+          AND NOT EXISTS (SELECT 1 FROM ordered_tests ot WHERE ot.eut_id = e.id AND ot.test_name = ?)
+    """, ("RE", "RE", "RE"))
+    db.execute("""
+        INSERT INTO ordered_tests (order_id, eut_id, test_name, required_capability_id)
+        SELECT o.id, e.id, ?, c.id
+        FROM customer_orders o
+        JOIN euts e ON e.order_id = o.id AND e.name = 'Mobil1'
+        JOIN capabilities c ON c.name = ?
+        WHERE o.order_code = 'ORD-2026-101'
+          AND NOT EXISTS (SELECT 1 FROM ordered_tests ot WHERE ot.eut_id = e.id AND ot.test_name = ?)
+    """, ("RI", "RI", "RI"))
+
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, result)
+        SELECT 'WO-0031', ot.id, u.id, 'completed', ?, ?, ?, 'pass'
+        FROM ordered_tests ot
+        JOIN euts e ON e.id = ot.eut_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'soren.demo'
+        WHERE o.order_code = 'ORD-2026-101' AND e.name = 'Mobil1' AND ot.test_name = 'RE'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """, (d(monday_this_week), dt(monday_this_week, 9, 0), dt(monday_this_week, 12, 0)))
+    db.execute("""
+        INSERT INTO work_orders
+            (work_order_code, ordered_test_id, technician_user_id, status,
+             scheduled_date, started_at, completed_at, result)
+        SELECT 'WO-0032', ot.id, u.id, 'completed', ?, ?, ?, 'pass'
+        FROM ordered_tests ot
+        JOIN euts e ON e.id = ot.eut_id
+        JOIN customer_orders o ON o.id = ot.order_id
+        JOIN users u ON u.username = 'tue.demo'
+        WHERE o.order_code = 'ORD-2026-101' AND e.name = 'Mobil1' AND ot.test_name = 'RI'
+          AND NOT EXISTS (SELECT 1 FROM work_orders wo WHERE wo.ordered_test_id = ot.id)
+    """, (d(monday_this_week), dt(monday_this_week, 13, 0), dt(monday_this_week, 17, 0)))
+
     db.commit()
 
 
