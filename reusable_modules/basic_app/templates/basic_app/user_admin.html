@@ -1,0 +1,76 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}User Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Administration</div>
+  <h1>User Admin</h1>
+  <p class="lead">Add, rename, or remove users, and assign each one a role. Login is by username only (no password), same as everywhere else in this app.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Add a user</div>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="action" value="create_user">
+    <div class="field">
+      <label for="new-username">Username</label>
+      <input type="text" id="new-username" name="username" required>
+    </div>
+    <div class="field">
+      <label for="new-role">Role</label>
+      <select id="new-role" name="role" required>
+        {% for r in allowed_roles %}
+        <option value="{{ r }}">{{ r|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field"><button type="submit" class="btn btn-primary">Add user</button></div>
+  </form>
+</div>
+
+{% if users %}
+<div class="table-wrap">
+  <table class="modern-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Role</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td><input type="text" name="username" value="{{ u['username'] }}" form="user-update-{{ u['id'] }}" required></td>
+        <td>
+          <select name="role" form="user-update-{{ u['id'] }}">
+            {% for r in allowed_roles %}
+            <option value="{{ r }}" {% if u['role'] == r %}selected{% endif %}>{{ r|title }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="inline-form">
+          <button type="submit" form="user-update-{{ u['id'] }}" class="btn btn-secondary btn-sm">Save</button>
+          <button type="submit" form="user-delete-{{ u['id'] }}" class="btn btn-danger btn-sm" data-confirm="Delete user &quot;{{ u['username'] }}&quot;?">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% for u in users %}
+<form id="user-update-{{ u['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="update_user">
+  <input type="hidden" name="user_id" value="{{ u['id'] }}">
+</form>
+<form id="user-delete-{{ u['id'] }}" method="post" hidden>
+  <input type="hidden" name="action" value="delete_user">
+  <input type="hidden" name="user_id" value="{{ u['id'] }}">
+</form>
+{% endfor %}
+{% else %}
+<div class="empty-state"><span class="icon">&#128101;</span>No users yet.</div>
+{% endif %}
+{% endblock %}

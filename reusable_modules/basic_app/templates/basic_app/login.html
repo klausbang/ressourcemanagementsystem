@@ -1,0 +1,20 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}Log in{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <h2>Log in</h2>
+    <p class="card-subtitle">Enter your username to access the app.</p>
+
+    <form method="post">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

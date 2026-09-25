@@ -1,0 +1,137 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}Visual Planner{% endblock %}
+
+{% block content %}
+<style>
+  .vp-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .vp-queue { flex: 0 0 220px; }
+  .vp-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    cursor: grab;
+    box-shadow: var(--shadow-sm);
+  }
+  .vp-card.dragging { opacity: 0.4; }
+  .vp-card-project { font-size: 0.72rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .vp-card-test { font-weight: 700; }
+  .vp-card-tester { font-size: 0.82rem; color: var(--color-text-muted); }
+
+  .vp-grid-wrap { flex: 1 1 480px; }
+  table.vp-grid { table-layout: fixed; }
+  table.vp-grid th, table.vp-grid td { text-align: center; padding: 6px; }
+  .vp-label-col { text-align: left !important; min-width: 100px; width: 100px; font-weight: 700; vertical-align: middle; }
+  .vp-cell { min-width: 56px; width: 56px; height: 20px; }
+  .vp-cell-test { font-weight: 700; }
+  .vp-cell-tester { font-size: 0.8rem; color: var(--color-text-muted); }
+  .vp-cell:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .vp-dragover { background: var(--color-primary-light) !important; }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Planner</div>
+  <h1>Visual Planner</h1>
+  <p class="lead">Drag an unplanned test onto its own project's row, at the hour it should run - or click straight into any cell to type/edit it. First, editable-only prototype (proposal id 5): nothing here is saved to the database yet, so reloading the page resets it.</p>
+</div>
+
+<div class="vp-layout">
+  <div class="vp-queue">
+    <div class="card-title">Unplanned</div>
+    <div class="card-subtitle">Drag one of these onto its own project's row.</div>
+    <div id="vpQueue">
+      {% for item in unplanned %}
+      <div class="vp-card" draggable="true" data-project-index="{{ item.project_index }}">
+        <div class="vp-card-project">{{ projects[item.project_index].name }}</div>
+        <div class="vp-card-test">{{ item.test }}</div>
+        <div class="vp-card-tester">{{ item.tester }}</div>
+      </div>
+      {% else %}
+      <p class="section-help">Nothing unplanned.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="vp-grid-wrap table-wrap">
+    <table class="modern-table vp-grid">
+      <thead>
+        <tr>
+          <th class="vp-label-col">Project</th>
+          {% for h in hours %}
+          <th>{{ "%02d:00"|format(h) }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+        {% set pidx = loop.index0 %}
+        <tr>
+          <td class="vp-label-col" rowspan="2">{{ project.name }}</td>
+          {% for h in hours %}
+          {% set item = placed_by_project_hour.get((pidx, h)) %}
+          <td class="vp-cell vp-cell-test" contenteditable="true" data-project-index="{{ pidx }}" data-hour="{{ h }}">{{ item.test if item else "" }}</td>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for h in hours %}
+          {% set item = placed_by_project_hour.get((pidx, h)) %}
+          <td class="vp-cell vp-cell-tester" contenteditable="true" data-project-index="{{ pidx }}" data-hour="{{ h }}">{{ item.tester if item else "" }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  var queue = document.getElementById('vpQueue');
+  if (!queue) return;
+
+  var draggedCard = null;
+
+  queue.querySelectorAll('.vp-card').forEach(function (card) {
+    card.addEventListener('dragstart', function () {
+      draggedCard = card;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', function () {
+      card.classList.remove('dragging');
+    });
+  });
+
+  document.querySelectorAll('.vp-cell-test').forEach(function (cell) {
+    cell.addEventListener('dragover', function (e) {
+      if (!draggedCard) return;
+      if (cell.dataset.projectIndex !== draggedCard.dataset.projectIndex) return;
+      e.preventDefault();
+      cell.classList.add('vp-dragover');
+    });
+    cell.addEventListener('dragleave', function () {
+      cell.classList.remove('vp-dragover');
+    });
+    cell.addEventListener('drop', function (e) {
+      e.preventDefault();
+      cell.classList.remove('vp-dragover');
+      if (!draggedCard) return;
+      if (cell.dataset.projectIndex !== draggedCard.dataset.projectIndex) return;
+
+      var testerCell = document.querySelector(
+        '.vp-cell-tester[data-project-index="' + cell.dataset.projectIndex + '"][data-hour="' + cell.dataset.hour + '"]'
+      );
+      var testName = draggedCard.querySelector('.vp-card-test').textContent;
+      var testerName = draggedCard.querySelector('.vp-card-tester').textContent;
+
+      cell.textContent = testName;
+      if (testerCell) testerCell.textContent = testerName;
+
+      draggedCard.remove();
+      draggedCard = null;
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">SimpleVisualPlanner</div>
+  <h1>Dashboard</h1>
+  <p class="lead">This started as a minimal assembly of the basic_app, database, and proposals reusable modules; the Visual Planner is the first real domain feature built on top. More functionality will be added here later.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">What's working right now</div>
+  <div class="card-subtitle">Most of this comes straight from the reusable module library in <code>reusable_modules/</code>; the Visual Planner is this project's own first feature.</div>
+  <ul>
+    <li>Login/logout, session-based auth (<code>reusable_modules/basic_app</code>)</li>
+    <li>A shared SQLite database with pluggable, per-module schema (<code>reusable_modules/database</code>)</li>
+    <li>The floating "P" button, bottom-right, for submitting a proposal (<code>reusable_modules/proposals</code>)</li>
+    {% if current_role in ('planner', 'admin') %}
+    <li>The <a href="{{ url_for('planner.visual_planner') }}">Visual Planner</a> - drag unplanned tests onto a project/hour grid (editable prototype, not yet backed by the database)</li>
+    {% endif %}
+    {% if current_role == 'admin' %}
+    <li>An admin-only <a href="{{ url_for('proposals.admin_review') }}">Review Proposals</a> screen</li>
+    <li>An admin-only <a href="{{ url_for('user_admin') }}">User Admin</a> screen (admin/user/planner roles)</li>
+    {% endif %}
+  </ul>
+</div>
+{% endblock %}
