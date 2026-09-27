@@ -1,0 +1,84 @@
+{% if session.get('username') %}
+{% set path = request.path + ('?' + request.query_string.decode('utf-8') if request.query_string else '') %}
+{% set form_id = 'dialog' %}
+{% set form_values = {} %}
+<button type="button" id="proposalOpenBtn" title="Suggest an enhancement or report a bug"
+        style="position:fixed; right:20px; bottom:20px; width:44px; height:44px; border-radius:50%; z-index:60;
+               background:var(--color-primary); color:#fff; border:none; font-weight:700; font-size:1rem; cursor:pointer;
+               box-shadow:0 2px 8px rgba(0,0,0,0.25);">P</button>
+
+<dialog id="proposalDialog" style="border:none; border-radius:var(--radius-md); padding:20px; max-width:480px; width:90%;">
+  <div class="card-title" id="proposalDialogHandle" style="cursor:move; user-select:none;" title="Drag to move this window">&#8597; Suggest an enhancement or report a bug</div>
+  {% include "proposals/_form.html" %}
+  <form method="dialog" style="margin-top:8px;"><button type="submit" class="btn btn-ghost btn-sm">Cancel</button></form>
+</dialog>
+
+<script>
+  (function () {
+    var btn = document.getElementById('proposalOpenBtn');
+    var dlg = document.getElementById('proposalDialog');
+    if (btn && dlg && typeof dlg.showModal === 'function') {
+      btn.addEventListener('click', function () {
+        // Re-read the current URL at the moment "P" is clicked, rather than trusting
+        // only the value Jinja rendered at page load - a client-side tab switch (e.g. a
+        // CSS-only tab widget) never triggers a real navigation, so the server-rendered
+        // value would otherwise still say whichever tab/page was active on last load.
+        var pathInput = document.getElementById('proposal-path-dialog');
+        var pathLabel = document.getElementById('proposal-path-label-dialog');
+        var current = window.location.pathname + window.location.search;
+        if (pathInput) pathInput.value = current;
+        if (pathLabel) pathLabel.textContent = current;
+        dlg.showModal();
+      });
+    }
+  })();
+
+  // Make the dialog draggable by its title bar, so it can be moved out of the way of
+  // whatever part of the page it's covering while writing a proposal about that exact
+  // area. Self-contained here (rather than living in basic_app's app.js) since it only
+  // concerns this module's own dialog.
+  (function () {
+    var dialog = document.getElementById('proposalDialog');
+    var handle = document.getElementById('proposalDialogHandle');
+    if (!dialog || !handle) return;
+
+    var dragging = false;
+    var startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+    handle.addEventListener('pointerdown', function (e) {
+      dragging = true;
+      var rect = dialog.getBoundingClientRect();
+      // First drag: switch from the browser's centered auto-margin layout to an
+      // explicit fixed position matching where it currently is, so it doesn't jump.
+      dialog.style.margin = '0';
+      dialog.style.position = 'fixed';
+      dialog.style.left = rect.left + 'px';
+      dialog.style.top = rect.top + 'px';
+      startLeft = rect.left;
+      startTop = rect.top;
+      startX = e.clientX;
+      startY = e.clientY;
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      dialog.style.left = startLeft + (e.clientX - startX) + 'px';
+      dialog.style.top = startTop + (e.clientY - startY) + 'px';
+    });
+
+    function stopDragging() { dragging = false; }
+    handle.addEventListener('pointerup', stopDragging);
+    handle.addEventListener('pointercancel', stopDragging);
+
+    // Reset to the browser's default centered position each time the dialog reopens, so
+    // a drag doesn't leave it off-screen next time it's used.
+    dialog.addEventListener('close', function () {
+      dialog.style.position = '';
+      dialog.style.margin = '';
+      dialog.style.left = '';
+      dialog.style.top = '';
+    });
+  })();
+</script>
+{% endif %}

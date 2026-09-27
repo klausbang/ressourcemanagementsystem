@@ -1,0 +1,15 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}Submit a proposal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="eyebrow">Feedback</div>
+  <h1>Submit a proposal</h1>
+  <p class="lead">Suggest an enhancement, request a new feature, or report a bug. Most of the time you'll use the floating "P" button instead - this page is the same form, for when you land here directly (e.g. after a validation error, or with JavaScript disabled).</p>
+</div>
+<div class="card" style="max-width: 520px;">
+  {% set form_id = 'page' %}
+  {% include "proposals/_form.html" %}
+</div>
+{% endblock %}

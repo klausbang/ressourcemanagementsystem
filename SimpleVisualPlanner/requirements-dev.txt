@@ -1,0 +1,6 @@
+# Test-only dependencies (proposal id 7: "Create a test suite for release test", using
+# standard tools) - not needed to run the app itself, only to run its test suite.
+-r requirements.txt
+pytest>=8.0,<9.0
+pytest-html>=4.0,<5.0
+pytest-playwright>=0.5,<1.0

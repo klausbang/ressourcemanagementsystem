@@ -1,0 +1,81 @@
+{% extends "basic_app/base.html" %}
+
+{% block title %}Proposals{% endblock %}
+
+{% block content %}
+<style>
+  .group-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 12px; background: var(--color-surface); }
+  .group-card-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .group-card-title { font-weight: 700; }
+  .group-card-meta { color: var(--color-text-muted); font-size: 0.82rem; }
+</style>
+
+<div class="page-header">
+  <div class="eyebrow">Review</div>
+  <h1>Proposals</h1>
+  <p class="lead">Enhancement ideas, new-feature requests, and bug reports submitted from the "P" button, along with the exact page they were on when they submitted it (or marked General if it wasn't about that specific page).</p>
+</div>
+
+{% if proposals %}
+{% for p in proposals %}
+<div class="group-card">
+  <div class="group-card-head">
+    <div>
+      <div class="group-card-title">
+        #{{ p['id'] }} {{ p['title'] }}
+        {% if p['is_general'] %}<span class="badge">General</span>{% endif %}
+      </div>
+      <div class="group-card-meta">
+        {{ p['submitted_by_username'] or 'unknown user' }} &middot; {{ p['created_at'] }} &middot; page: <code>{{ p['path'] }}</code>
+      </div>
+    </div>
+    <form method="post">
+      <input type="hidden" name="action" value="delete_proposal">
+      <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+      <button type="submit" class="btn btn-danger btn-sm" data-confirm="Delete this proposal?">Delete</button>
+    </form>
+  </div>
+
+  <form method="post" class="form-grid">
+    <input type="hidden" name="action" value="update_proposal">
+    <input type="hidden" name="proposal_id" value="{{ p['id'] }}">
+    <div class="field" style="flex:1 1 100%;">
+      <label for="proposal-title-{{ p['id'] }}">Title</label>
+      <input type="text" id="proposal-title-{{ p['id'] }}" name="title" value="{{ p['title'] }}" required>
+    </div>
+    <div class="field" style="flex:1 1 100%;">
+      <label for="proposal-desc-{{ p['id'] }}">Description</label>
+      <textarea id="proposal-desc-{{ p['id'] }}" name="description" rows="3" style="width:100%;">{{ p['description'] or '' }}</textarea>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="is_general" value="1" {% if p['is_general'] %}checked{% endif %}> General</label>
+    </div>
+    <div class="field">
+      <label for="proposal-type-{{ p['id'] }}">Type</label>
+      <select id="proposal-type-{{ p['id'] }}" name="proposal_type">
+        {% for t in proposal_types %}
+        <option value="{{ t }}" {% if p['proposal_type'] == t %}selected{% endif %}>{{ t.replace('_', ' ')|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="proposal-status-{{ p['id'] }}">Status</label>
+      <select id="proposal-status-{{ p['id'] }}" name="status">
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if p['status'] == s %}selected{% endif %}>{{ s.replace('_', ' ')|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" style="flex:1 1 260px;">
+      <label for="proposal-comment-{{ p['id'] }}">Admin comment</label>
+      <input type="text" id="proposal-comment-{{ p['id'] }}" name="admin_comment" value="{{ p['admin_comment'] or '' }}">
+    </div>
+    <div class="field"><button type="submit" class="btn btn-secondary btn-sm">Save</button></div>
+  </form>
+  {% if p['updated_at'] %}<p class="section-help" style="margin:4px 0 0;">Last reviewed {{ p['updated_at'] }}</p>{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state"><span class="icon">&#128161;</span>No proposals submitted yet.</div>
+{% endif %}
+{% endblock %}

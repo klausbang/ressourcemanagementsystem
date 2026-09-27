@@ -5,7 +5,7 @@
 {% block content %}
 <style>
   .vp-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-  .vp-queue { flex: 0 0 220px; }
+  .vp-queue { flex: 0 0 240px; }
   .vp-card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -16,37 +16,93 @@
     box-shadow: var(--shadow-sm);
   }
   .vp-card.dragging { opacity: 0.4; }
-  .vp-card-project { font-size: 0.72rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .vp-card-meta { font-size: 0.72rem; color: var(--color-text-muted); margin-bottom: 4px; }
+  .vp-card-body { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; flex-wrap: wrap; }
   .vp-card-test { font-weight: 700; }
   .vp-card-tester { font-size: 0.82rem; color: var(--color-text-muted); }
+  .vp-card-duration { font-size: 0.78rem; color: var(--color-text-muted); font-family: monospace; }
+  [contenteditable="true"] { cursor: text; }
+  [contenteditable="true"]:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; background: var(--color-primary-light); }
 
-  .vp-grid-wrap { flex: 1 1 480px; }
-  table.vp-grid { table-layout: fixed; }
-  table.vp-grid th, table.vp-grid td { text-align: center; padding: 6px; }
-  .vp-label-col { text-align: left !important; min-width: 100px; width: 100px; font-weight: 700; vertical-align: middle; }
-  .vp-cell { min-width: 56px; width: 56px; height: 20px; }
-  .vp-cell-test { font-weight: 700; }
-  .vp-cell-tester { font-size: 0.8rem; color: var(--color-text-muted); }
-  .vp-cell:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-  .vp-dragover { background: var(--color-primary-light) !important; }
+  .vp-planner { flex: 1 1 520px; overflow-x: auto; }
+  .vp-hours-header { display: flex; margin-left: 140px; border-bottom: 1px solid var(--color-border); }
+  .vp-hour-label { flex: none; font-size: 0.7rem; color: var(--color-text-muted); padding: 2px 0 2px 2px; border-left: 1px solid var(--color-border); box-sizing: border-box; }
+
+  .vp-row { display: flex; border-bottom: 1px solid var(--color-border); align-items: stretch; }
+  .vp-row.vp-row-target { background: var(--color-primary-light); }
+  .vp-row.vp-row-flash { animation: vp-flash 1.4s ease; }
+  @keyframes vp-flash { 0%, 40% { background: var(--color-warning-light); } 100% { background: transparent; } }
+
+  .vp-row-label { flex: 0 0 140px; width: 140px; padding: 4px 8px; overflow: hidden; }
+  .vp-row-project { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vp-row-meta { font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .vp-band {
+    position: relative;
+    flex: none;
+    height: 40px;
+    overflow: hidden;
+    background-image: repeating-linear-gradient(to right,
+      var(--color-border) 0, var(--color-border) 1px,
+      transparent 1px, transparent {{ slot_width * slots_per_hour }}px);
+    border-left: 1px solid var(--color-border);
+  }
+  .vp-band::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    border-top: 1px dashed var(--color-border);
+  }
+  .vp-band-placeholder { background-color: var(--color-bg); }
+  .vp-band.vp-dragover-ok { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+  .vp-block {
+    position: absolute;
+    top: 2px; bottom: 2px;
+    border-radius: 4px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 0.7rem;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 4px;
+    box-sizing: border-box;
+  }
+  .vp-block.dragging { opacity: 0.4; }
+  .vp-block-test { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vp-block-tester { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vp-block [contenteditable="true"]:focus { background: rgba(255, 255, 255, 0.25); outline: none; }
+
+  .vp-placeholder-row .vp-row-label { display: flex; align-items: center; font-size: 0.72rem; color: var(--color-text-muted); font-style: italic; }
+
+  #vpQueue.vp-dragover-ok { outline: 2px dashed var(--color-primary); outline-offset: 4px; border-radius: var(--radius-md); }
 </style>
 
 <div class="page-header">
   <div class="eyebrow">Planner</div>
   <h1>Visual Planner</h1>
-  <p class="lead">Drag an unplanned test onto its own project's row, at the hour it should run - or click straight into any cell to type/edit it. First, editable-only prototype (proposal id 5): nothing here is saved to the database yet, so reloading the page resets it.</p>
+  <p class="lead">Drag an unplanned test onto its own project's row - or onto "New project" if it isn't listed yet - at the hour it should run; the block's width follows its duration. An already-placed test can be dragged to a new time, or back into the Unplanned list to unschedule it. Every field is editable by clicking into it. Still a prototype (proposal id 5, extended by id 6): nothing here is saved to the database, so reloading the page resets it.</p>
 </div>
 
 <div class="vp-layout">
   <div class="vp-queue">
     <div class="card-title">Unplanned</div>
-    <div class="card-subtitle">Drag one of these onto its own project's row.</div>
+    <div class="card-subtitle">Drag one onto its project's row - or edit it right here first.</div>
     <div id="vpQueue">
       {% for item in unplanned %}
-      <div class="vp-card" draggable="true" data-project-index="{{ item.project_index }}">
-        <div class="vp-card-project">{{ projects[item.project_index].name }}</div>
-        <div class="vp-card-test">{{ item.test }}</div>
-        <div class="vp-card-tester">{{ item.tester }}</div>
+      <div class="vp-card" draggable="true">
+        <div class="vp-card-project" contenteditable="true">{{ item.project }}</div>
+        <div class="vp-card-meta">
+          <span class="vp-card-customer" contenteditable="true">{{ item.customer }}</span> &middot;
+          <span class="vp-card-eut" contenteditable="true">{{ item.eut }}</span>
+        </div>
+        <div class="vp-card-body">
+          <span class="vp-card-test" contenteditable="true">{{ item.test }}</span>
+          <span class="vp-card-tester" contenteditable="true">{{ item.tester }}</span>
+          <span class="vp-card-duration" contenteditable="true">{{ item.duration }}</span>
+        </div>
       </div>
       {% else %}
       <p class="section-help">Nothing unplanned.</p>
@@ -54,84 +110,272 @@
     </div>
   </div>
 
-  <div class="vp-grid-wrap table-wrap">
-    <table class="modern-table vp-grid">
-      <thead>
-        <tr>
-          <th class="vp-label-col">Project</th>
-          {% for h in hours %}
-          <th>{{ "%02d:00"|format(h) }}</th>
+  <div class="vp-planner">
+    <div class="vp-hours-header">
+      {% for h in hours %}
+      <div class="vp-hour-label" style="width: {{ slot_width * slots_per_hour }}px;">{{ "%02d:00"|format(h) }}</div>
+      {% endfor %}
+    </div>
+
+    <div id="vpRows">
+      {% for project in projects %}
+      <div class="vp-row" data-project="{{ project.name }}" data-customer="{{ project.customer }}" data-eut="{{ project.eut }}">
+        <div class="vp-row-label" title="{{ project.name }} - {{ project.customer }} - {{ project.eut }}">
+          <div class="vp-row-project">{{ project.name }}</div>
+          <div class="vp-row-meta">{{ project.customer }} &middot; {{ project.eut }}</div>
+        </div>
+        <div class="vp-band" style="width: {{ total_slots * slot_width }}px;">
+          {% for t in project.placed %}
+          <div class="vp-block" draggable="true" data-duration="{{ t.duration }}"
+               style="left: {{ t.slot_offset * slot_width }}px; width: {{ t.slot_span * slot_width }}px;">
+            <div class="vp-block-test" contenteditable="true">{{ t.test }}</div>
+            <div class="vp-block-tester" contenteditable="true">{{ t.tester }}</div>
+          </div>
           {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for project in projects %}
-        {% set pidx = loop.index0 %}
-        <tr>
-          <td class="vp-label-col" rowspan="2">{{ project.name }}</td>
-          {% for h in hours %}
-          {% set item = placed_by_project_hour.get((pidx, h)) %}
-          <td class="vp-cell vp-cell-test" contenteditable="true" data-project-index="{{ pidx }}" data-hour="{{ h }}">{{ item.test if item else "" }}</td>
-          {% endfor %}
-        </tr>
-        <tr>
-          {% for h in hours %}
-          {% set item = placed_by_project_hour.get((pidx, h)) %}
-          <td class="vp-cell vp-cell-tester" contenteditable="true" data-project-index="{{ pidx }}" data-hour="{{ h }}">{{ item.tester if item else "" }}</td>
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="vp-row vp-placeholder-row" data-project="">
+        <div class="vp-row-label">+ New project</div>
+        <div class="vp-band vp-band-placeholder" style="width: {{ total_slots * slot_width }}px;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 (function () {
-  var queue = document.getElementById('vpQueue');
-  if (!queue) return;
+  var SLOT_WIDTH = {{ slot_width }};
+  var TOTAL_SLOTS = {{ total_slots }};
+  var rowsEl = document.getElementById('vpRows');
+  var queueEl = document.getElementById('vpQueue');
+  if (!rowsEl || !queueEl) return;
 
-  var draggedCard = null;
+  var dragged = null;            // the DOM element being dragged (a .vp-card or a .vp-block)
+  var draggedKind = null;        // "card" | "block"
+  var draggedData = null;        // {project, customer, eut, test, tester, duration}
 
-  queue.querySelectorAll('.vp-card').forEach(function (card) {
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : s;
+    return div.innerHTML;
+  }
+
+  function readCardData(card) {
+    return {
+      project: card.querySelector('.vp-card-project').textContent.trim(),
+      customer: card.querySelector('.vp-card-customer').textContent.trim(),
+      eut: card.querySelector('.vp-card-eut').textContent.trim(),
+      test: card.querySelector('.vp-card-test').textContent.trim(),
+      tester: card.querySelector('.vp-card-tester').textContent.trim(),
+      duration: card.querySelector('.vp-card-duration').textContent.trim(),
+    };
+  }
+
+  function readBlockData(block, row) {
+    return {
+      project: row.dataset.project,
+      customer: row.dataset.customer,
+      eut: row.dataset.eut,
+      test: block.querySelector('.vp-block-test').textContent.trim(),
+      tester: block.querySelector('.vp-block-tester').textContent.trim(),
+      duration: block.dataset.duration,
+    };
+  }
+
+  function durationToSlots(duration) {
+    var parts = (duration || '').split(':');
+    var hh = parseInt(parts[0], 10);
+    var mm = parseInt(parts[1], 10);
+    if (isNaN(hh)) hh = 0;
+    if (isNaN(mm)) mm = 0;
+    var slots = Math.round((hh * 60 + mm) / 15);
+    return Math.max(1, slots);
+  }
+
+  function findRowByProject(project) {
+    var rows = rowsEl.querySelectorAll('.vp-row:not(.vp-placeholder-row)');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.project === project) return rows[i];
+    }
+    return null;
+  }
+
+  function highlightTargetForDrag() {
+    var row = findRowByProject(draggedData.project);
+    if (row) {
+      row.classList.add('vp-row-target');
+    } else {
+      var placeholder = rowsEl.querySelector('.vp-placeholder-row');
+      if (placeholder) placeholder.classList.add('vp-row-target');
+    }
+  }
+  function clearHighlights() {
+    rowsEl.querySelectorAll('.vp-row-target').forEach(function (r) { r.classList.remove('vp-row-target'); });
+  }
+  function flashRow(row) {
+    row.classList.add('vp-row-flash');
+    setTimeout(function () { row.classList.remove('vp-row-flash'); }, 1450);
+  }
+
+  function makeCard(data) {
+    var card = document.createElement('div');
+    card.className = 'vp-card';
+    card.draggable = true;
+    card.innerHTML =
+      '<div class="vp-card-project" contenteditable="true">' + escapeHtml(data.project) + '</div>' +
+      '<div class="vp-card-meta">' +
+        '<span class="vp-card-customer" contenteditable="true">' + escapeHtml(data.customer) + '</span> &middot; ' +
+        '<span class="vp-card-eut" contenteditable="true">' + escapeHtml(data.eut) + '</span>' +
+      '</div>' +
+      '<div class="vp-card-body">' +
+        '<span class="vp-card-test" contenteditable="true">' + escapeHtml(data.test) + '</span>' +
+        '<span class="vp-card-tester" contenteditable="true">' + escapeHtml(data.tester) + '</span>' +
+        '<span class="vp-card-duration" contenteditable="true">' + escapeHtml(data.duration) + '</span>' +
+      '</div>';
+    wireCard(card);
+    return card;
+  }
+
+  function makeRow(data) {
+    var row = document.createElement('div');
+    row.className = 'vp-row';
+    row.dataset.project = data.project;
+    row.dataset.customer = data.customer;
+    row.dataset.eut = data.eut;
+    var titleText = data.project + ' - ' + data.customer + ' - ' + data.eut;
+    row.innerHTML =
+      '<div class="vp-row-label" title="' + escapeHtml(titleText) + '">' +
+        '<div class="vp-row-project">' + escapeHtml(data.project) + '</div>' +
+        '<div class="vp-row-meta">' + escapeHtml(data.customer) + ' &middot; ' + escapeHtml(data.eut) + '</div>' +
+      '</div>' +
+      '<div class="vp-band" style="width:' + (TOTAL_SLOTS * SLOT_WIDTH) + 'px;"></div>';
+    wireBand(row.querySelector('.vp-band'));
+    return row;
+  }
+
+  function makeBlock(data, leftSlot) {
+    var block = document.createElement('div');
+    block.className = 'vp-block';
+    block.draggable = true;
+    block.dataset.duration = data.duration;
+    var span = durationToSlots(data.duration);
+    block.style.left = (leftSlot * SLOT_WIDTH) + 'px';
+    block.style.width = (span * SLOT_WIDTH) + 'px';
+    block.innerHTML =
+      '<div class="vp-block-test" contenteditable="true">' + escapeHtml(data.test) + '</div>' +
+      '<div class="vp-block-tester" contenteditable="true">' + escapeHtml(data.tester) + '</div>';
+    wireBlock(block);
+    return block;
+  }
+
+  function wireCard(card) {
     card.addEventListener('dragstart', function () {
-      draggedCard = card;
+      dragged = card;
+      draggedKind = 'card';
+      draggedData = readCardData(card);
       card.classList.add('dragging');
+      highlightTargetForDrag();
     });
     card.addEventListener('dragend', function () {
       card.classList.remove('dragging');
+      clearHighlights();
+      dragged = null; draggedKind = null; draggedData = null;
     });
-  });
+  }
 
-  document.querySelectorAll('.vp-cell-test').forEach(function (cell) {
-    cell.addEventListener('dragover', function (e) {
-      if (!draggedCard) return;
-      if (cell.dataset.projectIndex !== draggedCard.dataset.projectIndex) return;
+  function wireBlock(block) {
+    block.addEventListener('dragstart', function (e) {
+      e.stopPropagation();
+      var row = block.closest('.vp-row');
+      dragged = block;
+      draggedKind = 'block';
+      draggedData = readBlockData(block, row);
+      block.classList.add('dragging');
+      highlightTargetForDrag();
+    });
+    block.addEventListener('dragend', function () {
+      block.classList.remove('dragging');
+      clearHighlights();
+      dragged = null; draggedKind = null; draggedData = null;
+    });
+  }
+
+  function dropIsValid(row) {
+    if (!dragged || !draggedData) return false;
+    if (row.classList.contains('vp-placeholder-row')) {
+      return !findRowByProject(draggedData.project);
+    }
+    return row.dataset.project === draggedData.project;
+  }
+
+  function slotFromEvent(e, band) {
+    var rect = band.getBoundingClientRect();
+    var slot = Math.floor((e.clientX - rect.left) / SLOT_WIDTH);
+    return Math.max(0, Math.min(TOTAL_SLOTS - 1, slot));
+  }
+
+  function wireBand(band) {
+    band.addEventListener('dragover', function (e) {
+      var row = band.closest('.vp-row');
+      if (!dropIsValid(row)) return;
       e.preventDefault();
-      cell.classList.add('vp-dragover');
+      band.classList.add('vp-dragover-ok');
     });
-    cell.addEventListener('dragleave', function () {
-      cell.classList.remove('vp-dragover');
+    band.addEventListener('dragleave', function () {
+      band.classList.remove('vp-dragover-ok');
     });
-    cell.addEventListener('drop', function (e) {
+    band.addEventListener('drop', function (e) {
       e.preventDefault();
-      cell.classList.remove('vp-dragover');
-      if (!draggedCard) return;
-      if (cell.dataset.projectIndex !== draggedCard.dataset.projectIndex) return;
+      band.classList.remove('vp-dragover-ok');
+      var row = band.closest('.vp-row');
+      if (!dropIsValid(row)) return;
 
-      var testerCell = document.querySelector(
-        '.vp-cell-tester[data-project-index="' + cell.dataset.projectIndex + '"][data-hour="' + cell.dataset.hour + '"]'
-      );
-      var testName = draggedCard.querySelector('.vp-card-test').textContent;
-      var testerName = draggedCard.querySelector('.vp-card-tester').textContent;
+      var isPlaceholder = row.classList.contains('vp-placeholder-row');
+      var targetRow = isPlaceholder ? makeRow(draggedData) : row;
+      if (isPlaceholder) rowsEl.insertBefore(targetRow, row);
 
-      cell.textContent = testName;
-      if (testerCell) testerCell.textContent = testerName;
+      var targetBand = targetRow.querySelector('.vp-band');
+      var span = durationToSlots(draggedData.duration);
+      var slot = Math.max(0, Math.min(TOTAL_SLOTS - span, slotFromEvent(e, band)));
 
-      draggedCard.remove();
-      draggedCard = null;
+      if (draggedKind === 'block') {
+        dragged.style.left = (slot * SLOT_WIDTH) + 'px';
+        if (dragged.parentElement !== targetBand) targetBand.appendChild(dragged);
+      } else {
+        targetBand.appendChild(makeBlock(draggedData, slot));
+        dragged.remove();
+      }
+
+      if (isPlaceholder) flashRow(targetRow);
+      clearHighlights();
     });
-  });
+  }
+
+  function wireQueueDropZone() {
+    queueEl.addEventListener('dragover', function (e) {
+      if (draggedKind !== 'block') return;
+      e.preventDefault();
+      queueEl.classList.add('vp-dragover-ok');
+    });
+    queueEl.addEventListener('dragleave', function () {
+      queueEl.classList.remove('vp-dragover-ok');
+    });
+    queueEl.addEventListener('drop', function (e) {
+      e.preventDefault();
+      queueEl.classList.remove('vp-dragover-ok');
+      if (draggedKind !== 'block' || !dragged) return;
+      queueEl.appendChild(makeCard(draggedData));
+      dragged.remove();
+      clearHighlights();
+    });
+  }
+
+  queueEl.querySelectorAll('.vp-card').forEach(wireCard);
+  rowsEl.querySelectorAll('.vp-block').forEach(wireBlock);
+  rowsEl.querySelectorAll('.vp-band').forEach(wireBand);
+  wireQueueDropZone();
 })();
 </script>
 {% endblock %}

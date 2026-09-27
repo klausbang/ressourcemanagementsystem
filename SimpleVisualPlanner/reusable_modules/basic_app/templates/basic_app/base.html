@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}App{% endblock %} &middot; {{ config.get('BASIC_APP_BRAND', 'App') }}</title>
+  <link rel="stylesheet" href="{{ url_for('auth.static', filename='basic_app/css/app.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ basic_app_home_url }}">
+        <span class="brand-mark">{{ config.get('BASIC_APP_BRAND', 'App') }}</span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+
+      <nav class="main-nav" id="mainNav">
+        {% for item in basic_app_nav_items %}
+        <a href="{{ url_for(item.endpoint) }}" class="{{ 'active' if request.endpoint == item.endpoint }}">{{ item.label }}{% if item.badge_count %}<span class="nav-badge">{{ item.badge_count }}</span>{% endif %}</a>
+        {% endfor %}
+      </nav>
+
+      <div class="topbar-actions">
+        {% if session.get('username') %}
+        <span class="user-chip">{{ session.get('username') }} <span class="badge">{{ session.get('role') }}</span></span>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Log out</a>
+        {% else %}
+        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.login') }}">Log in</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <div class="flash-stack">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="flash flash-{{ category }}" role="status">
+        <span>{{ message }}</span>
+        <button class="flash-close" type="button" aria-label="Dismiss">&#10005;</button>
+      </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main id="main-content" class="page">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>Built with the <code>basic_app</code>/<code>database</code>/<code>proposals</code> reusable module library.</p>
+  </footer>
+
+  {% block floating_button %}{% include "proposals/floating_button.html" ignore missing %}{% endblock %}
+
+  <script src="{{ url_for('auth.static', filename='basic_app/js/app.js') }}"></script>
+</body>
+</html>

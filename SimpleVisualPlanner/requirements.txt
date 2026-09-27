@@ -1,1 +1,5 @@
 Flask>=3.0,<4.0
+# Only imported when app.config["DATABASE"] is a postgres:// URL (see
+# reusable_modules/database/__init__.py:get_db()) - required on Vercel, where the
+# database is Postgres; a plain local SQLite run (python run.py) never touches this.
+psycopg[binary]>=3.1,<4.0
